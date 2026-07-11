@@ -1,0 +1,15 @@
+# build output
+main.js
+*.map
+
+# dependencies
+node_modules/
+
+# per-vault runtime files — these live next to the plugin inside a vault,
+# never in this repo. local.json is machine-specific by design.
+data.json
+local.json
+
+# OS noise
+.DS_Store
+Thumbs.db

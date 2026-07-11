@@ -1,0 +1,136 @@
+/* ---------- Board ---------- */
+
+.dispatch-board-container {
+	overflow-x: auto;
+	padding: 0;
+}
+
+.dispatch-board {
+	display: flex;
+	gap: var(--size-4-3);
+	align-items: flex-start;
+	padding: var(--size-4-3);
+	min-height: 100%;
+}
+
+.dispatch-column {
+	flex: 0 0 260px;
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+	background: var(--background-secondary);
+	border-radius: var(--radius-m);
+	padding: var(--size-4-2);
+	max-height: calc(100vh - 120px);
+}
+
+.dispatch-column-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	font-weight: 600;
+	padding: 0 var(--size-4-1);
+}
+
+.dispatch-column-count {
+	color: var(--text-muted);
+	font-weight: 400;
+	font-size: var(--font-ui-smaller);
+}
+
+.dispatch-cards {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+	min-height: 40px;
+	overflow-y: auto;
+}
+
+.dispatch-card {
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	padding: var(--size-4-2);
+	cursor: grab;
+}
+
+.dispatch-card:hover {
+	border-color: var(--interactive-accent);
+}
+
+.dispatch-card-title {
+	font-size: var(--font-ui-small);
+}
+
+.dispatch-card-badges {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: 6px;
+}
+
+.dispatch-badge {
+	font-size: var(--font-ui-smaller);
+	background: var(--background-modifier-hover);
+	border-radius: 999px;
+	padding: 1px 8px;
+	color: var(--text-muted);
+}
+
+.dispatch-drop-active {
+	outline: 2px dashed var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+.dispatch-board-empty {
+	padding: var(--size-4-6);
+	color: var(--text-muted);
+}
+
+/* ---------- Chips ---------- */
+
+.dispatch-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border-radius: 999px;
+	padding: 4px 14px;
+	cursor: pointer;
+	background: var(--interactive-normal);
+}
+
+.dispatch-chip:hover {
+	background: var(--interactive-hover);
+}
+
+.dispatch-chip-icon {
+	display: flex;
+	color: var(--interactive-accent);
+}
+
+.dispatch-chip-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.dispatch-chip-error {
+	color: var(--text-error);
+	font-size: var(--font-ui-small);
+}
+
+/* ---------- Confirm modal ---------- */
+
+.dispatch-confirm-label {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin-bottom: var(--size-4-2);
+}
+
+.dispatch-confirm-command {
+	white-space: pre-wrap;
+	word-break: break-all;
+	background: var(--background-secondary);
+	padding: var(--size-4-2);
+	border-radius: var(--radius-s);
+	user-select: text;
+}
