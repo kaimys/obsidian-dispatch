@@ -82,6 +82,18 @@
 	outline-offset: -2px;
 }
 
+.dispatch-card.dispatch-insert-before {
+	box-shadow: 0 -3px 0 0 var(--interactive-accent);
+}
+
+.dispatch-cards.dispatch-insert-end::after {
+	content: "";
+	display: block;
+	flex: 0 0 3px;
+	background: var(--interactive-accent);
+	border-radius: 2px;
+}
+
 .dispatch-board-empty {
 	padding: var(--size-4-6);
 	color: var(--text-muted);

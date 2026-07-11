@@ -34,6 +34,12 @@ export interface BoardSettings {
 	sourceFolders: string[];
 	/** Frontmatter property that holds the column value. */
 	statusProperty: string;
+	/**
+	 * Frontmatter property that stores the manual sort position within a
+	 * column (numeric, written on drag & drop). Empty string disables manual
+	 * ordering — cards are then sorted by title and drops only change status.
+	 */
+	orderProperty: string;
 	/** Ordered list of columns. Unknown statuses get appended as extra columns. */
 	columns: ColumnConfig[];
 	/** Frontmatter property shown before the file name on each card (e.g. a ticket id). */
@@ -74,6 +80,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 	board: {
 		sourceFolders: [],
 		statusProperty: "status",
+		orderProperty: "rank",
 		columns: [{ value: "Backlog" }, { value: "In progress" }, { value: "Done" }],
 		titleProperty: "id",
 		badgeProperties: ["priority", "type"],

@@ -26,10 +26,15 @@ Configure in *Settings → Dispatch*:
 
 - **Source folders** — vault folders scanned for cards (one per line)
 - **Status property** — the frontmatter property that holds the column value (default `status`)
+- **Order property** — the frontmatter property that holds the manual sort position within a column (default `rank`; empty disables manual ordering)
 - **Columns** — ordered list, one per line (`value` or `value | Display label`). Statuses found in notes but not configured appear as extra columns at the end.
 - **Title / badge properties** — what each card shows (e.g. ticket `id` as title prefix, `priority` and `type` as badges)
 
-Open the board via the ribbon icon or the command *Dispatch: Open board*. Click a card to open the note; drag it to a column to change its status.
+Open the board via the ribbon icon or the command *Dispatch: Open board*. Click a card to open the note; drag it to a column to change its status, or within a column to change its position (typically used as a priority order).
+
+### Sort order within a column
+
+Card order is data, so it lives in the notes and syncs with the vault: dropping a card writes a numeric position into the order property. Ranks are assigned with gaps (1024 apart) and inserts take the midpoint, so a reorder normally rewrites **only the moved note**. When a column contains unranked cards or a gap is exhausted, the whole column is renormalized once (only notes whose value changes are written). Cards without a rank sort below ranked ones, alphabetically.
 
 ### Post-drop hook
 
@@ -111,7 +116,7 @@ Symlink or copy the repo folder into a test vault's `.obsidian/plugins/dispatch/
 
 - Multiple named boards
 - Column WIP limits and colors
-- Card sorting/filtering inside columns
+- Card filtering
 - Chip runs with inline output (headless mode) instead of opening a terminal
 
 ## License

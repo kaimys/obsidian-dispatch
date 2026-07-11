@@ -40,6 +40,18 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Order property")
+			.setDesc(
+				"Frontmatter property storing the manual sort position within a column (written on drag & drop). Leave empty to disable manual ordering."
+			)
+			.addText((t) =>
+				t.setValue(this.plugin.shared.board.orderProperty).onChange(async (v) => {
+					this.plugin.shared.board.orderProperty = v.trim();
+					await this.plugin.saveShared();
+				})
+			);
+
+		new Setting(containerEl)
 			.setName("Columns")
 			.setDesc(
 				"One column per line: the status value, optionally followed by | and a display label."
