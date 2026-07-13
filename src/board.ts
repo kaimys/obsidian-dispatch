@@ -13,6 +13,8 @@ type BoardMode = "status" | "milestone";
 interface Card {
 	file: TFile;
 	status: string;
+	/** Display label of the card's status (column label if configured). */
+	statusLabel: string;
 	/** Position of the card's status in the configured column order (for milestone sorting). */
 	statusIdx: number;
 	title: string;
@@ -97,7 +99,10 @@ export class BoardView extends ItemView {
 			this.plugin.shared.board;
 		const { versionProperty, sizeProperty } = this.plugin.shared.milestones;
 		const statusMeta = new Map(
-			columns.map((c, i) => [c.value, { idx: i, progress: c.progress, excluded: c.excluded === true }])
+			columns.map((c, i) => [
+				c.value,
+				{ idx: i, label: c.label, progress: c.progress, excluded: c.excluded === true },
+			])
 		);
 		const folders = sourceFolders
 			.map((f) => f.replace(/^\/+|\/+$/g, ""))
@@ -147,6 +152,7 @@ export class BoardView extends ItemView {
 			return {
 				file,
 				status,
+				statusLabel: meta?.label ?? (status || "(no status)"),
 				statusIdx: meta?.idx ?? Number.MAX_SAFE_INTEGER,
 				title,
 				badges,
@@ -182,7 +188,7 @@ export class BoardView extends ItemView {
 				this.render();
 			});
 		};
-		addTab("status", "Status");
+		addTab("status", "Kanban");
 		addTab("milestone", "Milestones");
 
 		if (this.plugin.shared.board.sourceFolders.length === 0) {
@@ -274,7 +280,7 @@ export class BoardView extends ItemView {
 
 			const list = colEl.createDiv({ cls: "dispatch-cards" });
 			this.makeVersionDropTarget(colEl, col);
-			for (const card of colCards) this.renderCard(list, card);
+			for (const card of colCards) this.renderCard(list, card, true);
 		}
 	}
 
@@ -334,11 +340,14 @@ export class BoardView extends ItemView {
 
 	// ---------------------------------------------------------------- cards
 
-	private renderCard(parent: HTMLElement, card: Card): void {
+	private renderCard(parent: HTMLElement, card: Card, showStatus = false): void {
 		const el = parent.createDiv({ cls: "dispatch-card", attr: { draggable: "true" } });
 		el.createDiv({ cls: "dispatch-card-title", text: card.title });
-		if (card.badges.length > 0) {
+		if (showStatus || card.badges.length > 0) {
 			const badges = el.createDiv({ cls: "dispatch-card-badges" });
+			if (showStatus) {
+				badges.createSpan({ cls: "dispatch-badge dispatch-badge-status", text: card.statusLabel });
+			}
 			for (const badge of card.badges) {
 				badges.createSpan({ cls: "dispatch-badge", text: badge });
 			}

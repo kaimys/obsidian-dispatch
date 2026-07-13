@@ -38,7 +38,7 @@ Card order is data, so it lives in the notes and syncs with the vault: dropping 
 
 ## Milestones
 
-The board has a second tab: **Milestones** — a roadmap view where columns are target versions and dragging a card between columns updates the version property immediately.
+The board has two tabs — **Kanban** (status columns) and **Milestones** — a roadmap view where columns are target versions and dragging a card between columns updates the version property immediately.
 
 - Columns are keyed by **major.minor**: `v1.2.0`, `1.2.0` and `1.2.1` all group into the column `1.2`, so inconsistent formatting doesn't split a milestone. Dropping writes the canonical value from *Planned versions* (or the plain `major.minor` for auto-discovered columns); dropping on *(no version)* removes the property.
 - **Planned versions** (settings) are always shown, even when empty — that's how you plan a future release before any ticket is assigned.
