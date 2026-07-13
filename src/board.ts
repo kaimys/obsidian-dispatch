@@ -33,6 +33,8 @@ interface MilestoneColumn {
 	display: string;
 	/** Exact value a drop writes into the version property ("" = remove it). */
 	writeValue: string;
+	/** Position in plannedVersions (discovered columns get a large index). */
+	order: number;
 }
 
 /** Normalize a version value to its major.minor key ("v1.2.0" → "1.2"). */
@@ -41,13 +43,16 @@ function versionKey(raw: string): string {
 	return m ? `${m[1]}.${m[2]}` : raw.trim();
 }
 
-function compareVersionKeys(a: string, b: string): number {
-	const pa = a.match(/^(\d+)\.(\d+)$/);
-	const pb = b.match(/^(\d+)\.(\d+)$/);
+/**
+ * Special (non-version) columns like "Rejected" or "Icebox" sort leftmost, in
+ * their plannedVersions order; semver columns follow, ascending.
+ */
+function compareMilestoneColumns(a: MilestoneColumn, b: MilestoneColumn): number {
+	const pa = a.key.match(/^(\d+)\.(\d+)$/);
+	const pb = b.key.match(/^(\d+)\.(\d+)$/);
+	if (!pa !== !pb) return pa ? 1 : -1;
 	if (pa && pb) return Number(pa[1]) - Number(pb[1]) || Number(pa[2]) - Number(pb[2]);
-	if (pa) return -1;
-	if (pb) return 1;
-	return a.localeCompare(b);
+	return a.order - b.order || a.key.localeCompare(b.key);
 }
 
 function compareRanks(a?: number, b?: number): number {
@@ -237,17 +242,18 @@ export class BoardView extends ItemView {
 		const cards = this.collectCards();
 
 		const columns = new Map<string, MilestoneColumn>();
-		for (const v of ms.plannedVersions) {
+		ms.plannedVersions.forEach((v, i) => {
 			const key = versionKey(v);
-			if (key && !columns.has(key)) columns.set(key, { key, display: key, writeValue: v });
-		}
+			if (key && !columns.has(key)) columns.set(key, { key, display: key, writeValue: v, order: i });
+		});
 		for (const card of cards) {
 			if (!card.version) continue;
 			const key = versionKey(card.version);
-			if (!columns.has(key)) columns.set(key, { key, display: key, writeValue: key });
+			if (!columns.has(key))
+				columns.set(key, { key, display: key, writeValue: key, order: Number.MAX_SAFE_INTEGER });
 		}
-		const ordered = [...columns.values()].sort((a, b) => compareVersionKeys(a.key, b.key));
-		ordered.push({ key: "", display: "(no version)", writeValue: "" });
+		const ordered = [...columns.values()].sort(compareMilestoneColumns);
+		ordered.push({ key: "", display: "(no version)", writeValue: "", order: Number.MAX_SAFE_INTEGER });
 
 		const board = root.createDiv({ cls: "dispatch-board" });
 		for (const col of ordered) {
