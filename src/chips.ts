@@ -25,15 +25,18 @@ interface ChipSpec {
 export function registerChipProcessor(plugin: DispatchPlugin): void {
 	plugin.registerMarkdownCodeBlockProcessor("dispatch", (source, el, ctx) => {
 		let spec: ChipSpec | null = null;
+		let parseError = "";
 		try {
 			spec = parseYaml(source) as ChipSpec;
-		} catch {
-			// handled below
+		} catch (e) {
+			parseError = e instanceof Error ? e.message : String(e);
 		}
 		if (!spec || typeof spec !== "object" || typeof spec.prompt !== "string") {
 			el.createDiv({
 				cls: "dispatch-chip-error",
-				text: "Dispatch chip: block must be YAML with at least a `prompt` key.",
+				text: parseError
+					? `Dispatch chip: invalid YAML — ${parseError} (hint: quote values containing ":" or "#").`
+					: "Dispatch chip: block must be YAML with at least a `prompt` key.",
 			});
 			return;
 		}
