@@ -55,6 +55,7 @@ export default class DispatchPlugin extends Plugin {
 		const data = ((await this.loadData()) ?? {}) as Partial<SharedSettings>;
 		this.shared = {
 			board: { ...DEFAULT_SHARED.board, ...data.board },
+			milestones: { ...DEFAULT_SHARED.milestones, ...data.milestones },
 			chips: { ...DEFAULT_SHARED.chips, ...data.chips },
 		};
 

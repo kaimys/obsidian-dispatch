@@ -8,16 +8,56 @@ export const VIEW_TYPE_BOARD = "dispatch-board";
 /** Spacing between freshly assigned ranks — leaves room for midpoint inserts. */
 const RANK_GAP = 1024;
 
+type BoardMode = "status" | "milestone";
+
 interface Card {
 	file: TFile;
 	status: string;
+	/** Position of the card's status in the configured column order (for milestone sorting). */
+	statusIdx: number;
 	title: string;
 	badges: string[];
 	rank?: number;
+	version: string;
+	size: number;
+	/** Completion contribution (0–100) of the card's status, per column config. */
+	progress?: number;
+	excludedFromProgress: boolean;
+}
+
+interface MilestoneColumn {
+	/** Normalized major.minor key ("" = no version). */
+	key: string;
+	display: string;
+	/** Exact value a drop writes into the version property ("" = remove it). */
+	writeValue: string;
+}
+
+/** Normalize a version value to its major.minor key ("v1.2.0" → "1.2"). */
+function versionKey(raw: string): string {
+	const m = raw.trim().match(/^[vV]?(\d+)\.(\d+)/);
+	return m ? `${m[1]}.${m[2]}` : raw.trim();
+}
+
+function compareVersionKeys(a: string, b: string): number {
+	const pa = a.match(/^(\d+)\.(\d+)$/);
+	const pb = b.match(/^(\d+)\.(\d+)$/);
+	if (pa && pb) return Number(pa[1]) - Number(pb[1]) || Number(pa[2]) - Number(pb[2]);
+	if (pa) return -1;
+	if (pb) return 1;
+	return a.localeCompare(b);
+}
+
+function compareRanks(a?: number, b?: number): number {
+	if (a !== undefined && b !== undefined) return a - b;
+	if (a !== undefined) return -1;
+	if (b !== undefined) return 1;
+	return 0;
 }
 
 export class BoardView extends ItemView {
 	private plugin: DispatchPlugin;
+	private mode: BoardMode = "status";
 	private requestRender = debounce(() => this.render(), 250, true);
 
 	constructor(leaf: WorkspaceLeaf, plugin: DispatchPlugin) {
@@ -50,9 +90,15 @@ export class BoardView extends ItemView {
 		this.requestRender();
 	}
 
+	// ------------------------------------------------------------------ data
+
 	private collectCards(): Card[] {
-		const { sourceFolders, statusProperty, titleProperty, badgeProperties, orderProperty } =
+		const { sourceFolders, statusProperty, titleProperty, badgeProperties, orderProperty, columns } =
 			this.plugin.shared.board;
+		const { versionProperty, sizeProperty } = this.plugin.shared.milestones;
+		const statusMeta = new Map(
+			columns.map((c, i) => [c.value, { idx: i, progress: c.progress, excluded: c.excluded === true }])
+		);
 		const folders = sourceFolders
 			.map((f) => f.replace(/^\/+|\/+$/g, ""))
 			.filter((f) => f.length > 0);
@@ -81,26 +127,63 @@ export class BoardView extends ItemView {
 				else if (typeof raw === "string" && raw.trim() !== "" && !Number.isNaN(Number(raw)))
 					rank = Number(raw);
 			}
-			return { file, status, title, badges, rank };
+
+			const rawVersion = fm[versionProperty];
+			const version =
+				typeof rawVersion === "string"
+					? rawVersion.trim()
+					: typeof rawVersion === "number"
+						? String(rawVersion)
+						: "";
+
+			let size = 1;
+			if (sizeProperty) {
+				const rawSize = fm[sizeProperty];
+				const n = typeof rawSize === "number" ? rawSize : Number(rawSize);
+				if (Number.isFinite(n) && n > 0) size = n;
+			}
+
+			const meta = statusMeta.get(status);
+			return {
+				file,
+				status,
+				statusIdx: meta?.idx ?? Number.MAX_SAFE_INTEGER,
+				title,
+				badges,
+				rank,
+				version,
+				size,
+				progress: meta?.progress,
+				excludedFromProgress: meta?.excluded ?? false,
+			};
 		});
 	}
 
 	/** Ranked cards first (ascending), unranked after them (by title). */
 	private sortCards(cards: Card[]): Card[] {
-		return [...cards].sort((a, b) => {
-			if (a.rank !== undefined && b.rank !== undefined) {
-				return a.rank - b.rank || a.title.localeCompare(b.title);
-			}
-			if (a.rank !== undefined) return -1;
-			if (b.rank !== undefined) return 1;
-			return a.title.localeCompare(b.title);
-		});
+		return [...cards].sort(
+			(a, b) => compareRanks(a.rank, b.rank) || a.title.localeCompare(b.title)
+		);
 	}
+
+	// ---------------------------------------------------------------- render
 
 	private render(): void {
 		const root = this.contentEl;
 		root.empty();
 		root.addClass("dispatch-board-container");
+
+		const tabs = root.createDiv({ cls: "dispatch-tabs" });
+		const addTab = (mode: BoardMode, label: string) => {
+			const tab = tabs.createEl("button", { cls: "dispatch-tab", text: label });
+			if (this.mode === mode) tab.addClass("dispatch-tab-active");
+			tab.addEventListener("click", () => {
+				this.mode = mode;
+				this.render();
+			});
+		};
+		addTab("status", "Status");
+		addTab("milestone", "Milestones");
 
 		if (this.plugin.shared.board.sourceFolders.length === 0) {
 			root.createDiv({
@@ -110,6 +193,13 @@ export class BoardView extends ItemView {
 			return;
 		}
 
+		if (this.mode === "status") this.renderStatusBoard(root);
+		else this.renderMilestoneBoard(root);
+	}
+
+	// ------------------------------------------------------------ status tab
+
+	private renderStatusBoard(root: HTMLElement): void {
 		const cards = this.collectCards();
 		const configured = this.plugin.shared.board.columns;
 		const known = new Set(configured.map((c) => c.value));
@@ -129,10 +219,120 @@ export class BoardView extends ItemView {
 			header.createSpan({ cls: "dispatch-column-count", text: String(colCards.length) });
 
 			const list = colEl.createDiv({ cls: "dispatch-cards" });
-			this.makeDropTarget(colEl, list, col.value);
+			this.makeStatusDropTarget(colEl, list, col.value);
 			for (const card of colCards) this.renderCard(list, card);
 		}
 	}
+
+	// --------------------------------------------------------- milestone tab
+
+	private renderMilestoneBoard(root: HTMLElement): void {
+		const ms = this.plugin.shared.milestones;
+		const cards = this.collectCards();
+
+		const columns = new Map<string, MilestoneColumn>();
+		for (const v of ms.plannedVersions) {
+			const key = versionKey(v);
+			if (key && !columns.has(key)) columns.set(key, { key, display: key, writeValue: v });
+		}
+		for (const card of cards) {
+			if (!card.version) continue;
+			const key = versionKey(card.version);
+			if (!columns.has(key)) columns.set(key, { key, display: key, writeValue: key });
+		}
+		const ordered = [...columns.values()].sort((a, b) => compareVersionKeys(a.key, b.key));
+		ordered.push({ key: "", display: "(no version)", writeValue: "" });
+
+		const board = root.createDiv({ cls: "dispatch-board" });
+		for (const col of ordered) {
+			const colCards = cards
+				.filter((c) => versionKey(c.version) === col.key)
+				.sort(
+					(a, b) =>
+						a.statusIdx - b.statusIdx ||
+						compareRanks(a.rank, b.rank) ||
+						a.title.localeCompare(b.title)
+				);
+
+			const colEl = board.createDiv({ cls: "dispatch-column" });
+			const header = colEl.createDiv({
+				cls: "dispatch-column-header dispatch-milestone-header",
+			});
+			const titleRow = header.createDiv({ cls: "dispatch-milestone-title-row" });
+			titleRow.createSpan({ cls: "dispatch-milestone-version", text: col.display });
+			this.renderVersionTag(titleRow, col);
+			titleRow.createSpan({ cls: "dispatch-column-count", text: String(colCards.length) });
+
+			const pct = this.milestonePercent(colCards);
+			const progressRow = header.createDiv({ cls: "dispatch-milestone-progress" });
+			const bar = progressRow.createDiv({ cls: "dispatch-progress-bar" });
+			bar.createDiv({ cls: "dispatch-progress-fill" }).style.width = `${pct ?? 0}%`;
+			progressRow.createSpan({
+				cls: "dispatch-progress-label",
+				text: pct === null ? "—" : `${pct}%`,
+			});
+
+			const list = colEl.createDiv({ cls: "dispatch-cards" });
+			this.makeVersionDropTarget(colEl, col);
+			for (const card of colCards) this.renderCard(list, card);
+		}
+	}
+
+	/**
+	 * Weighted completion of a milestone: Σ(size × status progress) / Σ(size),
+	 * skipping excluded statuses. Null when nothing is measurable.
+	 */
+	private milestonePercent(cards: Card[]): number | null {
+		let weight = 0;
+		let done = 0;
+		for (const c of cards) {
+			if (c.excludedFromProgress) continue;
+			weight += c.size;
+			done += (c.size * (c.progress ?? 0)) / 100;
+		}
+		if (weight === 0) return null;
+		return Math.round((100 * done) / weight);
+	}
+
+	private renderVersionTag(parent: HTMLElement, col: MilestoneColumn): void {
+		if (col.key === "") return;
+		const ms = this.plugin.shared.milestones;
+		const current = ms.tags[col.key] ?? "";
+		const tag = parent.createEl("button", {
+			cls: "dispatch-version-tag" + (current ? "" : " dispatch-version-tag-empty"),
+			text: current || "+ tag",
+			attr: { title: "Click to edit the version tag" },
+		});
+		tag.addEventListener("click", () => {
+			const input = createEl("input", {
+				cls: "dispatch-version-tag-input",
+				value: current,
+				attr: { placeholder: "MVP, Closed Beta, …" },
+			});
+			tag.replaceWith(input);
+			input.focus();
+			input.select();
+			let settled = false;
+			const save = async () => {
+				if (settled) return;
+				settled = true;
+				const value = input.value.trim();
+				if (value) ms.tags[col.key] = value;
+				else delete ms.tags[col.key];
+				await this.plugin.saveShared(); // re-renders all boards
+			};
+			input.addEventListener("keydown", (e) => {
+				if (e.key === "Enter") void save();
+				else if (e.key === "Escape") {
+					settled = true;
+					this.render();
+				}
+			});
+			input.addEventListener("blur", () => void save());
+		});
+	}
+
+	// ---------------------------------------------------------------- cards
 
 	private renderCard(parent: HTMLElement, card: Card): void {
 		const el = parent.createDiv({ cls: "dispatch-card", attr: { draggable: "true" } });
@@ -154,6 +354,8 @@ export class BoardView extends ItemView {
 		});
 	}
 
+	// ------------------------------------------------------ status drag&drop
+
 	private clearInsertMarkers(list: HTMLElement): void {
 		list.removeClass("dispatch-insert-end");
 		for (const child of Array.from(list.children)) {
@@ -171,7 +373,7 @@ export class BoardView extends ItemView {
 		return children.length;
 	}
 
-	private makeDropTarget(colEl: HTMLElement, list: HTMLElement, status: string): void {
+	private makeStatusDropTarget(colEl: HTMLElement, list: HTMLElement, status: string): void {
 		colEl.addEventListener("dragover", (e) => {
 			e.preventDefault();
 			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
@@ -276,6 +478,45 @@ export class BoardView extends ItemView {
 
 		if (statusChanged) this.notifyStatusChange(moved.file, oldStatus, newStatus);
 	}
+
+	// ----------------------------------------------------- version drag&drop
+
+	private makeVersionDropTarget(colEl: HTMLElement, col: MilestoneColumn): void {
+		colEl.addEventListener("dragover", (e) => {
+			e.preventDefault();
+			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+			colEl.addClass("dispatch-drop-active");
+		});
+		colEl.addEventListener("dragleave", (e) => {
+			if (e.relatedTarget instanceof Node && colEl.contains(e.relatedTarget)) return;
+			colEl.removeClass("dispatch-drop-active");
+		});
+		colEl.addEventListener("drop", (e) => {
+			e.preventDefault();
+			colEl.removeClass("dispatch-drop-active");
+			const path = e.dataTransfer?.getData("text/plain");
+			if (path) void this.moveCardToVersion(path, col);
+		});
+	}
+
+	private async moveCardToVersion(path: string, col: MilestoneColumn): Promise<void> {
+		const file = this.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile)) return;
+		const prop = this.plugin.shared.milestones.versionProperty;
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+		const current = typeof fm[prop] === "string" ? (fm[prop] as string).trim() : "";
+		// Same column — keep the raw value untouched (no format rewrite).
+		if (versionKey(current) === col.key) return;
+		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+			if (col.writeValue === "") delete frontmatter[prop];
+			else frontmatter[prop] = col.writeValue;
+		});
+		new Notice(
+			`${file.basename}: ${versionKey(current) || "(no version)"} → ${col.display}`
+		);
+	}
+
+	// ------------------------------------------------------------------ misc
 
 	private notifyStatusChange(file: TFile, oldStatus: string, newStatus: string): void {
 		new Notice(`${file.basename}: ${oldStatus || "(none)"} → ${newStatus || "(none)"}`);

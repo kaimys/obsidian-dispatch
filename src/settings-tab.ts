@@ -54,23 +54,35 @@ export class DispatchSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Columns")
 			.setDesc(
-				"One column per line: the status value, optionally followed by | and a display label."
+				"One column per line: status value | display label | milestone progress. Label may be empty; progress is 0–100 (how complete a card with this status counts on the Milestones tab) or - to exclude the status from milestone progress."
 			)
 			.addTextArea((ta) =>
 				ta
-					.setPlaceholder("Backlog\nIn progress | Doing\nDone")
+					.setPlaceholder("Backlog | | 0\nIn progress | Doing | 50\nDone | | 100\nRejected | | -")
 					.setValue(
 						this.plugin.shared.board.columns
-							.map((c) => (c.label ? `${c.value} | ${c.label}` : c.value))
+							.map((c) => {
+								const progress = c.excluded ? "-" : c.progress !== undefined ? String(c.progress) : "";
+								let line = c.value;
+								if (c.label || progress) line += ` | ${c.label ?? ""}`;
+								if (progress) line += ` | ${progress}`;
+								return line;
+							})
 							.join("\n")
 					)
 					.onChange(async (v) => {
 						this.plugin.shared.board.columns = splitLines(v).map((line) => {
-							const idx = line.indexOf("|");
-							if (idx === -1) return { value: line.trim() };
-							const value = line.slice(0, idx).trim();
-							const label = line.slice(idx + 1).trim();
-							return label ? { value, label } : { value };
+							const parts = line.split("|").map((s) => s.trim());
+							const col: { value: string; label?: string; progress?: number; excluded?: boolean } = {
+								value: parts[0],
+							};
+							if (parts[1]) col.label = parts[1];
+							if (parts[2]) {
+								if (parts[2] === "-") col.excluded = true;
+								else if (!Number.isNaN(Number(parts[2])))
+									col.progress = Math.max(0, Math.min(100, Number(parts[2])));
+							}
+							return col;
 						});
 						await this.plugin.saveShared();
 					})
@@ -97,6 +109,71 @@ export class DispatchSettingTab extends PluginSettingTab {
 							.split(",")
 							.map((s) => s.trim())
 							.filter((s) => s.length > 0);
+						await this.plugin.saveShared();
+					})
+			);
+
+		// ------------------------------------------------------------------
+		new Setting(containerEl).setName("Milestones").setHeading();
+		containerEl.createEl("p", {
+			cls: "setting-item-description",
+			text:
+				"The Milestones tab groups cards by target version, keyed by major.minor (v1.2.0 and 1.2.1 share the column 1.2). " +
+				"Column progress = Σ(size × status progress) / Σ(size), using the progress values configured on the columns above.",
+		});
+
+		new Setting(containerEl)
+			.setName("Version property")
+			.setDesc("Frontmatter property that holds the target version.")
+			.addText((t) =>
+				t.setValue(this.plugin.shared.milestones.versionProperty).onChange(async (v) => {
+					this.plugin.shared.milestones.versionProperty = v.trim() || "version";
+					await this.plugin.saveShared();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName("Planned versions")
+			.setDesc(
+				"One per line, in the exact form drops should write (e.g. v1.2.0). These columns are always shown, even when empty; versions found in notes appear automatically."
+			)
+			.addTextArea((ta) =>
+				ta
+					.setPlaceholder("v1.1.0\nv1.2.0")
+					.setValue(this.plugin.shared.milestones.plannedVersions.join("\n"))
+					.onChange(async (v) => {
+						this.plugin.shared.milestones.plannedVersions = splitLines(v);
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Size property")
+			.setDesc(
+				"Numeric frontmatter property used as the ticket's weight in the progress metric. Missing or invalid values count as 1."
+			)
+			.addText((t) =>
+				t.setValue(this.plugin.shared.milestones.sizeProperty).onChange(async (v) => {
+					this.plugin.shared.milestones.sizeProperty = v.trim();
+					await this.plugin.saveShared();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName("Version tags")
+			.setDesc(
+				"One per line: major.minor = tag (e.g. 1.1 = MVP). Also editable by clicking the tag in a column header."
+			)
+			.addTextArea((ta) =>
+				ta
+					.setPlaceholder("1.1 = MVP\n1.2 = Closed Beta")
+					.setValue(
+						Object.entries(this.plugin.shared.milestones.tags)
+							.map(([k, v]) => `${k} = ${v}`)
+							.join("\n")
+					)
+					.onChange(async (v) => {
+						this.plugin.shared.milestones.tags = parseKeyValueLines(v);
 						await this.plugin.saveShared();
 					})
 			);

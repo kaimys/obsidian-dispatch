@@ -16,6 +16,25 @@ export interface ColumnConfig {
 	value: string;
 	/** Optional display label; defaults to the value. */
 	label?: string;
+	/** Completion (0–100) that this status contributes to milestone progress. */
+	progress?: number;
+	/** Exclude cards with this status from milestone progress (e.g. Rejected). */
+	excluded?: boolean;
+}
+
+export interface MilestoneSettings {
+	/** Frontmatter property that holds the target version. */
+	versionProperty: string;
+	/**
+	 * Versions always shown as columns, in their canonical write form
+	 * (e.g. "v1.2.0"). Dropping a card writes this exact value; columns are
+	 * keyed/grouped by the normalized major.minor.
+	 */
+	plannedVersions: string[];
+	/** Optional tag per version (MVP, Closed Beta, …), keyed by major.minor. */
+	tags: Record<string, string>;
+	/** Frontmatter property with the ticket size/weight (numeric). Missing/invalid = 1. */
+	sizeProperty: string;
 }
 
 export interface PostDropHook {
@@ -51,6 +70,7 @@ export interface BoardSettings {
 
 export interface SharedSettings {
 	board: BoardSettings;
+	milestones: MilestoneSettings;
 	chips: {
 		/** Tool used when a chip block does not specify one. */
 		defaultTool: string;
@@ -81,10 +101,20 @@ export const DEFAULT_SHARED: SharedSettings = {
 		sourceFolders: [],
 		statusProperty: "status",
 		orderProperty: "rank",
-		columns: [{ value: "Backlog" }, { value: "In progress" }, { value: "Done" }],
+		columns: [
+			{ value: "Backlog", progress: 0 },
+			{ value: "In progress", progress: 50 },
+			{ value: "Done", progress: 100 },
+		],
 		titleProperty: "id",
 		badgeProperties: ["priority", "type"],
 		postDropHook: { repo: "", command: "" },
+	},
+	milestones: {
+		versionProperty: "version",
+		plannedVersions: [],
+		tags: {},
+		sizeProperty: "size",
 	},
 	chips: {
 		defaultTool: "claude",
