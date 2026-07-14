@@ -232,8 +232,8 @@ export class DispatchSettingTab extends PluginSettingTab {
 		containerEl.createEl("p", {
 			cls: "setting-item-description",
 			text:
-				"Machine-specific settings, stored in local.json next to the plugin. " +
-				"Exclude that file from vault sync / git so every team member keeps their own paths.",
+				`Machine-specific settings, stored outside the vault at ${this.plugin.localSettingsPath()} — ` +
+				"vault sync (Google Drive, Obsidian Sync, git) never sees them, and every team member keeps their own paths.",
 		});
 
 		new Setting(containerEl)

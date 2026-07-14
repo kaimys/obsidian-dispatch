@@ -14,11 +14,11 @@ Dispatch splits its configuration into two layers so a vault can be shared acros
 | Layer | Stored in | Synced? | Contains |
 | --- | --- | --- | --- |
 | **Shared** | `data.json` (normal plugin settings) | yes, with the vault | folders, status property, columns, hook command, default tool |
-| **This device** | `local.json` (next to the plugin) | **no — exclude it from sync/git** | repo alias → absolute path, tool command templates, opt-in toggles |
+| **This device** | `~/.dispatch/<vault>-<hash>.json` (user profile, **outside the vault**) | never | repo alias → absolute path, tool command templates, opt-in toggles |
 
 Notes and shared settings never contain absolute paths. They reference repositories by **alias** (e.g. `my-project`), and each team member maps that alias to a local path once in *Settings → Dispatch → This device*.
 
-> **Important:** add `.obsidian/plugins/dispatch/local.json` to your vault's sync exclusions (Obsidian Sync "Excluded files", or `.gitignore` for git-synced vaults).
+Because the device layer lives outside the vault (Windows: `%USERPROFILE%\.dispatch\`), it works with **any** vault sync — Google Drive, Obsidian Sync, git — without exclusion rules, and team members can never overwrite each other's device config. The exact file path is shown in the settings tab. A `local.json` from older versions found next to the plugin is migrated there and removed from the vault automatically.
 
 ## Board
 

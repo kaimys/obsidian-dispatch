@@ -1,4 +1,7 @@
-import { FileSystemAdapter, Plugin, WorkspaceLeaf } from "obsidian";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { homedir } from "os";
+import { dirname, join } from "path";
+import { FileSystemAdapter, Notice, Plugin, WorkspaceLeaf } from "obsidian";
 import { BoardView, VIEW_TYPE_BOARD } from "./board";
 import { registerChipProcessor } from "./chips";
 import { DispatchSettingTab } from "./settings-tab";
@@ -46,7 +49,23 @@ export default class DispatchPlugin extends Plugin {
 		return adapter instanceof FileSystemAdapter ? adapter.getBasePath() : "";
 	}
 
-	private localSettingsPath(): string {
+	/**
+	 * Device-local settings live OUTSIDE the vault (in the user profile), so
+	 * vault sync (Google Drive, Obsidian Sync, git) never sees machine paths
+	 * and team members can't overwrite each other's device config. The file is
+	 * keyed by vault name + a hash of the vault's absolute path, so multiple
+	 * vaults on one machine stay separate.
+	 */
+	localSettingsPath(): string {
+		const name = this.app.vault.getName().replace(/[^\w.-]+/g, "_");
+		const base = this.getVaultBasePath() || name;
+		let hash = 5381;
+		for (let i = 0; i < base.length; i++) hash = ((hash << 5) + hash + base.charCodeAt(i)) >>> 0;
+		return join(homedir(), ".dispatch", `${name}-${hash.toString(16)}.json`);
+	}
+
+	/** Pre-0.2 location inside the vault — synced, therefore wrong. */
+	private legacyLocalSettingsPath(): string {
 		const dir = this.manifest.dir ?? `.obsidian/plugins/${this.manifest.id}`;
 		return `${dir}/${LOCAL_SETTINGS_FILE}`;
 	}
@@ -59,17 +78,36 @@ export default class DispatchPlugin extends Plugin {
 			chips: { ...DEFAULT_SHARED.chips, ...data.chips },
 		};
 
-		const path = this.localSettingsPath();
 		this.local = { ...DEFAULT_LOCAL };
-		if (await this.app.vault.adapter.exists(path)) {
-			try {
-				const parsed = JSON.parse(
-					await this.app.vault.adapter.read(path)
-				) as Partial<LocalSettings>;
-				this.local = { ...DEFAULT_LOCAL, ...parsed };
-			} catch (e) {
-				console.error("Dispatch: could not parse local.json — using defaults", e);
+		const path = this.localSettingsPath();
+		try {
+			if (existsSync(path)) {
+				this.local = {
+					...DEFAULT_LOCAL,
+					...(JSON.parse(readFileSync(path, "utf8")) as Partial<LocalSettings>),
+				};
+			} else {
+				await this.migrateLegacyLocalSettings(path);
 			}
+		} catch (e) {
+			console.error("Dispatch: could not read device-local settings — using defaults", e);
+		}
+	}
+
+	/** One-time move of local.json out of the vault; removes the synced copy. */
+	private async migrateLegacyLocalSettings(newPath: string): Promise<void> {
+		const legacy = this.legacyLocalSettingsPath();
+		if (!(await this.app.vault.adapter.exists(legacy))) return;
+		try {
+			const parsed = JSON.parse(
+				await this.app.vault.adapter.read(legacy)
+			) as Partial<LocalSettings>;
+			this.local = { ...DEFAULT_LOCAL, ...parsed };
+			await this.saveLocal();
+			await this.app.vault.adapter.remove(legacy);
+			new Notice(`Dispatch: device settings moved out of the vault to ${newPath}`, 8000);
+		} catch (e) {
+			console.error("Dispatch: could not migrate legacy local.json — leaving it in place", e);
 		}
 	}
 
@@ -79,10 +117,9 @@ export default class DispatchPlugin extends Plugin {
 	}
 
 	async saveLocal(): Promise<void> {
-		await this.app.vault.adapter.write(
-			this.localSettingsPath(),
-			JSON.stringify(this.local, null, 2)
-		);
+		const path = this.localSettingsPath();
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, JSON.stringify(this.local, null, 2), "utf8");
 	}
 
 	refreshBoards(): void {
