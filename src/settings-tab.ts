@@ -260,7 +260,7 @@ export class DispatchSettingTab extends PluginSettingTab {
 			)
 			.addTextArea((ta) =>
 				ta
-					.setPlaceholder("claude = wt.exe -d {{cwd}} cmd /k claude {{prompt}}")
+					.setPlaceholder('claude = start "Dispatch" /d {{cwd}} cmd /k claude {{prompt}}')
 					.setValue(
 						Object.entries(this.plugin.local.tools)
 							.map(([k, v]) => `${k} = ${v.command}`)

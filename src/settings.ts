@@ -124,8 +124,10 @@ export const DEFAULT_SHARED: SharedSettings = {
 export const DEFAULT_LOCAL: LocalSettings = {
 	repos: {},
 	tools:
+		// `start` respects the user's default terminal and, unlike wt.exe,
+		// does not parse ";" inside arguments as a tab separator.
 		process.platform === "win32"
-			? { claude: { command: "wt.exe -d {{cwd}} cmd /k claude {{prompt}}" } }
+			? { claude: { command: 'start "Dispatch" /d {{cwd}} cmd /k claude {{prompt}}' } }
 			: { claude: { command: "" } },
 	enableHooks: false,
 	confirmBeforeRun: true,

@@ -80,9 +80,11 @@ prompt: |
 Tools are defined per device as command templates:
 
 ```
-claude = wt.exe -d {{cwd}} cmd /k claude {{prompt}}
-codex  = wt.exe -d {{cwd}} cmd /k codex {{prompt}}
+claude = start "Dispatch" /d {{cwd}} cmd /k claude {{prompt}}
+codex  = start "Dispatch" /d {{cwd}} cmd /k codex {{prompt}}
 ```
+
+> **Windows note:** avoid launching through `wt.exe` directly — Windows Terminal parses `;` in its command line as a *tab separator even inside quotes*, so any prompt containing a semicolon breaks. `start` opens the user's default terminal (which is usually Windows Terminal anyway) without that parsing.
 
 macOS example:
 
