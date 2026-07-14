@@ -1,4 +1,5 @@
-import { ItemView, Notice, TFile, WorkspaceLeaf, debounce } from "obsidian";
+import { App, ItemView, Menu, Modal, Notice, TFile, WorkspaceLeaf, debounce } from "obsidian";
+import { launchChip } from "./chips";
 import { runHook, shellVars, substitute } from "./exec";
 import type DispatchPlugin from "./main";
 import type { ColumnConfig } from "./settings";
@@ -195,6 +196,7 @@ export class BoardView extends ItemView {
 		};
 		addTab("status", "Kanban");
 		addTab("milestone", "Milestones");
+		this.renderProblemsBadge(tabs);
 
 		if (this.plugin.shared.board.sourceFolders.length === 0) {
 			root.createDiv({
@@ -367,6 +369,38 @@ export class BoardView extends ItemView {
 		el.addEventListener("click", () => {
 			void this.app.workspace.getLeaf("tab").openFile(card.file);
 		});
+		el.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			this.showCardMenu(e, card);
+		});
+	}
+
+	private showCardMenu(e: MouseEvent, card: Card): void {
+		const menu = new Menu();
+		const templates = this.plugin.shared.chips.templates;
+		for (const template of templates) {
+			menu.addItem((item) =>
+				item
+					.setTitle(template.label)
+					.setIcon("zap")
+					.onClick(() => launchChip(this.plugin, template, card.file.path))
+			);
+		}
+		if (templates.length > 0) menu.addSeparator();
+
+		const editable = [
+			this.plugin.shared.milestones.sizeProperty,
+			...this.plugin.shared.board.badgeProperties,
+		].filter((p, i, arr) => p && arr.indexOf(p) === i);
+		for (const prop of editable) {
+			menu.addItem((item) =>
+				item
+					.setTitle(`Set ${prop}…`)
+					.setIcon("pencil")
+					.onClick(() => new PropertyEditModal(this.app, card.file, prop).open())
+			);
+		}
+		menu.showAtMouseEvent(e);
 	}
 
 	// ------------------------------------------------------ status drag&drop
@@ -424,11 +458,14 @@ export class BoardView extends ItemView {
 		const oldStatus = moved.status;
 		const statusChanged = oldStatus !== newStatus;
 
+		const ruleSets = statusChanged ? this.ruleSetsFor(oldStatus, newStatus) : {};
+
 		// Ordering disabled — drops only change status.
 		if (!board.orderProperty) {
 			if (!statusChanged) return;
 			await this.app.fileManager.processFrontMatter(moved.file, (fm) => {
 				fm[board.statusProperty] = newStatus;
+				Object.assign(fm, ruleSets);
 			});
 			this.notifyStatusChange(moved.file, oldStatus, newStatus);
 			return;
@@ -472,7 +509,10 @@ export class BoardView extends ItemView {
 
 		if (singleRank !== undefined) {
 			await this.app.fileManager.processFrontMatter(moved.file, (fm) => {
-				if (statusChanged) fm[board.statusProperty] = newStatus;
+				if (statusChanged) {
+					fm[board.statusProperty] = newStatus;
+					Object.assign(fm, ruleSets);
+				}
 				fm[board.orderProperty] = singleRank;
 			});
 		} else {
@@ -485,13 +525,32 @@ export class BoardView extends ItemView {
 				const isMoved = card.file.path === path;
 				if (!isMoved && card.rank === rank) continue;
 				await this.app.fileManager.processFrontMatter(card.file, (fm) => {
-					if (isMoved && statusChanged) fm[board.statusProperty] = newStatus;
+					if (isMoved && statusChanged) {
+						fm[board.statusProperty] = newStatus;
+						Object.assign(fm, ruleSets);
+					}
 					fm[board.orderProperty] = rank;
 				});
 			}
 		}
 
 		if (statusChanged) this.notifyStatusChange(moved.file, oldStatus, newStatus);
+	}
+
+	/** Frontmatter assignments from all automation rules matching the target status. */
+	private ruleSetsFor(from: string, to: string): Record<string, string> {
+		const out: Record<string, string> = {};
+		const now = new Date();
+		const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+			now.getDate()
+		).padStart(2, "0")}`;
+		for (const rule of this.plugin.shared.board.automations) {
+			if (rule.when.length > 0 && !rule.when.includes(to)) continue;
+			for (const [key, value] of Object.entries(rule.set ?? {})) {
+				out[key] = substitute(value, { date, datetime: now.toISOString(), from, to });
+			}
+		}
+		return out;
 	}
 
 	// ----------------------------------------------------- version drag&drop
@@ -535,26 +594,149 @@ export class BoardView extends ItemView {
 
 	private notifyStatusChange(file: TFile, oldStatus: string, newStatus: string): void {
 		new Notice(`${file.basename}: ${oldStatus || "(none)"} → ${newStatus || "(none)"}`);
-		this.runPostDropHook(file.path, oldStatus, newStatus);
+		this.runAutomationCommands(file.path, oldStatus, newStatus);
 	}
 
-	private runPostDropHook(filePath: string, from: string, to: string): void {
-		const hook = this.plugin.shared.board.postDropHook;
-		if (!hook.command.trim()) return;
+	private runAutomationCommands(filePath: string, from: string, to: string): void {
+		const rules = this.plugin.shared.board.automations.filter(
+			(r) => r.command.trim() && (r.when.length === 0 || r.when.includes(to))
+		);
+		if (rules.length === 0) return;
 		if (!this.plugin.local.enableHooks) return;
 
-		const cwd = this.plugin.local.repos[hook.repo];
-		if (!cwd) {
-			new Notice(
-				`Dispatch: hook skipped — repository alias "${hook.repo}" is not configured on this device.`
-			);
-			return;
+		for (const rule of rules) {
+			const cwd = this.plugin.local.repos[rule.repo];
+			if (!cwd) {
+				new Notice(
+					`Dispatch: automation skipped — repository alias "${rule.repo}" is not configured on this device.`
+				);
+				continue;
+			}
+			const command = substitute(rule.command, shellVars({ cwd, file: filePath, from, to }));
+			runHook(command, cwd, (err, output) => {
+				if (err) new Notice(`Dispatch automation failed: ${output || err.message}`, 8000);
+				else new Notice(`Dispatch: ${output || "automation done"}`);
+			});
 		}
+	}
 
-		const command = substitute(hook.command, shellVars({ cwd, file: filePath, from, to }));
-		runHook(command, cwd, (err, output) => {
-			if (err) new Notice(`Dispatch hook failed: ${output || err.message}`, 8000);
-			else new Notice(`Dispatch hook: ${output || "done"}`);
+	// ------------------------------------------------------------- problems
+
+	private collectProblems(): { file: TFile; message: string }[] {
+		const { sourceFolders, statusProperty, columns, requiredProperties } =
+			this.plugin.shared.board;
+		const folders = sourceFolders
+			.map((f) => f.replace(/^\/+|\/+$/g, ""))
+			.filter((f) => f.length > 0);
+		const files = this.app.vault
+			.getMarkdownFiles()
+			.filter((file) => folders.some((folder) => file.path.startsWith(folder + "/")));
+		const known = new Set(columns.map((c) => c.value));
+
+		const problems: { file: TFile; message: string }[] = [];
+		for (const file of files) {
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+			for (const prop of requiredProperties) {
+				const value = fm[prop];
+				if (value === undefined || value === null || value === "") {
+					problems.push({ file, message: `missing required property "${prop}"` });
+				} else if (typeof value === "string" && /\{.+\}/.test(value)) {
+					problems.push({
+						file,
+						message: `unrendered template value in "${prop}": ${value}`,
+					});
+				}
+			}
+			const status = fm[statusProperty];
+			if (typeof status === "string" && status.trim() !== "" && !known.has(status.trim())) {
+				problems.push({ file, message: `status "${status}" is not a configured column` });
+			}
+		}
+		return problems;
+	}
+
+	private renderProblemsBadge(tabs: HTMLElement): void {
+		const problems = this.collectProblems();
+		if (problems.length === 0) return;
+		const badge = tabs.createEl("button", {
+			cls: "dispatch-tab dispatch-problems",
+			text: `⚠ ${problems.length}`,
+			attr: { title: "Show board problems" },
 		});
+		badge.addEventListener("click", () => new ProblemsModal(this.app, problems).open());
+	}
+}
+
+class ProblemsModal extends Modal {
+	constructor(
+		app: App,
+		private problems: { file: TFile; message: string }[]
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.titleEl.setText(`Board problems (${this.problems.length})`);
+		const list = this.contentEl.createEl("ul", { cls: "dispatch-problems-list" });
+		for (const problem of this.problems) {
+			const item = list.createEl("li");
+			const link = item.createEl("a", { text: problem.file.basename });
+			link.addEventListener("click", () => {
+				this.close();
+				void this.app.workspace.getLeaf("tab").openFile(problem.file);
+			});
+			item.createSpan({ text: ` — ${problem.message}` });
+		}
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
+class PropertyEditModal extends Modal {
+	constructor(
+		app: App,
+		private file: TFile,
+		private property: string
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.titleEl.setText(`${this.file.basename} — ${this.property}`);
+		const fm = this.app.metadataCache.getFileCache(this.file)?.frontmatter ?? {};
+		const current = fm[this.property];
+		const input = this.contentEl.createEl("input", {
+			cls: "dispatch-property-input",
+			value: current === undefined || current === null ? "" : String(current),
+			attr: { placeholder: "empty = remove property" },
+		});
+		input.focus();
+		input.select();
+
+		const save = async () => {
+			const raw = input.value.trim();
+			await this.app.fileManager.processFrontMatter(this.file, (frontmatter) => {
+				if (raw === "") delete frontmatter[this.property];
+				else if (!Number.isNaN(Number(raw))) frontmatter[this.property] = Number(raw);
+				else frontmatter[this.property] = raw;
+			});
+			this.close();
+		};
+		input.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") void save();
+			else if (e.key === "Escape") this.close();
+		});
+
+		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
+		const ok = row.createEl("button", { cls: "mod-cta", text: "Save" });
+		ok.addEventListener("click", () => void save());
+		const cancel = row.createEl("button", { text: "Cancel" });
+		cancel.addEventListener("click", () => this.close());
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
 	}
 }

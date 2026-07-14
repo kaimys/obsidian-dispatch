@@ -113,6 +113,24 @@ export class DispatchSettingTab extends PluginSettingTab {
 					})
 			);
 
+		new Setting(containerEl)
+			.setName("Required properties")
+			.setDesc(
+				"Comma-separated properties every card note must carry. Missing values, unrendered template stubs, and unknown statuses appear in the board's ⚠ problems panel."
+			)
+			.addText((t) =>
+				t
+					.setPlaceholder("id, status, updated")
+					.setValue(this.plugin.shared.board.requiredProperties.join(", "))
+					.onChange(async (v) => {
+						this.plugin.shared.board.requiredProperties = v
+							.split(",")
+							.map((s) => s.trim())
+							.filter((s) => s.length > 0);
+						await this.plugin.saveShared();
+					})
+			);
+
 		// ------------------------------------------------------------------
 		new Setting(containerEl).setName("Milestones").setHeading();
 		containerEl.createEl("p", {
@@ -179,40 +197,52 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		// ------------------------------------------------------------------
-		new Setting(containerEl).setName("Post-drop hook").setHeading();
+		new Setting(containerEl).setName("Automations").setHeading();
 		containerEl.createEl("p", {
 			cls: "setting-item-description",
 			text:
-				"Optional command that runs after a card is dropped (e.g. to mirror the move into an external tracker). " +
-				"Variables: {{file}}, {{from}}, {{to}}, {{cwd}} — quoted; append Raw for the unquoted value. " +
-				"It runs in the repository alias below, and every device must opt in under “This device”.",
+				'Rules evaluated when a card enters a column, as a JSON array. Rule shape: {"when": ["Deployed"], "set": {"deployed": "{{date}}"}, "repo": "my-project", "command": "node scripts/move-ticket.mjs {{file}} {{from}} {{to}}"}. ' +
+				"Empty \"when\" = every status change. \"set\" writes frontmatter atomically with the status ({{date}}, {{datetime}}, {{from}}, {{to}}). " +
+				"Commands run in the repo alias and only on devices that enable automations under “This device”.",
 		});
 
+		let automationError: HTMLElement | null = null;
 		new Setting(containerEl)
-			.setName("Hook repository alias")
-			.setDesc("Alias resolved via this device's repository list.")
-			.addText((t) =>
-				t
-					.setPlaceholder("my-project")
-					.setValue(this.plugin.shared.board.postDropHook.repo)
-					.onChange(async (v) => {
-						this.plugin.shared.board.postDropHook.repo = v.trim();
-						await this.plugin.saveShared();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Hook command")
-			.setDesc("Leave empty to disable the hook.")
-			.addTextArea((ta) =>
-				ta
-					.setPlaceholder("node scripts/move-ticket.mjs {{file}} {{from}} {{to}}")
-					.setValue(this.plugin.shared.board.postDropHook.command)
-					.onChange(async (v) => {
-						this.plugin.shared.board.postDropHook.command = v.trim();
-						await this.plugin.saveShared();
-					})
-			);
+			.setName("Rules")
+			.addTextArea((ta) => {
+				ta.inputEl.rows = 8;
+				ta.setValue(JSON.stringify(this.plugin.shared.board.automations, null, 2)).onChange(
+					async (v) => {
+						try {
+							const parsed: unknown = v.trim() === "" ? [] : JSON.parse(v);
+							if (!Array.isArray(parsed)) throw new Error("must be a JSON array");
+							this.plugin.shared.board.automations = parsed.map((r) => ({
+								when: Array.isArray((r as { when?: unknown }).when)
+									? ((r as { when: unknown[] }).when.map(String))
+									: [],
+								set:
+									typeof (r as { set?: unknown }).set === "object" &&
+									(r as { set?: unknown }).set !== null
+										? Object.fromEntries(
+												Object.entries(
+													(r as { set: Record<string, unknown> }).set
+												).map(([k, val]) => [k, String(val)])
+											)
+										: {},
+								command: String((r as { command?: unknown }).command ?? ""),
+								repo: String((r as { repo?: unknown }).repo ?? ""),
+							}));
+							automationError?.setText("");
+							await this.plugin.saveShared();
+						} catch (e) {
+							automationError?.setText(
+								`Not saved — ${e instanceof Error ? e.message : String(e)}`
+							);
+						}
+					}
+				);
+			});
+		automationError = containerEl.createEl("p", { cls: "dispatch-settings-error", text: "" });
 
 		// ------------------------------------------------------------------
 		new Setting(containerEl).setName("Chips").setHeading();
@@ -226,6 +256,41 @@ export class DispatchSettingTab extends PluginSettingTab {
 					await this.plugin.saveShared();
 				})
 			);
+
+		new Setting(containerEl)
+			.setName("Chip templates")
+			.setDesc(
+				"Virtual chips shown for every card note (board right-click + file menu) — no markdown block needed. One per line: label | tool | repo | prompt. Empty tool/repo = defaults. Prompt variables: {{id}}, {{status}}, {{file}}, {{title}}."
+			)
+			.addTextArea((ta) => {
+				ta.inputEl.rows = 5;
+				ta.setPlaceholder("Refine | claude | my-project | /refine {{id}}")
+					.setValue(
+						this.plugin.shared.chips.templates
+							.map((t) => `${t.label} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
+							.join("\n")
+					)
+					.onChange(async (v) => {
+						this.plugin.shared.chips.templates = splitLines(v)
+							.map((line) => {
+								const parts = line.split("|");
+								if (parts.length < 4) return null;
+								const label = parts[0].trim();
+								const tool = parts[1].trim();
+								const repo = parts[2].trim();
+								const prompt = parts.slice(3).join("|").trim();
+								if (!label || !prompt) return null;
+								return {
+									label,
+									tool: tool || undefined,
+									repo: repo || undefined,
+									prompt,
+								};
+							})
+							.filter((t): t is NonNullable<typeof t> => t !== null);
+						await this.plugin.saveShared();
+					});
+			});
 
 		// ------------------------------------------------------------------
 		new Setting(containerEl).setName("This device").setHeading();
@@ -278,8 +343,8 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Enable post-drop hook on this device")
-			.setDesc("Off by default — the shared hook command only runs where this is enabled.")
+			.setName("Enable automation commands on this device")
+			.setDesc("Off by default — shared automation commands only run where this is enabled (frontmatter 'set' assignments always apply).")
 			.addToggle((t) =>
 				t.setValue(this.plugin.local.enableHooks).onChange(async (v) => {
 					this.plugin.local.enableHooks = v;

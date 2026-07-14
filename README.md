@@ -46,20 +46,44 @@ The board has two tabs — **Kanban** (status columns) and **Milestones** — a 
 - The header shows a **progress bar**: `Σ(size × status progress) / Σ(size)`. Status progress comes from the third segment of the *Columns* setting (e.g. `Development | | 55`, `Done | | 100`, `Rejected | | -` to exclude); size comes from a numeric frontmatter property (default `size`, missing = 1).
 - Within a version column, cards sort by workflow progress (status order, then rank) — there is no manual ordering on this tab, and drops only change the version, never status or rank.
 
-### Post-drop hook
+### Automations
 
-Optionally run a command after every successful drop — e.g. to mirror the move into Asana, Jira, or Linear. The hook is **shared** (the command is part of the team workflow) but runs only on devices that opt in (*This device → Enable post-drop hook*), and it executes inside a repo alias:
+Rules evaluated when a card **enters a column** (settings → Automations, JSON):
 
+```json
+[
+  { "when": ["Deployed"], "set": { "deployed": "{{date}}" }, "repo": "", "command": "" },
+  { "when": [], "set": {},
+    "repo": "my-project",
+    "command": "node scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
+]
 ```
-Hook repository alias: my-project
-Hook command:          node scripts/move-ticket.mjs {{file}} {{from}} {{to}}
-```
 
-Variables: `{{file}}` (vault-relative note path), `{{from}}`, `{{to}}` (old/new status), `{{cwd}}` (resolved repo path). All are expanded as quoted arguments; append `Raw` for the unquoted value (e.g. `{{cwdRaw}}`).
+- `when` — status values that trigger the rule; empty = every status change.
+- `set` — frontmatter assignments written **atomically with the status change** (values support `{{date}}`, `{{datetime}}`, `{{from}}`, `{{to}}`). Great for stamping completion dates.
+- `command` — optional shell command run in the `repo` alias, e.g. to mirror the move into Asana/Jira/Linear. Variables: `{{file}}`, `{{from}}`, `{{to}}`, `{{cwd}}` (quoted; append `Raw` for unquoted). Commands are **shared** config but run only on devices that opt in (*This device → Enable automation commands*); `set` assignments always apply.
+
+### Problems panel
+
+If *Required properties* is configured (e.g. `id, status, updated`), the board shows a ⚠ badge when card notes are missing values, carry unrendered template stubs (`{ date:… }`), or use a status that isn't a configured column. Click it for the list with direct links — malformed tickets become visible the moment they appear instead of in next week's report.
+
+### Card context menu
+
+Right-click a card to run any chip template (see below) or edit the size / badge properties inline (empty value removes the property) — the quickest way to keep milestone weights and priorities populated.
 
 ## Chips
 
-A chip is a fenced code block. It carries **no commands and no paths** — only a prompt, a tool name, and a repo alias:
+Chips launch an AI coding agent (or any CLI) with a templated prompt, in the right repository. They come in two forms:
+
+**Virtual chips (recommended for recurring workflows):** define *chip templates* once in settings — `label | tool | repo | prompt`, with `{{id}}`, `{{status}}`, `{{file}}`, `{{title}}` variables — and every card note automatically offers them in the board's right-click menu and the note's file menu. No markdown needed, nothing to paste into notes, and generated/regenerated documents can't lose them:
+
+```
+Refine            | claude | my-project | /refine {{id}}
+Update ticket     | claude | my-project | /update-ticket {{id}}
+Implementation plan | claude | my-project | /implementation-plan {{id}}
+```
+
+**Block chips (for one-offs and reports):** a fenced code block anywhere in a note. It carries **no commands and no paths** — only a prompt, a tool name, and a repo alias:
 
 ````markdown
 ```dispatch

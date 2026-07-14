@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
-import { FileSystemAdapter, Notice, Plugin, WorkspaceLeaf } from "obsidian";
+import { FileSystemAdapter, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { BoardView, VIEW_TYPE_BOARD } from "./board";
-import { registerChipProcessor } from "./chips";
+import { launchChip, registerChipProcessor } from "./chips";
 import { DispatchSettingTab } from "./settings-tab";
 import {
 	DEFAULT_LOCAL,
@@ -30,6 +30,25 @@ export default class DispatchPlugin extends Plugin {
 		});
 		registerChipProcessor(this);
 		this.addSettingTab(new DispatchSettingTab(this.app, this));
+
+		// Virtual chips in the note's file menu for every card note.
+		this.registerEvent(
+			this.app.workspace.on("file-menu", (menu, file) => {
+				if (!(file instanceof TFile) || file.extension !== "md") return;
+				const folders = this.shared.board.sourceFolders
+					.map((f) => f.replace(/^\/+|\/+$/g, ""))
+					.filter((f) => f.length > 0);
+				if (!folders.some((folder) => file.path.startsWith(folder + "/"))) return;
+				for (const template of this.shared.chips.templates) {
+					menu.addItem((item) =>
+						item
+							.setTitle(`Dispatch: ${template.label}`)
+							.setIcon("zap")
+							.onClick(() => launchChip(this, template, file.path))
+					);
+				}
+			})
+		);
 	}
 
 	async activateBoard(): Promise<void> {
@@ -71,12 +90,24 @@ export default class DispatchPlugin extends Plugin {
 	}
 
 	async loadAllSettings(): Promise<void> {
-		const data = ((await this.loadData()) ?? {}) as Partial<SharedSettings>;
+		const data = ((await this.loadData()) ?? {}) as Partial<SharedSettings> & {
+			board?: Partial<SharedSettings["board"]> & {
+				postDropHook?: { repo: string; command: string };
+			};
+		};
 		this.shared = {
 			board: { ...DEFAULT_SHARED.board, ...data.board },
 			milestones: { ...DEFAULT_SHARED.milestones, ...data.milestones },
 			chips: { ...DEFAULT_SHARED.chips, ...data.chips },
 		};
+		// Pre-0.3: single postDropHook — migrate into the automations list.
+		const legacyHook = data.board?.postDropHook;
+		if (!data.board?.automations && legacyHook?.command?.trim()) {
+			this.shared.board.automations = [
+				{ when: [], set: {}, command: legacyHook.command, repo: legacyHook.repo },
+			];
+		}
+		delete (this.shared.board as { postDropHook?: unknown }).postDropHook;
 
 		this.local = { ...DEFAULT_LOCAL };
 		const path = this.localSettingsPath();

@@ -30,6 +30,31 @@
 	font-weight: 600;
 }
 
+.dispatch-problems {
+	margin-left: auto;
+	color: var(--text-warning);
+}
+
+.dispatch-problems-list {
+	margin: 0;
+	padding-left: var(--size-4-4);
+}
+
+.dispatch-problems-list a {
+	cursor: pointer;
+}
+
+.dispatch-property-input {
+	width: 100%;
+	margin-bottom: var(--size-4-2);
+}
+
+.dispatch-settings-error {
+	color: var(--text-error);
+	font-size: var(--font-ui-small);
+	margin: 0 0 var(--size-4-2);
+}
+
 .dispatch-board {
 	display: flex;
 	gap: var(--size-4-3);

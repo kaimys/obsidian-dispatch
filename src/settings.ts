@@ -37,15 +37,32 @@ export interface MilestoneSettings {
 	sizeProperty: string;
 }
 
-export interface PostDropHook {
-	/** Repo alias (resolved via local settings) used as working directory. */
-	repo: string;
+export interface AutomationRule {
+	/** Status values that trigger this rule when a card ENTERS them; empty = any status change. */
+	when: string[];
 	/**
-	 * Command template run after a successful drop. Empty = disabled.
-	 * Variables: {{file}}, {{from}}, {{to}}, {{cwd}} (quoted) — append `Raw`
-	 * for the unquoted value, e.g. {{cwdRaw}}.
+	 * Frontmatter assignments applied atomically with the status write.
+	 * Values support {{date}}, {{datetime}}, {{from}}, {{to}}.
+	 */
+	set: Record<string, string>;
+	/**
+	 * Optional command template, run in the repo alias below. Variables:
+	 * {{file}}, {{from}}, {{to}}, {{cwd}} (quoted; append Raw for unquoted).
+	 * Commands only run on devices that enabled automations locally.
 	 */
 	command: string;
+	/** Repo alias (resolved via local settings) for the command's working directory. */
+	repo: string;
+}
+
+export interface ChipTemplate {
+	label: string;
+	/** Tool name; empty = the shared default tool. */
+	tool?: string;
+	/** Repo alias; empty = vault folder. */
+	repo?: string;
+	/** Prompt template. Variables: {{id}}, {{status}}, {{file}}, {{title}}, {{vault}}. */
+	prompt: string;
 }
 
 export interface BoardSettings {
@@ -65,7 +82,13 @@ export interface BoardSettings {
 	titleProperty: string;
 	/** Frontmatter properties rendered as badges on each card. */
 	badgeProperties: string[];
-	postDropHook: PostDropHook;
+	/**
+	 * Properties every card note must carry (non-empty, no unrendered template
+	 * stubs). Violations appear in the board's problems panel.
+	 */
+	requiredProperties: string[];
+	/** Rules evaluated when a card enters a column. */
+	automations: AutomationRule[];
 }
 
 export interface SharedSettings {
@@ -74,6 +97,11 @@ export interface SharedSettings {
 	chips: {
 		/** Tool used when a chip block does not specify one. */
 		defaultTool: string;
+		/**
+		 * Virtual chips rendered for every card note (board context menu +
+		 * file menu) — computed from frontmatter, no markdown block needed.
+		 */
+		templates: ChipTemplate[];
 	};
 }
 
@@ -108,7 +136,8 @@ export const DEFAULT_SHARED: SharedSettings = {
 		],
 		titleProperty: "id",
 		badgeProperties: ["priority", "type"],
-		postDropHook: { repo: "", command: "" },
+		requiredProperties: [],
+		automations: [],
 	},
 	milestones: {
 		versionProperty: "version",
@@ -118,6 +147,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 	},
 	chips: {
 		defaultTool: "claude",
+		templates: [],
 	},
 };
 

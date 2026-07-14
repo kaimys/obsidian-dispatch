@@ -1,6 +1,7 @@
-import { App, Modal, Notice, parseYaml, setIcon } from "obsidian";
+import { App, Modal, Notice, TFile, parseYaml, setIcon } from "obsidian";
 import { launchDetached, quoteArg, shellVars, substitute, writePromptFile } from "./exec";
 import type DispatchPlugin from "./main";
+import type { ChipTemplate } from "./settings";
 
 /**
  * A chip block deliberately contains NO commands and NO absolute paths — it is
@@ -14,6 +15,9 @@ import type DispatchPlugin from "./main";
  * prompt: |
  *   Refine {{file}}: read the spec and list open questions.
  * ```
+ *
+ * Virtual chips (settings → Chip templates) reuse the same shape and launch
+ * path, but are computed per note instead of stored in markdown.
  */
 interface ChipSpec {
 	label?: string;
@@ -45,12 +49,24 @@ export function registerChipProcessor(plugin: DispatchPlugin): void {
 		const icon = chip.createSpan({ cls: "dispatch-chip-icon" });
 		setIcon(icon, "zap");
 		chip.createSpan({ text: spec.label ?? spec.tool ?? "Run" });
-		chip.addEventListener("click", () => runChip(plugin, spec as ChipSpec, ctx.sourcePath));
+		chip.addEventListener("click", () =>
+			launchChip(
+				plugin,
+				{
+					label: spec?.label ?? "Run",
+					tool: spec?.tool,
+					repo: spec?.repo,
+					prompt: spec?.prompt ?? "",
+				},
+				ctx.sourcePath
+			)
+		);
 	});
 }
 
-function runChip(plugin: DispatchPlugin, spec: ChipSpec, sourcePath: string): void {
-	const toolName = spec.tool ?? plugin.shared.chips.defaultTool;
+/** Resolve + launch a chip (from a code block or a template) for a note. */
+export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePath: string): void {
+	const toolName = spec.tool || plugin.shared.chips.defaultTool;
 	const tool = plugin.local.tools[toolName];
 	if (!tool || !tool.command.trim()) {
 		new Notice(
@@ -75,11 +91,20 @@ function runChip(plugin: DispatchPlugin, spec: ChipSpec, sourcePath: string): vo
 		return;
 	}
 
+	const file = plugin.app.vault.getAbstractFileByPath(sourcePath);
+	const fm =
+		file instanceof TFile
+			? plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {}
+			: {};
+	const id = fm[plugin.shared.board.titleProperty];
+	const status = fm[plugin.shared.board.statusProperty];
 	const title = sourcePath.replace(/^.*\//, "").replace(/\.md$/, "");
-	const prompt = substitute(spec.prompt ?? "", {
+	const prompt = substitute(spec.prompt, {
 		file: sourcePath,
 		title,
 		vault: plugin.getVaultBasePath(),
+		id: id === undefined || id === null ? "" : String(id),
+		status: typeof status === "string" ? status : "",
 	});
 
 	const vars = shellVars({ cwd });
