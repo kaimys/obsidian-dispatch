@@ -99,13 +99,28 @@ export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePat
 	const id = fm[plugin.shared.board.titleProperty];
 	const status = fm[plugin.shared.board.statusProperty];
 	const title = sourcePath.replace(/^.*\//, "").replace(/\.md$/, "");
-	const prompt = substitute(spec.prompt, {
+	const values: Record<string, string> = {
 		file: sourcePath,
 		title,
 		vault: plugin.getVaultBasePath(),
 		id: id === undefined || id === null ? "" : String(id),
 		status: typeof status === "string" ? status : "",
-	});
+	};
+
+	// A referenced variable that resolves empty would launch a broken command
+	// (e.g. "/refine " without a ticket ID) — fail loudly instead.
+	const missing = [...spec.prompt.matchAll(/\{\{(\w+)\}\}/g)]
+		.map((m) => m[1])
+		.filter((name) => name in values && values[name].trim() === "");
+	if (missing.length > 0) {
+		new Notice(
+			`Dispatch: "${spec.label}" not launched — {{${missing.join("}}, {{")}}} is empty on this note. ` +
+				`Fix the note's frontmatter (see the board's ⚠ panel).`,
+			8000
+		);
+		return;
+	}
+	const prompt = substitute(spec.prompt, values);
 
 	const vars = shellVars({ cwd });
 	vars.prompt = quoteArg(prompt); // no {{promptRaw}} on purpose — injection guard
