@@ -132,8 +132,30 @@ export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePat
 	const command = substitute(tool.command, vars);
 
 	const launch = () => {
-		launchDetached(command, cwd, (err) =>
-			new Notice(`Dispatch: failed to launch ${toolName}: ${err.message}`, 8000)
+		// Run lifecycle: record the launch; the agent's lifecycle hooks (in the
+		// target repo) append "running"/"done" via the env vars below.
+		const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+		const startedIso = new Date().toISOString();
+		plugin.runs.append({
+			id: runId,
+			file: sourcePath,
+			label: spec.label,
+			state: "launched",
+			ts: startedIso,
+		});
+		const vaultBase = plugin.getVaultBasePath();
+		const env: Record<string, string> = {
+			DISPATCH_RUN_ID: runId,
+			DISPATCH_RUNS_FILE: plugin.runs.path(),
+			DISPATCH_NOTE: vaultBase ? `${vaultBase}\\${sourcePath.replace(/\//g, "\\")}` : "",
+			DISPATCH_LABEL: spec.label,
+			DISPATCH_STARTED: startedIso,
+		};
+		launchDetached(
+			command,
+			cwd,
+			(err) => new Notice(`Dispatch: failed to launch ${toolName}: ${err.message}`, 8000),
+			env
 		);
 		new Notice(`Dispatch: launched ${toolName}`);
 	};

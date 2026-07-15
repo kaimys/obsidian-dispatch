@@ -20,6 +20,8 @@ export interface ColumnConfig {
 	progress?: number;
 	/** Exclude cards with this status from milestone progress (e.g. Rejected). */
 	excluded?: boolean;
+	/** WIP limit — the column highlights when the card count reaches/exceeds it. */
+	wip?: number;
 }
 
 export interface MilestoneSettings {
@@ -35,6 +37,13 @@ export interface MilestoneSettings {
 	tags: Record<string, string>;
 	/** Frontmatter property with the ticket size/weight (numeric). Missing/invalid = 1. */
 	sizeProperty: string;
+	/**
+	 * Frontmatter property holding a completion date (e.g. "deployed").
+	 * Powers the velocity-based milestone forecast. Empty = forecast off.
+	 */
+	completedProperty: string;
+	/** Look-back window (days) for the velocity calculation. */
+	velocityWindowDays: number;
 }
 
 export interface AutomationRule {
@@ -144,6 +153,8 @@ export const DEFAULT_SHARED: SharedSettings = {
 		plannedVersions: [],
 		tags: {},
 		sizeProperty: "size",
+		completedProperty: "",
+		velocityWindowDays: 28,
 	},
 	chips: {
 		defaultTool: "claude",

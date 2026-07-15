@@ -54,18 +54,20 @@ export class DispatchSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Columns")
 			.setDesc(
-				"One column per line: status value | display label | milestone progress. Label may be empty; progress is 0–100 (how complete a card with this status counts on the Milestones tab) or - to exclude the status from milestone progress."
+				"One column per line: status value | display label | milestone progress | WIP limit. Label may be empty; progress is 0–100 (how complete a card with this status counts on the Milestones tab) or - to exclude the status from milestone progress; the WIP limit highlights the column when reached (amber) or exceeded (red)."
 			)
 			.addTextArea((ta) =>
 				ta
-					.setPlaceholder("Backlog | | 0\nIn progress | Doing | 50\nDone | | 100\nRejected | | -")
+					.setPlaceholder("Backlog | | 0\nIn progress | Doing | 50 | 5\nDone | | 100\nRejected | | -")
 					.setValue(
 						this.plugin.shared.board.columns
 							.map((c) => {
 								const progress = c.excluded ? "-" : c.progress !== undefined ? String(c.progress) : "";
+								const wip = c.wip !== undefined ? String(c.wip) : "";
 								let line = c.value;
-								if (c.label || progress) line += ` | ${c.label ?? ""}`;
-								if (progress) line += ` | ${progress}`;
+								if (c.label || progress || wip) line += ` | ${c.label ?? ""}`;
+								if (progress || wip) line += ` | ${progress}`;
+								if (wip) line += ` | ${wip}`;
 								return line;
 							})
 							.join("\n")
@@ -73,14 +75,21 @@ export class DispatchSettingTab extends PluginSettingTab {
 					.onChange(async (v) => {
 						this.plugin.shared.board.columns = splitLines(v).map((line) => {
 							const parts = line.split("|").map((s) => s.trim());
-							const col: { value: string; label?: string; progress?: number; excluded?: boolean } = {
-								value: parts[0],
-							};
+							const col: {
+								value: string;
+								label?: string;
+								progress?: number;
+								excluded?: boolean;
+								wip?: number;
+							} = { value: parts[0] };
 							if (parts[1]) col.label = parts[1];
 							if (parts[2]) {
 								if (parts[2] === "-") col.excluded = true;
 								else if (!Number.isNaN(Number(parts[2])))
 									col.progress = Math.max(0, Math.min(100, Number(parts[2])));
+							}
+							if (parts[3] && !Number.isNaN(Number(parts[3])) && Number(parts[3]) > 0) {
+								col.wip = Math.floor(Number(parts[3]));
 							}
 							return col;
 						});
@@ -175,6 +184,35 @@ export class DispatchSettingTab extends PluginSettingTab {
 					this.plugin.shared.milestones.sizeProperty = v.trim();
 					await this.plugin.saveShared();
 				})
+			);
+
+		new Setting(containerEl)
+			.setName("Completed property")
+			.setDesc(
+				"Frontmatter property holding a completion date (e.g. deployed, stamped by an automation rule). Powers the velocity-based forecast in the milestone headers. Empty = forecast off."
+			)
+			.addText((t) =>
+				t
+					.setPlaceholder("deployed")
+					.setValue(this.plugin.shared.milestones.completedProperty)
+					.onChange(async (v) => {
+						this.plugin.shared.milestones.completedProperty = v.trim();
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Velocity window (days)")
+			.setDesc("Look-back window for the completion velocity behind the forecast.")
+			.addText((t) =>
+				t
+					.setValue(String(this.plugin.shared.milestones.velocityWindowDays))
+					.onChange(async (v) => {
+						const n = Number(v.trim());
+						this.plugin.shared.milestones.velocityWindowDays =
+							Number.isFinite(n) && n > 0 ? Math.floor(n) : 28;
+						await this.plugin.saveShared();
+					})
 			);
 
 		new Setting(containerEl)

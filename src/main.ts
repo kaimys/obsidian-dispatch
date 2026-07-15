@@ -4,6 +4,7 @@ import { dirname, join } from "path";
 import { FileSystemAdapter, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { BoardView, VIEW_TYPE_BOARD } from "./board";
 import { launchChip, registerChipProcessor } from "./chips";
+import { RunTracker } from "./runs";
 import { DispatchSettingTab } from "./settings-tab";
 import {
 	DEFAULT_LOCAL,
@@ -17,9 +18,11 @@ const LOCAL_SETTINGS_FILE = "local.json";
 export default class DispatchPlugin extends Plugin {
 	shared: SharedSettings = DEFAULT_SHARED;
 	local: LocalSettings = DEFAULT_LOCAL;
+	runs: RunTracker = new RunTracker(this);
 
 	async onload(): Promise<void> {
 		await this.loadAllSettings();
+		this.runs.start(() => this.refreshBoards());
 
 		this.registerView(VIEW_TYPE_BOARD, (leaf) => new BoardView(leaf, this));
 		this.addRibbonIcon("kanban", "Open Dispatch board", () => void this.activateBoard());
@@ -49,6 +52,10 @@ export default class DispatchPlugin extends Plugin {
 				}
 			})
 		);
+	}
+
+	onunload(): void {
+		this.runs.stop();
 	}
 
 	async activateBoard(): Promise<void> {

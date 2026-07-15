@@ -43,9 +43,16 @@ export function writePromptFile(prompt: string): string {
 export function launchDetached(
 	command: string,
 	cwd: string,
-	onError: (err: Error) => void
+	onError: (err: Error) => void,
+	env?: Record<string, string>
 ): void {
-	const child = spawn(command, { shell: true, cwd, detached: true, stdio: "ignore" });
+	const child = spawn(command, {
+		shell: true,
+		cwd,
+		detached: true,
+		stdio: "ignore",
+		env: env ? { ...process.env, ...env } : undefined,
+	});
 	child.on("error", onError);
 	child.unref();
 }

@@ -63,6 +63,20 @@ Rules evaluated when a card **enters a column** (settings → Automations, JSON)
 - `set` — frontmatter assignments written **atomically with the status change** (values support `{{date}}`, `{{datetime}}`, `{{from}}`, `{{to}}`). Great for stamping completion dates.
 - `command` — optional shell command run in the `repo` alias, e.g. to mirror the move into Asana/Jira/Linear. Variables: `{{file}}`, `{{from}}`, `{{to}}`, `{{cwd}}` (quoted; append `Raw` for unquoted). Commands are **shared** config but run only on devices that opt in (*This device → Enable automation commands*); `set` assignments always apply.
 
+### WIP limits, slice-by, keyboard
+
+- **WIP limits**: the fourth segment of a *Columns* line (`In progress | | 50 | 5`) sets a limit — the header shows `count/limit`, the column outlines amber at the limit and red above it.
+- **Slice-by bar**: pick a badge property (type, priority, …) in the bar above the board and click a value chip to filter both tabs to matching cards; click again to clear. Counts are shown per value; missing values group under "(none)".
+- **Keyboard**: arrow keys move the card focus, `Enter`/`o` opens the note, `[` / `]` move the focused card one column left/right (Kanban: status change; Milestones: version change).
+
+### Milestone forecast
+
+With a **Completed property** configured (e.g. `deployed`, stamped by an automation rule), milestone headers show a velocity-based ETA: remaining weight `Σ size × (1 − progress)` divided by the completed weight per day over the look-back window (default 28 days). Hover for the assumptions and an optimistic/pessimistic range (±40%). No completions in the window = no forecast — the feature never guesses.
+
+### Run lifecycle (chips → board)
+
+When a chip launches a tool, Dispatch records the run in a machine-local file (`~/.dispatch/runs/…jsonl`) and passes `DISPATCH_RUN_ID`, `DISPATCH_RUNS_FILE`, `DISPATCH_NOTE`, `DISPATCH_LABEL`, `DISPATCH_STARTED` to the process. Lifecycle hooks in the target repo (e.g. Claude Code `SessionStart`/`SessionEnd` hooks calling a three-line script) append `running`/`done` records — the board shows a live badge on the card (started → running → done, done fades after 24 h), and on completion the hook appends a run-log line to the note's `## Dispatch runs` section. The plugin only *observes*: live state stays on the machine that runs the agent; durable outcomes land in the note and sync with the vault.
+
 ### Problems panel
 
 If *Required properties* is configured (e.g. `id, status, updated`), the board shows a ⚠ badge when card notes are missing values, carry unrendered template stubs (`{ date:… }`), or use a status that isn't a configured column. Click it for the list with direct links — malformed tickets become visible the moment they appear instead of in next week's report.

@@ -26,6 +26,16 @@ interface Card {
 	/** Completion contribution (0–100) of the card's status, per column config. */
 	progress?: number;
 	excludedFromProgress: boolean;
+	/** Parsed completion date (ms) from the milestone completedProperty. */
+	completedAt?: number;
+	/** Raw frontmatter — used by the slice-by filter. */
+	raw: Record<string, unknown>;
+}
+
+/** Slice key for a frontmatter value: empty/missing collapses to "(none)". */
+function sliceKey(value: unknown): string {
+	if (value === undefined || value === null || value === "") return "(none)";
+	return String(value);
 }
 
 interface MilestoneColumn {
@@ -66,6 +76,9 @@ function compareRanks(a?: number, b?: number): number {
 export class BoardView extends ItemView {
 	private plugin: DispatchPlugin;
 	private mode: BoardMode = "status";
+	private sliceProp = "";
+	private sliceValue: string | null = null;
+	private focusedPath: string | null = null;
 	private requestRender = debounce(() => this.render(), 250, true);
 
 	constructor(leaf: WorkspaceLeaf, plugin: DispatchPlugin) {
@@ -90,6 +103,8 @@ export class BoardView extends ItemView {
 		this.registerEvent(this.app.vault.on("create", () => this.requestRender()));
 		this.registerEvent(this.app.vault.on("delete", () => this.requestRender()));
 		this.registerEvent(this.app.vault.on("rename", () => this.requestRender()));
+		this.contentEl.setAttr("tabindex", "0");
+		this.registerDomEvent(this.contentEl, "keydown", (e) => this.onKey(e));
 		this.render();
 	}
 
@@ -154,6 +169,14 @@ export class BoardView extends ItemView {
 				if (Number.isFinite(n) && n > 0) size = n;
 			}
 
+			let completedAt: number | undefined;
+			const { completedProperty } = this.plugin.shared.milestones;
+			if (completedProperty) {
+				const rawCompleted = fm[completedProperty];
+				const parsed = typeof rawCompleted === "string" ? Date.parse(rawCompleted) : NaN;
+				if (Number.isFinite(parsed)) completedAt = parsed;
+			}
+
 			const meta = statusMeta.get(status);
 			return {
 				file,
@@ -167,6 +190,8 @@ export class BoardView extends ItemView {
 				size,
 				progress: meta?.progress,
 				excludedFromProgress: meta?.excluded ?? false,
+				completedAt,
+				raw: fm as Record<string, unknown>,
 			};
 		});
 	}
@@ -206,14 +231,59 @@ export class BoardView extends ItemView {
 			return;
 		}
 
-		if (this.mode === "status") this.renderStatusBoard(root);
-		else this.renderMilestoneBoard(root);
+		const allCards = this.collectCards();
+		this.renderSliceBar(root, allCards);
+		const cards =
+			this.sliceProp && this.sliceValue !== null
+				? allCards.filter((c) => sliceKey(c.raw[this.sliceProp]) === this.sliceValue)
+				: allCards;
+
+		if (this.mode === "status") this.renderStatusBoard(root, cards);
+		else this.renderMilestoneBoard(root, cards, allCards);
+
+		this.applyFocus();
+	}
+
+	// ------------------------------------------------------------- slice bar
+
+	private renderSliceBar(root: HTMLElement, cards: Card[]): void {
+		const props = this.plugin.shared.board.badgeProperties;
+		if (props.length === 0) return;
+		const bar = root.createDiv({ cls: "dispatch-slice-bar" });
+
+		const select = bar.createEl("select", { cls: "dropdown" });
+		select.createEl("option", { text: "Slice: off", value: "" });
+		for (const prop of props) select.createEl("option", { text: `Slice: ${prop}`, value: prop });
+		select.value = this.sliceProp;
+		select.addEventListener("change", () => {
+			this.sliceProp = select.value;
+			this.sliceValue = null;
+			this.render();
+		});
+
+		if (!this.sliceProp) return;
+		const counts = new Map<string, number>();
+		for (const card of cards) {
+			const key = sliceKey(card.raw[this.sliceProp]);
+			counts.set(key, (counts.get(key) ?? 0) + 1);
+		}
+		for (const [value, count] of [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+			const chip = bar.createEl("button", {
+				cls:
+					"dispatch-slice-chip" +
+					(this.sliceValue === value ? " dispatch-slice-active" : ""),
+				text: `${value} (${count})`,
+			});
+			chip.addEventListener("click", () => {
+				this.sliceValue = this.sliceValue === value ? null : value;
+				this.render();
+			});
+		}
 	}
 
 	// ------------------------------------------------------------ status tab
 
-	private renderStatusBoard(root: HTMLElement): void {
-		const cards = this.collectCards();
+	private renderStatusBoard(root: HTMLElement, cards: Card[]): void {
 		const configured = this.plugin.shared.board.columns;
 		const known = new Set(configured.map((c) => c.value));
 		const extras: ColumnConfig[] = [...new Set(cards.map((c) => c.status))]
@@ -226,10 +296,23 @@ export class BoardView extends ItemView {
 			const label = col.label ?? (col.value === "" ? "(no status)" : col.value);
 			const colCards = this.sortCards(cards.filter((c) => c.status === col.value));
 
-			const colEl = board.createDiv({ cls: "dispatch-column" });
+			const colEl = board.createDiv({
+				cls: "dispatch-column",
+				attr: { "data-col": col.value },
+			});
+			if (col.wip !== undefined && col.wip > 0) {
+				if (colCards.length > col.wip) colEl.addClass("dispatch-wip-over");
+				else if (colCards.length === col.wip) colEl.addClass("dispatch-wip-at");
+			}
 			const header = colEl.createDiv({ cls: "dispatch-column-header" });
 			header.createSpan({ text: label });
-			header.createSpan({ cls: "dispatch-column-count", text: String(colCards.length) });
+			header.createSpan({
+				cls: "dispatch-column-count",
+				text:
+					col.wip !== undefined && col.wip > 0
+						? `${colCards.length}/${col.wip}`
+						: String(colCards.length),
+			});
 
 			const list = colEl.createDiv({ cls: "dispatch-cards" });
 			this.makeStatusDropTarget(colEl, list, col.value);
@@ -239,9 +322,9 @@ export class BoardView extends ItemView {
 
 	// --------------------------------------------------------- milestone tab
 
-	private renderMilestoneBoard(root: HTMLElement): void {
+	private renderMilestoneBoard(root: HTMLElement, cards: Card[], allCards: Card[]): void {
 		const ms = this.plugin.shared.milestones;
-		const cards = this.collectCards();
+		const velocity = this.velocityPerDay(allCards);
 
 		const columns = new Map<string, MilestoneColumn>();
 		ms.plannedVersions.forEach((v, i) => {
@@ -268,7 +351,14 @@ export class BoardView extends ItemView {
 						a.title.localeCompare(b.title)
 				);
 
-			const colEl = board.createDiv({ cls: "dispatch-column" });
+			const colEl = board.createDiv({
+				cls: "dispatch-column",
+				attr: {
+					"data-col-key": col.key,
+					"data-col-write": col.writeValue,
+					"data-col-display": col.display,
+				},
+			});
 			const header = colEl.createDiv({
 				cls: "dispatch-column-header dispatch-milestone-header",
 			});
@@ -285,11 +375,67 @@ export class BoardView extends ItemView {
 				cls: "dispatch-progress-label",
 				text: pct === null ? "—" : `${pct}%`,
 			});
+			this.renderForecast(header, col, colCards, velocity);
 
 			const list = colEl.createDiv({ cls: "dispatch-cards" });
 			this.makeVersionDropTarget(colEl, col);
 			for (const card of colCards) this.renderCard(list, card, true);
 		}
+	}
+
+	/**
+	 * Completed weight per day over the look-back window, across the whole
+	 * board (not just one column). Null when the feature is off or no
+	 * completions fall inside the window.
+	 */
+	private velocityPerDay(allCards: Card[]): { perDay: number; samples: number } | null {
+		const { completedProperty, velocityWindowDays } = this.plugin.shared.milestones;
+		if (!completedProperty || velocityWindowDays <= 0) return null;
+		const cutoff = Date.now() - velocityWindowDays * 86_400_000;
+		let weight = 0;
+		let samples = 0;
+		for (const card of allCards) {
+			if (card.completedAt === undefined || card.completedAt < cutoff) continue;
+			weight += card.size;
+			samples++;
+		}
+		if (samples === 0 || weight <= 0) return null;
+		return { perDay: weight / velocityWindowDays, samples };
+	}
+
+	/** Velocity-based ETA line for a version column (semver columns only). */
+	private renderForecast(
+		header: HTMLElement,
+		col: MilestoneColumn,
+		colCards: Card[],
+		velocity: { perDay: number; samples: number } | null
+	): void {
+		if (!velocity || !/^\d+\.\d+$/.test(col.key)) return;
+		let remaining = 0;
+		for (const card of colCards) {
+			if (card.excludedFromProgress) continue;
+			remaining += card.size * (1 - (card.progress ?? 0) / 100);
+		}
+		if (remaining <= 0) return;
+
+		const days = remaining / velocity.perDay;
+		const fmt = (d: number) => {
+			const eta = new Date(Date.now() + d * 86_400_000);
+			return `${eta.getFullYear()}-${String(eta.getMonth() + 1).padStart(2, "0")}-${String(
+				eta.getDate()
+			).padStart(2, "0")}`;
+		};
+		const windowDays = this.plugin.shared.milestones.velocityWindowDays;
+		header.createDiv({
+			cls: "dispatch-forecast",
+			text: `≈ ${fmt(days)}`,
+			attr: {
+				title:
+					`Remaining weight ${remaining.toFixed(1)} at ${(velocity.perDay * 7).toFixed(1)}/week ` +
+					`(${velocity.samples} completions in the last ${windowDays} days). ` +
+					`Optimistic ${fmt(days * 0.6)} · pessimistic ${fmt(days * 1.4)}.`,
+			},
+		});
 	}
 
 	/**
@@ -349,8 +495,23 @@ export class BoardView extends ItemView {
 	// ---------------------------------------------------------------- cards
 
 	private renderCard(parent: HTMLElement, card: Card, showStatus = false): void {
-		const el = parent.createDiv({ cls: "dispatch-card", attr: { draggable: "true" } });
-		el.createDiv({ cls: "dispatch-card-title", text: card.title });
+		const el = parent.createDiv({
+			cls: "dispatch-card",
+			attr: { draggable: "true", "data-path": card.file.path },
+		});
+		const titleRow = el.createDiv({ cls: "dispatch-card-title" });
+		titleRow.createSpan({ text: card.title });
+
+		// Run lifecycle badge (launched/running always; done fades after 24h).
+		const run = this.plugin.runs.latestForFile(card.file.path);
+		if (run && (run.state !== "done" || Date.now() - run.lastTs < 86_400_000)) {
+			titleRow.createSpan({
+				cls: `dispatch-run-badge dispatch-run-${run.state}`,
+				text: run.state === "launched" ? "started" : run.state,
+				attr: { title: `${run.label} — ${run.state} (${new Date(run.lastTs).toLocaleString()})` },
+			});
+		}
+
 		if (showStatus || card.badges.length > 0) {
 			const badges = el.createDiv({ cls: "dispatch-card-badges" });
 			if (showStatus) {
@@ -367,10 +528,12 @@ export class BoardView extends ItemView {
 			}
 		});
 		el.addEventListener("click", () => {
+			this.focusedPath = card.file.path;
 			void this.app.workspace.getLeaf("tab").openFile(card.file);
 		});
 		el.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
+			this.focusedPath = card.file.path;
 			this.showCardMenu(e, card);
 		});
 	}
@@ -401,6 +564,125 @@ export class BoardView extends ItemView {
 			);
 		}
 		menu.showAtMouseEvent(e);
+	}
+
+	// -------------------------------------------------------------- keyboard
+
+	private applyFocus(): void {
+		if (!this.focusedPath) return;
+		const el = this.contentEl.querySelector<HTMLElement>(
+			`.dispatch-card[data-path="${CSS.escape(this.focusedPath)}"]`
+		);
+		if (!el) return;
+		el.addClass("dispatch-card-focused");
+		el.scrollIntoView({ block: "nearest", inline: "nearest" });
+	}
+
+	private onKey(e: KeyboardEvent): void {
+		if (
+			e.target instanceof HTMLInputElement ||
+			e.target instanceof HTMLTextAreaElement ||
+			e.target instanceof HTMLSelectElement
+		)
+			return;
+		const columns = Array.from(this.contentEl.querySelectorAll<HTMLElement>(".dispatch-column"));
+		if (columns.length === 0) return;
+		const cardsOf = (col: HTMLElement) =>
+			Array.from(col.querySelectorAll<HTMLElement>(".dispatch-card"));
+
+		let colIdx = -1;
+		let cardIdx = -1;
+		outer: for (let i = 0; i < columns.length; i++) {
+			const cards = cardsOf(columns[i]);
+			for (let j = 0; j < cards.length; j++) {
+				if (cards[j].dataset.path === this.focusedPath) {
+					colIdx = i;
+					cardIdx = j;
+					break outer;
+				}
+			}
+		}
+
+		const focusAt = (ci: number, ri: number) => {
+			const cards = cardsOf(columns[ci]);
+			if (cards.length === 0) return false;
+			const el = cards[Math.max(0, Math.min(ri, cards.length - 1))];
+			this.focusedPath = el.dataset.path ?? null;
+			this.contentEl
+				.querySelectorAll(".dispatch-card-focused")
+				.forEach((c) => c.removeClass("dispatch-card-focused"));
+			this.applyFocus();
+			return true;
+		};
+		const nextColumnWithCards = (start: number, dir: number): number => {
+			for (let i = start + dir; i >= 0 && i < columns.length; i += dir) {
+				if (cardsOf(columns[i]).length > 0) return i;
+			}
+			return -1;
+		};
+
+		switch (e.key) {
+			case "ArrowDown":
+			case "ArrowUp": {
+				if (colIdx === -1) {
+					const first = nextColumnWithCards(-1, 1);
+					if (first !== -1) focusAt(first, 0);
+					break;
+				}
+				focusAt(colIdx, cardIdx + (e.key === "ArrowDown" ? 1 : -1));
+				break;
+			}
+			case "ArrowLeft":
+			case "ArrowRight": {
+				const dir = e.key === "ArrowRight" ? 1 : -1;
+				if (colIdx === -1) {
+					const first = nextColumnWithCards(-1, 1);
+					if (first !== -1) focusAt(first, 0);
+					break;
+				}
+				const target = nextColumnWithCards(colIdx, dir);
+				if (target !== -1) focusAt(target, cardIdx);
+				break;
+			}
+			case "Enter":
+			case "o": {
+				if (!this.focusedPath) return;
+				const file = this.app.vault.getAbstractFileByPath(this.focusedPath);
+				if (file instanceof TFile) void this.app.workspace.getLeaf("tab").openFile(file);
+				break;
+			}
+			case "[":
+			case "]": {
+				if (colIdx === -1 || !this.focusedPath) return;
+				const dir = e.key === "]" ? 1 : -1;
+				const targetIdx = colIdx + dir;
+				if (targetIdx < 0 || targetIdx >= columns.length) return;
+				this.moveFocusedTo(columns[targetIdx]);
+				break;
+			}
+			default:
+				return;
+		}
+		e.preventDefault();
+	}
+
+	/** Move the focused card into the given column element (keyboard [ / ]). */
+	private moveFocusedTo(colEl: HTMLElement): void {
+		if (!this.focusedPath) return;
+		if (this.mode === "status") {
+			const status = colEl.dataset.col;
+			if (status === undefined) return;
+			void this.moveCard(this.focusedPath, status, Number.MAX_SAFE_INTEGER);
+		} else {
+			const { colKey, colWrite, colDisplay } = colEl.dataset;
+			if (colKey === undefined) return;
+			void this.moveCardToVersion(this.focusedPath, {
+				key: colKey,
+				writeValue: colWrite ?? "",
+				display: colDisplay ?? colKey,
+				order: 0,
+			});
+		}
 	}
 
 	// ------------------------------------------------------ status drag&drop
