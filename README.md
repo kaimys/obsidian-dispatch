@@ -172,6 +172,17 @@ Not yet in the community plugin directory. Until then:
 
 Or install via [BRAT](https://github.com/TfTHacker/obsidian42-brat) with this repository's URL.
 
+### Claude Code setup skill
+
+Integrating Dispatch into a project (boards, device config, chips, tracker sync, agent hooks) is itself agent-guided. In [Claude Code](https://claude.com/claude-code):
+
+```
+/plugin marketplace add kaimys/obsidian-dispatch
+/plugin install dispatch-setup
+```
+
+Then say "set up Dispatch for this project" in your repo — the skill interviews you and writes the config. (No Claude Code? The skill is a plain markdown checklist: `plugins/dispatch-setup/skills/dispatch-setup/SKILL.md`.)
+
 ## Development
 
 ```bash
