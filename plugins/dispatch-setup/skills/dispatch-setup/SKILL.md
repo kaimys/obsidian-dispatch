@@ -20,6 +20,12 @@ You are integrating the **Dispatch** Obsidian plugin (the agentic ticket board) 
 
 ## 1 · Interview (keep it short, confirm with examples from their vault)
 
+- **Wiki already in place? Scan it before asking anything** — turn the interview into a confirmation of pre-filled suggestions instead of cold questions:
+  - Find candidate **ticket folders**: folders dense in notes carrying id-like + `status:` frontmatter.
+  - Collect the **status vocabulary with counts** (`grep '^status:'` across the candidates) — propose it as the column order, and flag inconsistencies (casing/typo variants would split columns; quoted vs unquoted is harmless).
+  - Inventory the **other frontmatter keys and their fill rates** — map what exists to Dispatch's properties (assignee, priority/type → badges, size, version target, discussion URLs) and only propose *new* properties for real gaps.
+  - Detect a **releases folder** (notes with `version` + `date` frontmatter or version-numbered names) and a **meetings folder** (date-prefixed note names) for the Milestones/Meetings tabs.
+  - Present the result as one proposal ("here's the config I'd write — corrections?") and list any hygiene findings (missing ids, unrendered template stubs) that the ⚠ problems panel will surface after setup.
 - **No wiki/vault structure yet?** Offer to scaffold one before anything else — Dispatch works best on top of an agent-friendly wiki (inspiration: [Karpathy's wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)). Suggested structure (adapt names/domains to the project, numbered for stable ordering):
   - `00_Start-Here/` with `index.md` (a **content-oriented catalog** of every page — the entry point agents read first) and `log.md` (an **append-only activity ledger**: `## [YYYY-MM-DD] <type> | <title>` entries for every wiki change)
   - `01_Product/` (vision, definitions, reports) · `02_Requirements/User-Stories/` (the ticket folder Dispatch will point at) · `03_UX/` · `04_<Domain>/` (the project's subject matter) · `05_Engineering/` · `06_Delivery-and-QA/Releases/` (release notes with `version`/`date` frontmatter — feeds the Milestones tab) · `07_Decisions/` (ADRs) · `08_Meetings/` (feeds the Meetings tab) · `09_Templates/` · `10_Inbox/` (unsorted raw material)
