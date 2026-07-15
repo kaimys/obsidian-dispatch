@@ -1,5 +1,6 @@
 {
 	"name": "dispatch",
+	"description": "Companion tooling for the Dispatch Obsidian plugin — the agentic ticket board.",
 	"owner": {
 		"name": "Kai Mysliwiec",
 		"url": "https://github.com/kaimys"
