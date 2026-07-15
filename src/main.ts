@@ -20,9 +20,15 @@ export default class DispatchPlugin extends Plugin {
 	local: LocalSettings = DEFAULT_LOCAL;
 	runs: RunTracker = new RunTracker(this);
 
+	/** In-memory FIFO of chip launches waiting for their repo to free up. */
+	private pendingRuns = new Map<string, { id: string; label: string; execute: () => void }[]>();
+
 	async onload(): Promise<void> {
 		await this.loadAllSettings();
-		this.runs.start(() => this.refreshBoards());
+		this.runs.start(() => {
+			this.refreshBoards();
+			this.drainRunQueues();
+		});
 
 		this.registerView(VIEW_TYPE_BOARD, (leaf) => new BoardView(leaf, this));
 		this.addRibbonIcon("kanban", "Open Dispatch board", () => void this.activateBoard());
@@ -68,6 +74,33 @@ export default class DispatchPlugin extends Plugin {
 		await this.loadAllSettings();
 		this.refreshBoards();
 		new Notice("Dispatch: settings and boards reloaded");
+	}
+
+	/** Queue a chip launch until the repo (cwd) has no active run. */
+	enqueueRun(cwd: string, file: string, label: string, execute: () => void): void {
+		const id = `${Date.now().toString(36)}-q${Math.random().toString(36).slice(2, 8)}`;
+		const queue = this.pendingRuns.get(cwd) ?? [];
+		queue.push({ id, label, execute });
+		this.pendingRuns.set(cwd, queue);
+		this.runs.append({ id, file, label, cwd, state: "queued", ts: new Date().toISOString() });
+		new Notice(`Dispatch: "${label}" queued (${queue.length} waiting for this repo)`);
+	}
+
+	pendingRunCount(cwd: string): number {
+		return this.pendingRuns.get(cwd)?.length ?? 0;
+	}
+
+	/** Start the next queued run for every repo that has become free. */
+	private drainRunQueues(): void {
+		for (const [cwd, queue] of this.pendingRuns) {
+			if (queue.length === 0) continue;
+			if (this.runs.activeForCwd(cwd).length > 0) continue;
+			const next = queue.shift();
+			if (!next) continue;
+			this.runs.append({ id: next.id, state: "cancelled", ts: new Date().toISOString() });
+			new Notice(`Dispatch: starting queued "${next.label}"`);
+			next.execute();
+		}
 	}
 
 	async activateBoard(): Promise<void> {

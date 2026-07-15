@@ -147,6 +147,12 @@
 	color: var(--text-muted);
 }
 
+.dispatch-run-queued {
+	background: transparent;
+	border: 1px dashed var(--text-faint);
+	color: var(--text-muted);
+}
+
 .dispatch-run-running {
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);

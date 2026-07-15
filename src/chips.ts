@@ -131,7 +131,7 @@ export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePat
 	}
 	const command = substitute(tool.command, vars);
 
-	const launch = () => {
+	const execute = () => {
 		// Run lifecycle: record the launch; the agent's lifecycle hooks (in the
 		// target repo) append "running"/"done" via the env vars below.
 		const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -140,6 +140,7 @@ export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePat
 			id: runId,
 			file: sourcePath,
 			label: spec.label,
+			cwd,
 			state: "launched",
 			ts: startedIso,
 		});
@@ -160,10 +161,70 @@ export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePat
 		new Notice(`Dispatch: launched ${toolName}`);
 	};
 
+	// One agent per working tree: if the repo is busy (or has a queue), let
+	// the user queue behind it, run anyway, or back out.
+	const gate = () => {
+		const active = plugin.runs.activeForCwd(cwd);
+		const waiting = plugin.pendingRunCount(cwd);
+		if (active.length === 0 && waiting === 0) {
+			execute();
+			return;
+		}
+		new BusyModal(plugin.app, active[0], waiting, cwd, {
+			onQueue: () => plugin.enqueueRun(cwd, sourcePath, spec.label, execute),
+			onRunAnyway: execute,
+		}).open();
+	};
+
 	if (plugin.local.confirmBeforeRun) {
-		new ConfirmModal(plugin.app, `Run ${toolName}?`, command, cwd, launch).open();
+		new ConfirmModal(plugin.app, `Run ${toolName}?`, command, cwd, gate).open();
 	} else {
-		launch();
+		gate();
+	}
+}
+
+class BusyModal extends Modal {
+	constructor(
+		app: App,
+		private blocking: { label: string; file: string; state: string; lastTs: number } | undefined,
+		private waiting: number,
+		private cwd: string,
+		private actions: { onQueue: () => void; onRunAnyway: () => void }
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.titleEl.setText("Repository busy");
+		const lines: string[] = [];
+		if (this.blocking) {
+			lines.push(
+				`"${this.blocking.label}" (${this.blocking.file.replace(/^.*\//, "")}) is still ${this.blocking.state} in ${this.cwd} — since ${new Date(this.blocking.lastTs).toLocaleTimeString()}.`
+			);
+		}
+		if (this.waiting > 0) lines.push(`${this.waiting} run(s) already queued for this repo.`);
+		lines.push(
+			"Two agents in the same working tree can clobber each other's changes. Queued runs start automatically when the repo frees up."
+		);
+		for (const line of lines) this.contentEl.createEl("p", { text: line });
+
+		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
+		const queue = row.createEl("button", { cls: "mod-cta", text: "Queue" });
+		queue.addEventListener("click", () => {
+			this.close();
+			this.actions.onQueue();
+		});
+		const anyway = row.createEl("button", { text: "Run anyway" });
+		anyway.addEventListener("click", () => {
+			this.close();
+			this.actions.onRunAnyway();
+		});
+		const cancel = row.createEl("button", { text: "Cancel" });
+		cancel.addEventListener("click", () => this.close());
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
 	}
 }
 

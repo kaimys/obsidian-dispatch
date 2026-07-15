@@ -79,6 +79,8 @@ With a **Completed property** configured (e.g. `deployed`, stamped by an automat
 
 When a chip launches a tool, Dispatch records the run in a machine-local file (`~/.dispatch/runs/…jsonl`) and passes `DISPATCH_RUN_ID`, `DISPATCH_RUNS_FILE`, `DISPATCH_NOTE`, `DISPATCH_LABEL`, `DISPATCH_STARTED` to the process. Lifecycle hooks in the target repo (e.g. Claude Code `SessionStart`/`SessionEnd` hooks calling a three-line script) append `running`/`done` records — the board shows a live badge on the card (started → running → done, done fades after 24 h), and on completion the hook appends a run-log line to the note's `## Dispatch runs` section. The plugin only *observes*: live state stays on the machine that runs the agent; durable outcomes land in the note and sync with the vault.
 
+**One agent per working tree:** launching a chip into a repo that already has an active run opens a choice — **Queue** (starts automatically when the blocking session ends), **Run anyway**, or cancel. The queue is in-memory (unstarted entries are marked cancelled after an Obsidian restart), and staleness caps (2 h for launched, 24 h for running) keep a killed terminal from blocking a repo forever.
+
 ### Problems panel
 
 If *Required properties* is configured (e.g. `id, status, updated`), the board shows a ⚠ badge when card notes are missing values, carry unrendered template stubs (`{ date:… }`), or use a status that isn't a configured column. Click it for the list with direct links — malformed tickets become visible the moment they appear instead of in next week's report.
