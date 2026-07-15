@@ -1,6 +1,8 @@
 # Dispatch
 
-An [Obsidian](https://obsidian.md) plugin for teams who run their workflow out of their vault:
+**The agentic ticket board for Obsidian.**
+
+For teams who run their workflow out of their vault:
 
 - **Board** — a kanban board driven by note properties. Cards are notes; columns come from a frontmatter property (e.g. `status`). Drag a card to another column and the property updates immediately via Obsidian's frontmatter API.
 - **Chips** — buttons embedded in notes that dispatch a prompt to an AI coding agent (Claude Code, Codex, or any CLI you configure) in the right repository.
@@ -152,6 +154,12 @@ Vault content is data, not code. Because notes sync across a team, Dispatch is d
 - By default every chip click shows a confirmation dialog with the exact command; the post-drop hook is off per device until you enable it.
 
 Caveat: commands run through your system shell. On Windows (`cmd.exe`), `%VAR%` sequences inside arguments are still expanded by the shell — another reason to keep the confirmation dialog on in shared vaults.
+
+### Disclosures
+
+- **Executes local processes** — but only commands *you* configure on *your* device (tool templates, automation commands). Note content can never introduce a command; a confirmation dialog showing the exact command is on by default.
+- **Reads/writes outside the vault**: device settings at `~/.dispatch/<vault>-<hash>.json` and run records at `~/.dispatch/runs/…jsonl` — kept outside the vault deliberately so machine paths never sync.
+- **No network access** — the plugin itself makes no requests and collects no telemetry. Commands you configure (e.g. a script calling your tracker's API) act under your own credentials.
 
 ## Installation
 

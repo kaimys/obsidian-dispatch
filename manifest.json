@@ -3,7 +3,7 @@
 	"name": "Dispatch",
 	"version": "0.1.0",
 	"minAppVersion": "1.5.0",
-	"description": "Property-driven kanban board with drag & drop, plus chip buttons that dispatch prompts to AI coding agents like Claude Code or Codex.",
+	"description": "The agentic ticket board — property-driven kanban, milestone and meeting boards, plus chips that dispatch AI coding agents (Claude Code, Codex) from your notes.",
 	"author": "Kai Mysliwiec",
 	"authorUrl": "https://github.com/kaimys",
 	"isDesktopOnly": true
