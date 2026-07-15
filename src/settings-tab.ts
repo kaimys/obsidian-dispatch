@@ -187,6 +187,23 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Release notes folder")
+			.setDesc(
+				"Vault folder with release notes carrying version and date frontmatter. A version column whose initial (x.y.0) note exists shows the linked release date; estimates only appear for unreleased versions."
+			)
+			.addText((t) =>
+				t
+					.setPlaceholder("06_Delivery-and-QA/Releases")
+					.setValue(this.plugin.shared.milestones.releaseNotesFolder)
+					.onChange(async (v) => {
+						this.plugin.shared.milestones.releaseNotesFolder = v
+							.trim()
+							.replace(/^\/+|\/+$/g, "");
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Completed property")
 			.setDesc(
 				"Frontmatter property holding a completion date (e.g. deployed, stamped by an automation rule). Powers the velocity-based forecast in the milestone headers. Empty = forecast off."

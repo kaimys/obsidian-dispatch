@@ -44,6 +44,12 @@ export interface MilestoneSettings {
 	completedProperty: string;
 	/** Look-back window (days) for the velocity calculation. */
 	velocityWindowDays: number;
+	/**
+	 * Vault folder containing release notes with `version` and `date`
+	 * frontmatter. A version column whose initial (x.y.0) release note exists
+	 * shows the linked release date instead of a forecast. Empty = off.
+	 */
+	releaseNotesFolder: string;
 }
 
 export interface AutomationRule {
@@ -155,6 +161,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 		sizeProperty: "size",
 		completedProperty: "",
 		velocityWindowDays: 28,
+		releaseNotesFolder: "",
 	},
 	chips: {
 		defaultTool: "claude",

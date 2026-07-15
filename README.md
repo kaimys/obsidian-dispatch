@@ -43,6 +43,7 @@ The board has two tabs — **Kanban** (status columns) and **Milestones** — a 
 - Non-version values ("Rejected", "Icebox") become **special columns on the far left**, in their *Planned versions* order. Version columns are keyed by **major.minor**: `v1.2.0`, `1.2.0` and `1.2.1` all group into the column `1.2`, so inconsistent formatting doesn't split a milestone. Dropping writes the canonical value from *Planned versions* (or the plain `major.minor` for auto-discovered columns); dropping on *(no version)* removes the property.
 - **Planned versions** (settings) are always shown, even when empty — that's how you plan a future release before any ticket is assigned.
 - Each version can carry one **tag** ("MVP", "Closed Beta", …) — click the tag chip in the column header to edit it; tags are shared settings, keyed by `major.minor`.
+- With a **Release notes folder** configured, a column whose initial (x.y.0) release note exists shows its linked release date instead of an estimate — forecasts only appear for unreleased versions.
 - The header shows a **progress bar**: `Σ(size × status progress) / Σ(size)`. Status progress comes from the third segment of the *Columns* setting (e.g. `Development | | 55`, `Done | | 100`, `Rejected | | -` to exclude); size comes from a numeric frontmatter property (default `size`, missing = 1).
 - Within a version column, cards sort by workflow progress (status order, then rank) — there is no manual ordering on this tab, and drops only change the version, never status or rank.
 

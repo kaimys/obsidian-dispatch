@@ -202,6 +202,17 @@
 	cursor: help;
 }
 
+.dispatch-release-link {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-accent);
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.dispatch-release-link:hover {
+	text-decoration: underline;
+}
+
 .dispatch-card-badges {
 	display: flex;
 	flex-wrap: wrap;

@@ -48,6 +48,14 @@ interface MilestoneColumn {
 	order: number;
 }
 
+interface ReleaseInfo {
+	file: TFile;
+	date: string;
+	version: string;
+	/** True for the initial x.y.0 release of the line. */
+	initial: boolean;
+}
+
 /** Normalize a version value to its major.minor key ("v1.2.0" → "1.2"). */
 function versionKey(raw: string): string {
 	const m = raw.trim().match(/^[vV]?(\d+)\.(\d+)/);
@@ -322,9 +330,38 @@ export class BoardView extends ItemView {
 
 	// --------------------------------------------------------- milestone tab
 
+	/**
+	 * Release notes by major.minor key. The initial (x.y.0) note wins; without
+	 * one, the earliest-dated note of the line is used.
+	 */
+	private collectReleases(): Map<string, ReleaseInfo> {
+		const map = new Map<string, ReleaseInfo>();
+		const folder = this.plugin.shared.milestones.releaseNotesFolder.replace(/^\/+|\/+$/g, "");
+		if (!folder) return map;
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			if (!file.path.startsWith(folder + "/")) continue;
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+			const version = typeof fm.version === "string" ? fm.version.trim() : "";
+			if (!version) continue;
+			const key = versionKey(version);
+			const date = typeof fm.date === "string" ? fm.date.trim() : String(fm.date ?? "");
+			const initial = /^[vV]?\d+\.\d+\.0$/.test(version);
+			const existing = map.get(key);
+			if (
+				!existing ||
+				(!existing.initial &&
+					(initial || (date !== "" && existing.date !== "" && date < existing.date)))
+			) {
+				map.set(key, { file, date, version, initial });
+			}
+		}
+		return map;
+	}
+
 	private renderMilestoneBoard(root: HTMLElement, cards: Card[], allCards: Card[]): void {
 		const ms = this.plugin.shared.milestones;
 		const velocity = this.velocityPerDay(allCards);
+		const releases = this.collectReleases();
 
 		const columns = new Map<string, MilestoneColumn>();
 		ms.plannedVersions.forEach((v, i) => {
@@ -375,7 +412,21 @@ export class BoardView extends ItemView {
 				cls: "dispatch-progress-label",
 				text: pct === null ? "—" : `${pct}%`,
 			});
-			this.renderForecast(header, col, colCards, velocity);
+			const release = releases.get(col.key);
+			if (release) {
+				// Released line: show the (linked) initial release date, no estimate.
+				const link = header.createEl("a", {
+					cls: "dispatch-release-link",
+					text: release.date ? `released ${release.date}` : "release notes",
+					attr: { title: release.file.basename },
+				});
+				link.addEventListener("click", (e) => {
+					e.preventDefault();
+					void this.app.workspace.getLeaf("tab").openFile(release.file);
+				});
+			} else {
+				this.renderForecast(header, col, colCards, velocity);
+			}
 
 			const list = colEl.createDiv({ cls: "dispatch-cards" });
 			this.makeVersionDropTarget(colEl, col);
