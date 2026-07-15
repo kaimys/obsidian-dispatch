@@ -31,6 +31,11 @@ export default class DispatchPlugin extends Plugin {
 			name: "Open board",
 			callback: () => void this.activateBoard(),
 		});
+		this.addCommand({
+			id: "reload",
+			name: "Reload settings and boards",
+			callback: () => void this.reloadAll(),
+		});
 		registerChipProcessor(this);
 		this.addSettingTab(new DispatchSettingTab(this.app, this));
 
@@ -56,6 +61,13 @@ export default class DispatchPlugin extends Plugin {
 
 	onunload(): void {
 		this.runs.stop();
+	}
+
+	/** Re-read both settings layers from disk and re-render all boards. */
+	async reloadAll(): Promise<void> {
+		await this.loadAllSettings();
+		this.refreshBoards();
+		new Notice("Dispatch: settings and boards reloaded");
 	}
 
 	async activateBoard(): Promise<void> {

@@ -30,8 +30,19 @@
 	font-weight: 600;
 }
 
-.dispatch-problems {
+.dispatch-tabs-right {
 	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-1);
+}
+
+.dispatch-tabs-right .dispatch-tab svg {
+	width: 14px;
+	height: 14px;
+}
+
+.dispatch-problems {
 	color: var(--text-warning);
 }
 
