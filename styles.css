@@ -128,8 +128,28 @@
 	font-size: var(--font-ui-small);
 	display: flex;
 	align-items: baseline;
-	justify-content: space-between;
 	gap: 6px;
+}
+
+.dispatch-card-title-text {
+	flex: 1;
+}
+
+.dispatch-card-chat {
+	display: flex;
+	align-self: center;
+	color: var(--text-muted);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.dispatch-card-chat:hover {
+	color: var(--text-accent);
+}
+
+.dispatch-card-chat svg {
+	width: 13px;
+	height: 13px;
 }
 
 /* ---------- Run lifecycle badges ---------- */

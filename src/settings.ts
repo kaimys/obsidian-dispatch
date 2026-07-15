@@ -103,6 +103,11 @@ export interface BoardSettings {
 	 */
 	questionsProperty: string;
 	/**
+	 * Frontmatter property holding a discussion URL (Slack/Teams/forum thread).
+	 * Rendered as a chat icon on the card that opens the link. Empty = off.
+	 */
+	discussionProperty: string;
+	/**
 	 * Properties every card note must carry (non-empty, no unrendered template
 	 * stubs). Violations appear in the board's problems panel.
 	 */
@@ -157,6 +162,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 		titleProperty: "id",
 		badgeProperties: ["priority", "type"],
 		questionsProperty: "",
+		discussionProperty: "",
 		requiredProperties: [],
 		automations: [],
 	},
