@@ -40,7 +40,8 @@ Card order is data, so it lives in the notes and syncs with the vault: dropping 
 
 The board has two tabs — **Kanban** (status columns) and **Milestones** — a roadmap view where columns are target versions and dragging a card between columns updates the version property immediately.
 
-- Non-version values ("Rejected", "Icebox") become **special columns on the far left**, in their *Planned versions* order. Version columns are keyed by **major.minor**: `v1.2.0`, `1.2.0` and `1.2.1` all group into the column `1.2`, so inconsistent formatting doesn't split a milestone. Dropping writes the canonical value from *Planned versions* (or the plain `major.minor` for auto-discovered columns); dropping on *(no version)* removes the property.
+- A built-in **(archive)** column sits on the far left: cards whose status is excluded from progress (e.g. Rejected) plus completed cards without a version. Display-only (no drop target) — it keeps *(no version)* a pure pool of unscheduled open work.
+- Other non-version planned values ("Icebox") become **special columns** left of the versions, in their *Planned versions* order. Version columns are keyed by **major.minor**: `v1.2.0`, `1.2.0` and `1.2.1` all group into the column `1.2`, so inconsistent formatting doesn't split a milestone. Dropping writes the canonical value from *Planned versions* (or the plain `major.minor` for auto-discovered columns); dropping on *(no version)* removes the property.
 - **Planned versions** (settings) are always shown, even when empty — that's how you plan a future release before any ticket is assigned.
 - Each version can carry one **tag** ("MVP", "Closed Beta", …) — click the tag chip in the column header to edit it; tags are shared settings, keyed by `major.minor`.
 - With a **Release notes folder** configured, a column whose initial (x.y.0) release note exists shows its linked release date instead of an estimate — forecasts only appear for unreleased versions.
