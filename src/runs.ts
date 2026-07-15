@@ -139,16 +139,19 @@ export class RunTracker {
 	}
 
 	/**
-	 * Runs considered to be occupying a working directory. Staleness caps keep
-	 * a killed terminal (missed SessionEnd) from blocking a repo forever:
-	 * "launched" counts for 2 h, "running" for 24 h.
+	 * Runs considered to be occupying a working directory. "waiting" (Claude
+	 * finished a turn, session still open) counts as busy — the session still
+	 * owns the working tree. Staleness caps keep a killed terminal (missed
+	 * SessionEnd) from blocking a repo forever: "launched" counts for 2 h,
+	 * "running"/"waiting" for 24 h.
 	 */
 	activeForCwd(cwd: string): RunStatus[] {
 		const now = Date.now();
 		return this.read().all.filter((run) => {
 			if (run.cwd !== cwd) return false;
 			if (run.state === "launched") return now - run.lastTs < 2 * 3_600_000;
-			if (run.state === "running") return now - run.lastTs < 24 * 3_600_000;
+			if (run.state === "running" || run.state === "waiting")
+				return now - run.lastTs < 24 * 3_600_000;
 			return false;
 		});
 	}

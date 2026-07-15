@@ -164,6 +164,15 @@
 	color: var(--text-on-accent);
 }
 
+.dispatch-run-waiting {
+	background: var(--color-yellow, #e0a800);
+	color: var(--background-primary);
+}
+
+.dispatch-run-badge {
+	cursor: pointer;
+}
+
 @keyframes dispatch-pulse {
 	50% {
 		opacity: 0.55;
