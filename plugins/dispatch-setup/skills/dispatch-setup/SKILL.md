@@ -20,6 +20,10 @@ You are integrating the **Dispatch** Obsidian plugin (the agentic ticket board) 
 
 ## 1 · Interview (keep it short, confirm with examples from their vault)
 
+- **No wiki/vault structure yet?** Offer to scaffold one before anything else — Dispatch works best on top of an agent-friendly wiki (inspiration: [Karpathy's wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)). Suggested structure (adapt names/domains to the project, numbered for stable ordering):
+  - `00_Start-Here/` with `index.md` (a **content-oriented catalog** of every page — the entry point agents read first) and `log.md` (an **append-only activity ledger**: `## [YYYY-MM-DD] <type> | <title>` entries for every wiki change)
+  - `01_Product/` (vision, definitions, reports) · `02_Requirements/User-Stories/` (the ticket folder Dispatch will point at) · `03_UX/` · `04_<Domain>/` (the project's subject matter) · `05_Engineering/` · `06_Delivery-and-QA/Releases/` (release notes with `version`/`date` frontmatter — feeds the Milestones tab) · `07_Decisions/` (ADRs) · `08_Meetings/` (feeds the Meetings tab) · `09_Templates/` · `10_Inbox/` (unsorted raw material)
+  - Conventions to write into `index.md`: a doc is authoritative only with `status: approved` + `source_of_truth: true` frontmatter; a precedence order for conflicts (decisions > requirements > UX > engineering); every change gets a `log.md` entry. Seed `09_Templates/` with a ticket template carrying the full frontmatter set from step 1.
 - Which folder(s) hold ticket notes? Which frontmatter property is the **status**, and what is the exact status vocabulary (order matters — it becomes the Kanban columns)?
 - Per status: display label? milestone **progress** weight (0–100, or excluded — e.g. Rejected)? **WIP limit**?
 - Which property holds the **target version** (milestones)? Which versions are planned? Release notes folder with `version`/`date` frontmatter?
