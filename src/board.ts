@@ -378,6 +378,10 @@ export class BoardView extends ItemView {
 		ordered.push({ key: "", display: "(no version)", writeValue: "", order: Number.MAX_SAFE_INTEGER });
 
 		const board = root.createDiv({ cls: "dispatch-board" });
+		// Versions ship sequentially — forecasts accumulate the remaining
+		// weight of every earlier version line (incl. leftovers in released
+		// ones) instead of pretending each version starts today.
+		let pipelineBefore = 0;
 		for (const col of ordered) {
 			const colCards = cards
 				.filter((c) => versionKey(c.version) === col.key)
@@ -412,6 +416,15 @@ export class BoardView extends ItemView {
 				cls: "dispatch-progress-label",
 				text: pct === null ? "—" : `${pct}%`,
 			});
+			const isVersionLine = /^\d+\.\d+$/.test(col.key);
+			let colRemaining = 0;
+			if (isVersionLine) {
+				for (const card of colCards) {
+					if (card.excludedFromProgress) continue;
+					colRemaining += card.size * (1 - (card.progress ?? 0) / 100);
+				}
+			}
+
 			const release = releases.get(col.key);
 			if (release) {
 				// Released line: show the (linked) initial release date, no estimate.
@@ -424,9 +437,10 @@ export class BoardView extends ItemView {
 					e.preventDefault();
 					void this.app.workspace.getLeaf("tab").openFile(release.file);
 				});
-			} else {
-				this.renderForecast(header, col, colCards, velocity);
+			} else if (isVersionLine) {
+				this.renderForecast(header, col, colRemaining, pipelineBefore, velocity);
 			}
+			pipelineBefore += colRemaining;
 
 			const list = colEl.createDiv({ cls: "dispatch-cards" });
 			this.makeVersionDropTarget(colEl, col);
@@ -454,22 +468,21 @@ export class BoardView extends ItemView {
 		return { perDay: weight / velocityWindowDays, samples };
 	}
 
-	/** Velocity-based ETA line for a version column (semver columns only). */
+	/**
+	 * Velocity-based ETA for an unreleased version column. Cumulative: the
+	 * pipeline weight of all earlier version lines is finished first.
+	 */
 	private renderForecast(
 		header: HTMLElement,
 		col: MilestoneColumn,
-		colCards: Card[],
+		colRemaining: number,
+		pipelineBefore: number,
 		velocity: { perDay: number; samples: number } | null
 	): void {
-		if (!velocity || !/^\d+\.\d+$/.test(col.key)) return;
-		let remaining = 0;
-		for (const card of colCards) {
-			if (card.excludedFromProgress) continue;
-			remaining += card.size * (1 - (card.progress ?? 0) / 100);
-		}
-		if (remaining <= 0) return;
+		if (!velocity || colRemaining <= 0) return;
 
-		const days = remaining / velocity.perDay;
+		const total = pipelineBefore + colRemaining;
+		const days = total / velocity.perDay;
 		const fmt = (d: number) => {
 			const eta = new Date(Date.now() + d * 86_400_000);
 			return `${eta.getFullYear()}-${String(eta.getMonth() + 1).padStart(2, "0")}-${String(
@@ -482,8 +495,8 @@ export class BoardView extends ItemView {
 			text: `≈ ${fmt(days)}`,
 			attr: {
 				title:
-					`Remaining weight ${remaining.toFixed(1)} at ${(velocity.perDay * 7).toFixed(1)}/week ` +
-					`(${velocity.samples} completions in the last ${windowDays} days). ` +
+					`Remaining weight ${colRemaining.toFixed(1)} + ${pipelineBefore.toFixed(1)} queued in earlier versions, ` +
+					`at ${(velocity.perDay * 7).toFixed(1)}/week (${velocity.samples} completions in the last ${windowDays} days). ` +
 					`Optimistic ${fmt(days * 0.6)} · pessimistic ${fmt(days * 1.4)}.`,
 			},
 		});

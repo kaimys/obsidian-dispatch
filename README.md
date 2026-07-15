@@ -72,7 +72,7 @@ Rules evaluated when a card **enters a column** (settings → Automations, JSON)
 
 ### Milestone forecast
 
-With a **Completed property** configured (e.g. `deployed`, stamped by an automation rule), milestone headers show a velocity-based ETA: remaining weight `Σ size × (1 − progress)` divided by the completed weight per day over the look-back window (default 28 days). Hover for the assumptions and an optimistic/pessimistic range (±40%). No completions in the window = no forecast — the feature never guesses.
+With a **Completed property** configured (e.g. `deployed`, stamped by an automation rule), milestone headers show a velocity-based ETA. Estimates **accumulate along the version pipeline**: a version’s ETA covers the remaining weight `Σ size × (1 − progress)` of **all earlier version lines** (including leftovers in released ones) plus its own, divided by the completed weight per day over the look-back window (default 28 days) — so a later version can never be forecast before an earlier one. Hover for the assumptions and an optimistic/pessimistic range (±40%). No completions in the window = no forecast — the feature never guesses.
 
 ### Run lifecycle (chips → board)
 
