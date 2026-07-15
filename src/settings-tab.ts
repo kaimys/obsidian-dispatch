@@ -205,7 +205,7 @@ export class DispatchSettingTab extends PluginSettingTab {
 		containerEl.createEl("p", {
 			cls: "setting-item-description",
 			text:
-				"The Milestones tab groups cards by target version, keyed by major.minor (v1.2.0 and 1.2.1 share the column 1.2). " +
+				"The Release Plan tab groups cards by target version, keyed by major.minor (v1.2.0 and 1.2.1 share the column 1.2). " +
 				"Column progress = Σ(size × status progress) / Σ(size), using the progress values configured on the columns above.",
 		});
 

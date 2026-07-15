@@ -2,12 +2,16 @@
 
 **The agentic ticket board for Obsidian.**
 
-For teams who run their workflow out of their vault:
+![Dispatch — Kanban board and Release Plan](docs/release-plan.gif)
 
-- **Board** — a kanban board driven by note properties. Cards are notes; columns come from a frontmatter property (e.g. `status`). Drag a card to another column and the property updates immediately via Obsidian's frontmatter API.
-- **Chips** — buttons embedded in notes that dispatch a prompt to an AI coding agent (Claude Code, Codex, or any CLI you configure) in the right repository.
+Your coding agents ship faster than you can decide. **You are now the bottleneck** — what remains of the development cycle is deciding *what* to build, agreeing on it as a team, and reviewing what comes back. Dispatch turns an agent-friendly wiki (à la [Karpathy's LLM wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)) into the cockpit for that human side: tickets are plain notes, boards are live views over their frontmatter, and every card can dispatch a coding agent — Claude Code, Codex, any CLI — into the right repository.
 
-Desktop only (chips and hooks spawn local processes).
+- **Refinement is the new development.** The agent posts a ticket's open questions into your team chat (Slack via MCP), the team answers where it already talks, and the answers flow back into the spec. Every card shows its refinement state as a `? N` badge that burns down to green — green means build-ready.
+- **Release planning is drag & drop.** The Release Plan view groups tickets by target version: live weighted progress per release, velocity-based forecasts that accumulate across versions, linked release notes for everything shipped. Drag a card — the plan is up to date the moment you drop it.
+- **Meetings run themselves around you.** The agenda is prepared from the board; after the call, a NoteTaker transcript (e.g. Google Gemini) becomes an interpreted report in your vault, decisions are folded into the affected tickets automatically, and action items are tracked per person on the Meetings tab.
+- **Testing works like refinement.** Manual test plans cover only what the automated suites don't; a `✓ N` badge counts the open checks through review and turns green when a ticket is safe to ship.
+
+Under the hood, two primitives: **boards** (kanban views driven by note properties — drag & drop writes frontmatter) and **chips** (buttons that launch coding agents with the ticket as context). Desktop only — chips and automations spawn local processes.
 
 ## Team-safe configuration model
 
@@ -42,9 +46,9 @@ Open the board via the ribbon icon or the command *Dispatch: Open board*. Click 
 
 Card order is data, so it lives in the notes and syncs with the vault: dropping a card writes a numeric position into the order property. Ranks are assigned with gaps (1024 apart) and inserts take the midpoint, so a reorder normally rewrites **only the moved note**. When a column contains unranked cards or a gap is exhausted, the whole column is renormalized once (only notes whose value changes are written). Cards without a rank sort below ranked ones, alphabetically.
 
-## Milestones
+## Release Plan
 
-The board has two tabs — **Kanban** (status columns) and **Milestones** — a roadmap view where columns are target versions and dragging a card between columns updates the version property immediately.
+Next to **Kanban** (status columns) sits the **Release Plan** tab — a roadmap view where columns are target versions and dragging a card between columns updates the version property immediately. (Its settings live under "Milestones".)
 
 - A built-in **(archive)** column sits on the far left: cards whose status is excluded from progress (e.g. Rejected) plus completed cards without a version. Display-only (no drop target) — it keeps *(no version)* a pure pool of unscheduled open work.
 - Other non-version planned values ("Icebox") become **special columns** left of the versions, in their *Planned versions* order. Version columns are keyed by **major.minor**: `v1.2.0`, `1.2.0` and `1.2.1` all group into the column `1.2`, so inconsistent formatting doesn't split a milestone. Dropping writes the canonical value from *Planned versions* (or the plain `major.minor` for auto-discovered columns); dropping on *(no version)* removes the property.
@@ -77,9 +81,9 @@ Rules evaluated when a card **enters a column** (settings → Automations, JSON)
 - **Slice-by bar**: pick a badge property (type, priority, …) in the bar above the board and click a value chip to filter both tabs to matching cards; click again to clear. Counts are shown per value; missing values group under "(none)".
 - **Keyboard**: arrow keys move the card focus, `Enter`/`o` opens the note, `[` / `]` move the focused card one column left/right (Kanban: status change; Milestones: version change).
 
-### Milestone forecast
+### Release forecast
 
-With a **Completed property** configured (e.g. `deployed`, stamped by an automation rule), milestone headers show a velocity-based ETA. Estimates **accumulate along the version pipeline**: a version’s ETA covers the remaining weight `Σ size × (1 − progress)` of **all earlier version lines** (including leftovers in released ones) plus its own, divided by the completed weight per day over the look-back window (default 28 days) — so a later version can never be forecast before an earlier one. Hover for the assumptions and an optimistic/pessimistic range (±40%). No completions in the window = no forecast — the feature never guesses.
+With a **Completed property** configured (e.g. `deployed`, stamped by an automation rule), release headers show a velocity-based ETA. Estimates **accumulate along the version pipeline**: a version’s ETA covers the remaining weight `Σ size × (1 − progress)` of **all earlier version lines** (including leftovers in released ones) plus its own, divided by the completed weight per day over the look-back window (default 28 days) — so a later version can never be forecast before an earlier one. Hover for the assumptions and an optimistic/pessimistic range (±40%). No completions in the window = no forecast — the feature never guesses.
 
 ### Run lifecycle (chips → board)
 
