@@ -138,6 +138,21 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Open-tests property")
+			.setDesc(
+				"Numeric frontmatter property counting open manual test-plan items. Shown as a \"✓ N\" badge on cards — green at 0 (manual review complete). Empty = off."
+			)
+			.addText((t) =>
+				t
+					.setPlaceholder("open_tests")
+					.setValue(this.plugin.shared.board.testsProperty)
+					.onChange(async (v) => {
+						this.plugin.shared.board.testsProperty = v.trim();
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Discussion property")
 			.setDesc(
 				"Frontmatter property holding a discussion URL (e.g. a Slack thread). Cards show a chat icon that opens the link. Empty = off."

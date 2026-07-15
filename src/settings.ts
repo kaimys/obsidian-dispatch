@@ -108,6 +108,11 @@ export interface BoardSettings {
 	 */
 	discussionProperty: string;
 	/**
+	 * Numeric frontmatter property counting open manual test-plan items.
+	 * Rendered as a "✓ N" badge (green at 0 = manual review complete). Empty = off.
+	 */
+	testsProperty: string;
+	/**
 	 * Properties every card note must carry (non-empty, no unrendered template
 	 * stubs). Violations appear in the board's problems panel.
 	 */
@@ -163,6 +168,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 		badgeProperties: ["priority", "type"],
 		questionsProperty: "",
 		discussionProperty: "",
+		testsProperty: "",
 		requiredProperties: [],
 		automations: [],
 	},
