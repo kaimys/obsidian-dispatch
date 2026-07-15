@@ -123,6 +123,21 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Open-questions property")
+			.setDesc(
+				"Numeric frontmatter property counting unanswered refinement questions. Shown as a \"? N\" badge on cards — green at 0 (refinement complete). Empty = off."
+			)
+			.addText((t) =>
+				t
+					.setPlaceholder("open_questions")
+					.setValue(this.plugin.shared.board.questionsProperty)
+					.onChange(async (v) => {
+						this.plugin.shared.board.questionsProperty = v.trim();
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Required properties")
 			.setDesc(
 				"Comma-separated properties every card note must carry. Missing values, unrendered template stubs, and unknown statuses appear in the board's ⚠ problems panel."

@@ -29,6 +29,7 @@ Configure in *Settings → Dispatch*:
 - **Order property** — the frontmatter property that holds the manual sort position within a column (default `rank`; empty disables manual ordering)
 - **Columns** — ordered list, one per line (`value` or `value | Display label`). Statuses found in notes but not configured appear as extra columns at the end.
 - **Title / badge properties** — what each card shows (e.g. ticket `id` as title prefix, `priority` and `type` as badges)
+- **Open-questions property** — numeric frontmatter counter (e.g. `open_questions`, maintained by your refinement workflow) rendered as a `? N` badge: amber while questions remain, green at 0 (refinement complete)
 
 Open the board via the ribbon icon or the command *Dispatch: Open board*. Click a card to open the note; drag it to a column to change its status, or within a column to change its position (typically used as a priority order).
 

@@ -98,6 +98,11 @@ export interface BoardSettings {
 	/** Frontmatter properties rendered as badges on each card. */
 	badgeProperties: string[];
 	/**
+	 * Numeric frontmatter property counting unanswered refinement questions.
+	 * Rendered as a "? N" badge (green at 0 = refinement complete). Empty = off.
+	 */
+	questionsProperty: string;
+	/**
 	 * Properties every card note must carry (non-empty, no unrendered template
 	 * stubs). Violations appear in the board's problems panel.
 	 */
@@ -151,6 +156,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 		],
 		titleProperty: "id",
 		badgeProperties: ["priority", "type"],
+		questionsProperty: "",
 		requiredProperties: [],
 		automations: [],
 	},
