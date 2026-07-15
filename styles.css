@@ -242,19 +242,52 @@
 
 /* ---------- Meetings tab ---------- */
 
-.dispatch-agg-label {
-	font-size: var(--font-ui-small);
-	color: var(--text-muted);
+.dispatch-meeting-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+	padding: var(--size-4-3);
+	max-width: 900px;
 }
 
-.dispatch-agg-chip {
-	cursor: default;
+.dispatch-meeting-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	cursor: pointer;
+}
+
+.dispatch-meeting-main {
+	flex: 1;
+	min-width: 0;
+}
+
+.dispatch-meeting-sub {
+	display: flex;
+	gap: 12px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	margin-top: 2px;
+}
+
+.dispatch-meeting-badges {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	justify-content: flex-end;
+	flex-shrink: 0;
+	max-width: 45%;
+}
+
+.dispatch-badge.dispatch-badge-questions-zero {
+	background: var(--color-green, #4caf50);
+	color: var(--text-on-accent);
 }
 
 .dispatch-agg-unassigned {
-	cursor: default;
 	border: 1px dashed var(--text-faint);
 	background: transparent;
+	color: var(--text-muted);
 }
 
 .dispatch-meeting-future {
