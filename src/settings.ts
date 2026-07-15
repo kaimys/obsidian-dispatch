@@ -121,9 +121,23 @@ export interface BoardSettings {
 	automations: AutomationRule[];
 }
 
+export interface MeetingSettings {
+	/** Vault folder (root only — subfolders ignored) with meeting notes. Empty = tab hidden. */
+	folder: string;
+	/** Frontmatter property with the meeting date (YYYY-MM-DD). */
+	dateProperty: string;
+	/** Frontmatter property listing participants. */
+	participantsProperty: string;
+	/** Numeric frontmatter property counting open action items (card badge). */
+	actionsProperty: string;
+	/** Chips offered on meeting cards (e.g. "Read transcript" → /meeting report). */
+	templates: ChipTemplate[];
+}
+
 export interface SharedSettings {
 	board: BoardSettings;
 	milestones: MilestoneSettings;
+	meetings: MeetingSettings;
 	chips: {
 		/** Tool used when a chip block does not specify one. */
 		defaultTool: string;
@@ -180,6 +194,13 @@ export const DEFAULT_SHARED: SharedSettings = {
 		completedProperty: "",
 		velocityWindowDays: 28,
 		releaseNotesFolder: "",
+	},
+	meetings: {
+		folder: "",
+		dateProperty: "meeting_date",
+		participantsProperty: "participants",
+		actionsProperty: "open_actions",
+		templates: [],
 	},
 	chips: {
 		defaultTool: "claude",

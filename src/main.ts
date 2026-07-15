@@ -45,10 +45,27 @@ export default class DispatchPlugin extends Plugin {
 		registerChipProcessor(this);
 		this.addSettingTab(new DispatchSettingTab(this.app, this));
 
-		// Virtual chips in the note's file menu for every card note.
+		// Virtual chips in the note's file menu — ticket chips for card notes,
+		// meeting chips for meeting notes.
 		this.registerEvent(
 			this.app.workspace.on("file-menu", (menu, file) => {
 				if (!(file instanceof TFile) || file.extension !== "md") return;
+				const meetingsFolder = this.shared.meetings.folder.replace(/^\/+|\/+$/g, "");
+				if (
+					meetingsFolder &&
+					file.path.startsWith(meetingsFolder + "/") &&
+					!file.path.slice(meetingsFolder.length + 1).includes("/")
+				) {
+					for (const template of this.shared.meetings.templates) {
+						menu.addItem((item) =>
+							item
+								.setTitle(`Dispatch: ${template.label}`)
+								.setIcon("zap")
+								.onClick(() => launchChip(this, template, file.path))
+						);
+					}
+					return;
+				}
 				const folders = this.shared.board.sourceFolders
 					.map((f) => f.replace(/^\/+|\/+$/g, ""))
 					.filter((f) => f.length > 0);
@@ -150,6 +167,7 @@ export default class DispatchPlugin extends Plugin {
 		this.shared = {
 			board: { ...DEFAULT_SHARED.board, ...data.board },
 			milestones: { ...DEFAULT_SHARED.milestones, ...data.milestones },
+			meetings: { ...DEFAULT_SHARED.meetings, ...data.meetings },
 			chips: { ...DEFAULT_SHARED.chips, ...data.chips },
 		};
 		// Pre-0.3: single postDropHook — migrate into the automations list.

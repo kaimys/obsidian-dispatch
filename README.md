@@ -92,6 +92,10 @@ If *Required properties* is configured (e.g. `id, status, updated`), the board s
 
 Right-click a card to run any chip template (see below) or edit the size / badge properties inline (empty value removes the property) — the quickest way to keep milestone weights and priorities populated.
 
+## Meetings tab
+
+Point **Meetings folder** at a folder of meeting notes (root only) and a third tab appears: month columns of past and upcoming meetings (upcoming = dashed accent border), each card showing the date, an open-action-items badge (frontmatter counter) and the participants. A bar above the board totals **open action items per person** — unchecked `- [ ]` items across all notes, owner from a bold-only section line (`**Kai**`) or an inline `- [ ] **Kai:** …` prefix, ownerless items counted as *unassigned*. Meeting cards get their own chip templates (e.g. "Read transcript" → your meeting-report workflow).
+
 ## Chips
 
 Chips launch an AI coding agent (or any CLI) with a templated prompt, in the right repository. They come in two forms:

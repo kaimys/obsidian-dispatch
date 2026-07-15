@@ -240,6 +240,28 @@
 	color: var(--text-on-accent);
 }
 
+/* ---------- Meetings tab ---------- */
+
+.dispatch-agg-label {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
+.dispatch-agg-chip {
+	cursor: default;
+}
+
+.dispatch-agg-unassigned {
+	cursor: default;
+	border: 1px dashed var(--text-faint);
+	background: transparent;
+}
+
+.dispatch-meeting-future {
+	border-style: dashed;
+	border-color: var(--interactive-accent);
+}
+
 /* ---------- Milestone forecast ---------- */
 
 .dispatch-forecast {

@@ -297,6 +297,79 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		// ------------------------------------------------------------------
+		new Setting(containerEl).setName("Meetings").setHeading();
+		containerEl.createEl("p", {
+			cls: "setting-item-description",
+			text:
+				"The Meetings tab shows the notes of a folder (root only) in month columns — past and upcoming — with an open-action-items badge per meeting and per-person totals. " +
+				"Unchecked '- [ ]' items count; a bold-only line (**Kai**) sets the owner for following items, '- [ ] **Kai:** …' overrides, no owner = unassigned.",
+		});
+
+		new Setting(containerEl)
+			.setName("Meetings folder")
+			.setDesc("Vault folder with meeting notes. Empty = tab hidden.")
+			.addText((t) =>
+				t
+					.setPlaceholder("08_Meetings-and-Workshop-Notes")
+					.setValue(this.plugin.shared.meetings.folder)
+					.onChange(async (v) => {
+						this.plugin.shared.meetings.folder = v.trim().replace(/^\/+|\/+$/g, "");
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Meeting properties")
+			.setDesc("Date | participants | open-actions frontmatter property names.")
+			.addText((t) =>
+				t
+					.setValue(
+						[
+							this.plugin.shared.meetings.dateProperty,
+							this.plugin.shared.meetings.participantsProperty,
+							this.plugin.shared.meetings.actionsProperty,
+						].join(" | ")
+					)
+					.onChange(async (v) => {
+						const parts = v.split("|").map((s) => s.trim());
+						this.plugin.shared.meetings.dateProperty = parts[0] || "meeting_date";
+						this.plugin.shared.meetings.participantsProperty = parts[1] || "participants";
+						this.plugin.shared.meetings.actionsProperty = parts[2] || "open_actions";
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Meeting chip templates")
+			.setDesc(
+				"Chips offered on meeting cards (right-click + file menu). One per line: label | tool | repo | prompt — same variables as ticket chips."
+			)
+			.addTextArea((ta) => {
+				ta.inputEl.rows = 3;
+				ta.setPlaceholder("Read transcript | claude | my-project | /meeting report {{title}}")
+					.setValue(
+						this.plugin.shared.meetings.templates
+							.map((t) => `${t.label} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
+							.join("\n")
+					)
+					.onChange(async (v) => {
+						this.plugin.shared.meetings.templates = splitLines(v)
+							.map((line) => {
+								const parts = line.split("|");
+								if (parts.length < 4) return null;
+								const label = parts[0].trim();
+								const tool = parts[1].trim();
+								const repo = parts[2].trim();
+								const prompt = parts.slice(3).join("|").trim();
+								if (!label || !prompt) return null;
+								return { label, tool: tool || undefined, repo: repo || undefined, prompt };
+							})
+							.filter((t): t is NonNullable<typeof t> => t !== null);
+						await this.plugin.saveShared();
+					});
+			});
+
+		// ------------------------------------------------------------------
 		new Setting(containerEl).setName("Automations").setHeading();
 		containerEl.createEl("p", {
 			cls: "setting-item-description",
