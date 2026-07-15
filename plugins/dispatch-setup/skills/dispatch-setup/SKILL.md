@@ -36,6 +36,18 @@ You are integrating the **Dispatch** Obsidian plugin (the agentic ticket board) 
 - Which properties exist / should exist: `assignee`, `size`, `open_questions`, `open_tests`, `discussion` (thread URL)? Required properties for the problems panel (typically `id, status, updated`)?
 - Meetings folder (optional third tab)?
 - Grep a few real ticket notes to validate every answer against reality — inconsistent value formats (e.g. `v1.2.0` vs `1.2.0`) are normal; Dispatch normalizes versions by major.minor, but statuses must match exactly.
+- **Last step — propose workflow skills for the CODE repo (the glue).** Chips only carry `/command {{id}}` one-liners; the actual workflow logic must live as Claude skills (`.claude/commands/*.md`) **in the user's code repository** — not the wiki — so it versions with the code, travels through git to every teammate, and is reviewable like code. Derive a catalog from their lifecycle and offer to scaffold it, each skill pre-wired to a chip:
+  | Skill (repo) | Chip (Dispatch) | Does |
+  |---|---|---|
+  | `/create-ticket <desc>` | block chips in reports/meeting notes | duplicate check → spec (full frontmatter, counters seeded) + tracker task, wiki hygiene |
+  | `/refine <id>` | ticket cards | read spec + linked context, open a team thread (`discussion:`), maintain `open_questions` → 0 gates the next status |
+  | `/update-ticket <id>` | ticket cards | fold inline/thread/tracker feedback into the spec, recount counters |
+  | `/implementation-plan <id>` | ticket cards | feedback first, then plan mode, plan stored in the spec |
+  | `/develop <id>` | ticket cards | preconditions, status move, set `assignee`, implement with tests |
+  | `/test-plan <id>` | ticket cards | manual-only checklist (excluding automated coverage), set `open_tests`, status move |
+  | `/release [version]` | manual / release chip | test pass, version bump, release note with `version`/`date` frontmatter (feeds Milestones), promote tickets, announce |
+  | `/meeting agenda\|report` | meeting cards | agenda file; transcript → interpreted report with checkbox action items (the format the Meetings tab counts) |
+  Adapt names, statuses and tracker calls to their answers; every status move must update wiki frontmatter *and* tracker per the source-of-truth decision (step 5). Skills reference repos only via Dispatch's alias mechanism — never hardcode machine paths.
 
 ## 2 · Shared config (`<vault>/.obsidian/plugins/dispatch/data.json`)
 
