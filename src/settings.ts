@@ -95,6 +95,9 @@ export interface BoardSettings {
 	columns: ColumnConfig[];
 	/** Frontmatter property shown before the file name on each card (e.g. a ticket id). */
 	titleProperty: string;
+	/** Frontmatter property naming the ticket's assignee — rendered as an
+	 * @-badge and always offered in the slice-by bar. Empty = off. */
+	assigneeProperty: string;
 	/** Frontmatter properties rendered as badges on each card. */
 	badgeProperties: string[];
 	/**
@@ -179,6 +182,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 			{ value: "Done", progress: 100 },
 		],
 		titleProperty: "id",
+		assigneeProperty: "",
 		badgeProperties: ["priority", "type"],
 		questionsProperty: "",
 		discussionProperty: "",

@@ -108,6 +108,21 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Assignee property")
+			.setDesc(
+				"Frontmatter property naming the ticket's assignee — shown as an @-badge on the card and always offered in the slice-by bar. Empty = off."
+			)
+			.addText((t) =>
+				t
+					.setPlaceholder("assignee")
+					.setValue(this.plugin.shared.board.assigneeProperty)
+					.onChange(async (v) => {
+						this.plugin.shared.board.assigneeProperty = v.trim();
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Badge properties")
 			.setDesc("Comma-separated frontmatter properties rendered as badges on each card.")
 			.addText((t) =>

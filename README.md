@@ -31,6 +31,7 @@ Configure in *Settings → Dispatch*:
 - **Order property** — the frontmatter property that holds the manual sort position within a column (default `rank`; empty disables manual ordering)
 - **Columns** — ordered list, one per line (`value` or `value | Display label`). Statuses found in notes but not configured appear as extra columns at the end.
 - **Title / badge properties** — what each card shows (e.g. ticket `id` as title prefix, `priority` and `type` as badges)
+- **Assignee property** — who owns the ticket (e.g. `assignee`), shown as an accent-outlined `@Name` badge and always first in the slice-by bar
 - **Open-questions property** — numeric frontmatter counter (e.g. `open_questions`, maintained by your refinement workflow) rendered as a `? N` badge: amber while questions remain, green at 0 (refinement complete)
 - **Open-tests property** — numeric counter of open manual test-plan items (e.g. `open_tests`, set when the test plan is written) rendered as a `✓ N` badge: purple while checks remain, green at 0 (manual review complete)
 - **Discussion property** — a thread URL (e.g. Slack) rendered as a chat icon in the card title that opens the link

@@ -341,6 +341,13 @@
 	font-weight: 500;
 }
 
+.dispatch-badge-assignee {
+	background: transparent;
+	border: 1px solid var(--interactive-accent);
+	color: var(--text-accent);
+	font-weight: 500;
+}
+
 .dispatch-badge-questions {
 	background: var(--color-yellow, #e0a800);
 	color: var(--background-primary);
