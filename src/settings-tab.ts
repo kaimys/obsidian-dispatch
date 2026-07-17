@@ -483,6 +483,43 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Column chips")
+			.setDesc(
+				"Batch chips offered when clicking a Kanban column header — one agent session over all tickets in the column. Same line format as chip templates; prompt variables: {{ids}} (space-separated ticket IDs in board order), {{status}}, {{count}}."
+			)
+			.addTextArea((ta) => {
+				ta.inputEl.rows = 4;
+				ta.setPlaceholder(
+					"Update all | claude | my-project | Process these tickets sequentially with /update-ticket: {{ids}}"
+				)
+					.setValue(
+						this.plugin.shared.chips.columnTemplates
+							.map((t) => `${t.label} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
+							.join("\n")
+					)
+					.onChange(async (v) => {
+						this.plugin.shared.chips.columnTemplates = splitLines(v)
+							.map((line) => {
+								const parts = line.split("|");
+								if (parts.length < 4) return null;
+								const label = parts[0].trim();
+								const tool = parts[1].trim();
+								const repo = parts[2].trim();
+								const prompt = parts.slice(3).join("|").trim();
+								if (!label || !prompt) return null;
+								return {
+									label,
+									tool: tool || undefined,
+									repo: repo || undefined,
+									prompt,
+								};
+							})
+							.filter((t): t is NonNullable<typeof t> => t !== null);
+						await this.plugin.saveShared();
+					});
+			});
+
+		new Setting(containerEl)
 			.setName("Chip templates")
 			.setDesc(
 				"Virtual chips shown for every card note (board right-click + file menu) — no markdown block needed. One per line: label | tool | repo | prompt. Empty tool/repo = defaults. Prompt variables: {{id}}, {{status}}, {{file}}, {{title}}."

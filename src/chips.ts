@@ -66,31 +66,6 @@ export function registerChipProcessor(plugin: DispatchPlugin): void {
 
 /** Resolve + launch a chip (from a code block or a template) for a note. */
 export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePath: string): void {
-	const toolName = spec.tool || plugin.shared.chips.defaultTool;
-	const tool = plugin.local.tools[toolName];
-	if (!tool || !tool.command.trim()) {
-		new Notice(
-			`Dispatch: tool "${toolName}" is not configured on this device (Settings → Dispatch → This device).`
-		);
-		return;
-	}
-
-	let cwd = plugin.getVaultBasePath();
-	if (spec.repo) {
-		const resolved = plugin.local.repos[spec.repo];
-		if (!resolved) {
-			new Notice(
-				`Dispatch: repository alias "${spec.repo}" is not configured on this device.`
-			);
-			return;
-		}
-		cwd = resolved;
-	}
-	if (!cwd) {
-		new Notice("Dispatch: no working directory available (set a repo alias on the chip).");
-		return;
-	}
-
 	const file = plugin.app.vault.getAbstractFileByPath(sourcePath);
 	const fm =
 		file instanceof TFile
@@ -121,6 +96,66 @@ export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePat
 		return;
 	}
 	const prompt = substitute(spec.prompt, values);
+	const vaultBase = plugin.getVaultBasePath();
+	const noteAbs = vaultBase ? `${vaultBase}\\${sourcePath.replace(/\//g, "\\")}` : "";
+	executeChip(plugin, spec, prompt, sourcePath, noteAbs);
+}
+
+/**
+ * Launch a batch chip over all tickets of a Kanban column — ONE agent session
+ * working through the IDs sequentially. Run tracked under a pseudo-path (no
+ * card badge, but the repo busy-gate and queue still apply).
+ */
+export function launchColumnChip(
+	plugin: DispatchPlugin,
+	spec: ChipTemplate,
+	ids: string[],
+	status: string
+): void {
+	if (ids.length === 0) {
+		new Notice("Dispatch: no tickets with IDs in this column.");
+		return;
+	}
+	const prompt = substitute(spec.prompt, {
+		ids: ids.join(" "),
+		status,
+		count: String(ids.length),
+	});
+	executeChip(plugin, spec, prompt, `(batch) ${status || "column"}`, "");
+}
+
+/** Shared launch core: tool/repo resolution, command build, busy gate, confirm, run record. */
+function executeChip(
+	plugin: DispatchPlugin,
+	spec: ChipTemplate,
+	prompt: string,
+	recordFile: string,
+	noteAbs: string
+): void {
+	const toolName = spec.tool || plugin.shared.chips.defaultTool;
+	const tool = plugin.local.tools[toolName];
+	if (!tool || !tool.command.trim()) {
+		new Notice(
+			`Dispatch: tool "${toolName}" is not configured on this device (Settings → Dispatch → This device).`
+		);
+		return;
+	}
+
+	let cwd = plugin.getVaultBasePath();
+	if (spec.repo) {
+		const resolved = plugin.local.repos[spec.repo];
+		if (!resolved) {
+			new Notice(
+				`Dispatch: repository alias "${spec.repo}" is not configured on this device.`
+			);
+			return;
+		}
+		cwd = resolved;
+	}
+	if (!cwd) {
+		new Notice("Dispatch: no working directory available (set a repo alias on the chip).");
+		return;
+	}
 
 	const vars = shellVars({ cwd });
 	vars.prompt = quoteArg(prompt); // no {{promptRaw}} on purpose — injection guard
@@ -138,17 +173,16 @@ export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePat
 		const startedIso = new Date().toISOString();
 		plugin.runs.append({
 			id: runId,
-			file: sourcePath,
+			file: recordFile,
 			label: spec.label,
 			cwd,
 			state: "launched",
 			ts: startedIso,
 		});
-		const vaultBase = plugin.getVaultBasePath();
 		const env: Record<string, string> = {
 			DISPATCH_RUN_ID: runId,
 			DISPATCH_RUNS_FILE: plugin.runs.path(),
-			DISPATCH_NOTE: vaultBase ? `${vaultBase}\\${sourcePath.replace(/\//g, "\\")}` : "",
+			DISPATCH_NOTE: noteAbs,
 			DISPATCH_LABEL: spec.label,
 			DISPATCH_STARTED: startedIso,
 		};
@@ -171,7 +205,7 @@ export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePat
 			return;
 		}
 		new BusyModal(plugin.app, active[0], waiting, cwd, {
-			onQueue: () => plugin.enqueueRun(cwd, sourcePath, spec.label, execute),
+			onQueue: () => plugin.enqueueRun(cwd, recordFile, spec.label, execute),
 			onRunAnyway: execute,
 		}).open();
 	};

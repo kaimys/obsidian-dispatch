@@ -163,6 +163,12 @@ export interface SharedSettings {
 		 * file menu) — computed from frontmatter, no markdown block needed.
 		 */
 		templates: ChipTemplate[];
+		/**
+		 * Batch chips on Kanban column headers — one agent session over all
+		 * tickets in the column. Prompt variables: {{ids}} (space-separated
+		 * ticket IDs, board order), {{status}}, {{count}}.
+		 */
+		columnTemplates: ChipTemplate[];
 	};
 }
 
@@ -227,6 +233,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 	chips: {
 		defaultTool: "claude",
 		templates: [],
+		columnTemplates: [],
 	},
 };
 

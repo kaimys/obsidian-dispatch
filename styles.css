@@ -99,6 +99,15 @@
 	font-size: var(--font-ui-smaller);
 }
 
+.dispatch-column-header-clickable {
+	cursor: pointer;
+	border-radius: var(--radius-s);
+}
+
+.dispatch-column-header-clickable:hover {
+	background: var(--background-modifier-hover);
+}
+
 .dispatch-cards {
 	display: flex;
 	flex-direction: column;
