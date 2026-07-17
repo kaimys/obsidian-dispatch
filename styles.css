@@ -285,6 +285,13 @@
 	margin: var(--size-4-2) 0;
 }
 
+.dispatch-upcoming-chips {
+	display: flex;
+	gap: 6px;
+	flex-shrink: 0;
+	margin-left: 8px;
+}
+
 .dispatch-meeting-list {
 	display: flex;
 	flex-direction: column;

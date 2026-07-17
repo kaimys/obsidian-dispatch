@@ -458,6 +458,36 @@ export class DispatchSettingTab extends PluginSettingTab {
 					})
 			);
 
+		new Setting(containerEl)
+			.setName("Calendar event chips")
+			.setDesc(
+				"Chips shown on each upcoming calendar card (e.g. Prepare agenda). Same line format as chip templates; prompt variables: {{date}} (YYYY-MM-DD), {{title}} (event title)."
+			)
+			.addTextArea((ta) => {
+				ta.inputEl.rows = 3;
+				ta.setPlaceholder("Prepare agenda | claude | my-project | /agenda {{date}} {{title}}")
+					.setValue(
+						this.plugin.shared.meetings.calendarChips
+							.map((t) => `${t.label} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
+							.join("\n")
+					)
+					.onChange(async (v) => {
+						this.plugin.shared.meetings.calendarChips = splitLines(v)
+							.map((line) => {
+								const parts = line.split("|");
+								if (parts.length < 4) return null;
+								const label = parts[0].trim();
+								const tool = parts[1].trim();
+								const repo = parts[2].trim();
+								const prompt = parts.slice(3).join("|").trim();
+								if (!label || !prompt) return null;
+								return { label, tool: tool || undefined, repo: repo || undefined, prompt };
+							})
+							.filter((t): t is NonNullable<typeof t> => t !== null);
+						await this.plugin.saveShared();
+					});
+			});
+
 		// ------------------------------------------------------------------
 		new Setting(containerEl).setName("Todos").setHeading();
 		containerEl.createEl("p", {

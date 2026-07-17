@@ -139,6 +139,8 @@ export interface MeetingSettings {
 	calendarFilter: string;
 	/** How far ahead the upcoming-events strip looks. */
 	calendarLookaheadDays: number;
+	/** Chips on upcoming calendar cards. Prompt variables: {{date}}, {{title}}. */
+	calendarChips: ChipTemplate[];
 }
 
 export interface TodoSettings {
@@ -236,6 +238,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 		templates: [],
 		calendarFilter: "",
 		calendarLookaheadDays: 14,
+		calendarChips: [],
 	},
 	todos: {
 		folders: [],

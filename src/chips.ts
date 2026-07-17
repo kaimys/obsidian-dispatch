@@ -124,6 +124,20 @@ export function launchColumnChip(
 	executeChip(plugin, spec, prompt, `(batch) ${status || "column"}`, "");
 }
 
+/**
+ * Launch a chip from a calendar event (no note behind it). Prompt variables:
+ * {{date}} (YYYY-MM-DD), {{title}} (event title).
+ */
+export function launchEventChip(
+	plugin: DispatchPlugin,
+	spec: ChipTemplate,
+	date: string,
+	title: string
+): void {
+	const prompt = substitute(spec.prompt, { date, title });
+	executeChip(plugin, spec, prompt, `(calendar) ${date}`, "");
+}
+
 /** Shared launch core: tool/repo resolution, command build, busy gate, confirm, run record. */
 function executeChip(
 	plugin: DispatchPlugin,
