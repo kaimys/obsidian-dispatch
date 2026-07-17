@@ -109,7 +109,7 @@ The **Todos** tab collects every open action item across your configured folders
 
 ## Meetings tab
 
-Point **Meetings folder** at a folder of meeting notes (root only) and a third tab appears: **one row per meeting, newest (incl. upcoming) at the top** — upcoming meetings get a dashed accent border. Each row shows date + participants and **that meeting's open action items broken down per person** (unchecked `- [ ]` items; owner from a bold-only section line (`**Kai**`) or an inline `- [ ] **Kai:** …` prefix; ownerless items count as *unassigned*; a green check marks meetings with nothing open). Meeting cards get their own chip templates (e.g. "Read transcript" → your meeting-report workflow).
+Point **Meetings folder** at a folder of meeting notes (root only) and a third tab appears: **one row per meeting, newest (incl. upcoming) at the top** — upcoming meetings get a dashed accent border. Each row shows date + participants and **that meeting's open action items broken down per person** (unchecked `- [ ]` items; owner from a bold-only section line (`**Kai**`) or an inline `- [ ] **Kai:** …` prefix; ownerless items count as *unassigned*; a green check marks meetings with nothing open). Meeting cards get their own chip templates (e.g. "Read transcript" → your meeting-report workflow). With a **Calendar ICS URL** configured (device-local — e.g. Google Calendar's secret iCal address), an **Upcoming strip** on top shows the next events (DAILY/WEEKLY recurrence expanded, optional title filter): events whose date already has a meeting note link to it („agenda ✓"), the rest show „no agenda yet".
 
 ## Chips
 
@@ -172,7 +172,7 @@ Caveat: commands run through your system shell. On Windows (`cmd.exe`), `%VAR%` 
 
 - **Executes local processes** — but only commands *you* configure on *your* device (tool templates, automation commands). Note content can never introduce a command; a confirmation dialog showing the exact command is on by default.
 - **Reads/writes outside the vault**: device settings at `~/.dispatch/<vault>-<hash>.json` and run records at `~/.dispatch/runs/…jsonl` — kept outside the vault deliberately so machine paths never sync.
-- **No network access** — the plugin itself makes no requests and collects no telemetry. Commands you configure (e.g. a script calling your tracker's API) act under your own credentials.
+- **One network request type** — if (and only if) you configure a calendar ICS URL, the plugin fetches that feed read-only (cached 15 min) for the Meetings tab's upcoming strip. Nothing else leaves your machine; no telemetry. Commands you configure (e.g. a script calling your tracker's API) act under your own credentials.
 
 ## Installation
 

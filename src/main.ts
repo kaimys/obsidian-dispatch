@@ -3,6 +3,7 @@ import { homedir } from "os";
 import { dirname, join } from "path";
 import { FileSystemAdapter, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { BoardView, VIEW_TYPE_BOARD } from "./board";
+import { CalendarEvent, fetchCalendar } from "./calendar";
 import { launchChip, registerChipProcessor } from "./chips";
 import { RunTracker } from "./runs";
 import { DispatchSettingTab } from "./settings-tab";
@@ -89,8 +90,46 @@ export default class DispatchPlugin extends Plugin {
 	/** Re-read both settings layers from disk and re-render all boards. */
 	async reloadAll(): Promise<void> {
 		await this.loadAllSettings();
+		this.calendarCache = null;
 		this.refreshBoards();
 		new Notice("Dispatch: settings and boards reloaded");
+	}
+
+	/** Upcoming calendar events, cached for 15 minutes (↻ reload clears). */
+	private calendarCache: { at: number; events: CalendarEvent[]; error: string } | null = null;
+
+	async getUpcomingEvents(): Promise<{ events: CalendarEvent[]; error: string }> {
+		const url = this.local.calendarUrl.trim();
+		if (!url) return { events: [], error: "" };
+		const now = Date.now();
+		if (this.calendarCache && now - this.calendarCache.at < 15 * 60_000) {
+			return this.calendarCache;
+		}
+		let events: CalendarEvent[] = [];
+		let error = "";
+		try {
+			events = await fetchCalendar(
+				url,
+				new Date(now - 6 * 3_600_000), // include a meeting running right now
+				new Date(now + this.shared.meetings.calendarLookaheadDays * 86_400_000)
+			);
+			const filter = this.shared.meetings.calendarFilter.trim();
+			if (filter) {
+				let re: RegExp | null = null;
+				try {
+					re = new RegExp(filter, "i");
+				} catch {
+					/* fall back to substring */
+				}
+				events = events.filter((e) =>
+					re ? re.test(e.title) : e.title.toLowerCase().includes(filter.toLowerCase())
+				);
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		}
+		this.calendarCache = { at: now, events, error };
+		return this.calendarCache;
 	}
 
 	/** Queue a chip launch until the repo (cwd) has no active run. */

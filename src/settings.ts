@@ -135,6 +135,10 @@ export interface MeetingSettings {
 	actionsProperty: string;
 	/** Chips offered on meeting cards (e.g. "Read transcript" → /meeting report). */
 	templates: ChipTemplate[];
+	/** Optional title filter (regex or substring) for the upcoming-events strip. */
+	calendarFilter: string;
+	/** How far ahead the upcoming-events strip looks. */
+	calendarLookaheadDays: number;
 }
 
 export interface TodoSettings {
@@ -185,6 +189,11 @@ export interface LocalSettings {
 	repos: Record<string, string>;
 	/** Tool name -> launch command template on this machine. */
 	tools: Record<string, ToolConfig>;
+	/**
+	 * Secret iCal URL (e.g. Google Calendar's "Secret address in iCal format")
+	 * for the Meetings tab's upcoming strip. Credential-like — device-local.
+	 */
+	calendarUrl: string;
 	/** Whether the shared post-drop hook may run on this machine. */
 	enableHooks: boolean;
 	/** Show a confirmation dialog (with the exact command) before running a chip. */
@@ -225,6 +234,8 @@ export const DEFAULT_SHARED: SharedSettings = {
 		participantsProperty: "participants",
 		actionsProperty: "open_actions",
 		templates: [],
+		calendarFilter: "",
+		calendarLookaheadDays: 14,
 	},
 	todos: {
 		folders: [],
@@ -245,6 +256,7 @@ export const DEFAULT_LOCAL: LocalSettings = {
 		process.platform === "win32"
 			? { claude: { command: 'start "Dispatch" /d {{cwd}} cmd /k claude {{prompt}}' } }
 			: { claude: { command: "" } },
+	calendarUrl: "",
 	enableHooks: false,
 	confirmBeforeRun: true,
 };

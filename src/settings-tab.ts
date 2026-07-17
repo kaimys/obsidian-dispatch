@@ -432,6 +432,32 @@ export class DispatchSettingTab extends PluginSettingTab {
 			});
 		automationError = containerEl.createEl("p", { cls: "dispatch-settings-error", text: "" });
 
+		new Setting(containerEl)
+			.setName("Calendar filter")
+			.setDesc(
+				"Optional title filter (regex or substring) for the upcoming-events strip on the Meetings tab — e.g. Weekly|Product to hide personal events."
+			)
+			.addText((t) =>
+				t.setValue(this.plugin.shared.meetings.calendarFilter).onChange(async (v) => {
+					this.plugin.shared.meetings.calendarFilter = v.trim();
+					await this.plugin.saveShared();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName("Calendar lookahead (days)")
+			.setDesc("How far ahead the upcoming-events strip looks.")
+			.addText((t) =>
+				t
+					.setValue(String(this.plugin.shared.meetings.calendarLookaheadDays))
+					.onChange(async (v) => {
+						const n = Number(v.trim());
+						this.plugin.shared.meetings.calendarLookaheadDays =
+							Number.isFinite(n) && n > 0 ? Math.floor(n) : 14;
+						await this.plugin.saveShared();
+					})
+			);
+
 		// ------------------------------------------------------------------
 		new Setting(containerEl).setName("Todos").setHeading();
 		containerEl.createEl("p", {
@@ -600,6 +626,21 @@ export class DispatchSettingTab extends PluginSettingTab {
 								{ command },
 							])
 						);
+						await this.plugin.saveLocal();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Calendar ICS URL")
+			.setDesc(
+				"Secret iCal address for the Meetings tab's upcoming strip (Google Calendar: Settings → your calendar → Integrate calendar → Secret address in iCal format). Credential-like — stored device-local, never synced."
+			)
+			.addText((t) =>
+				t
+					.setPlaceholder("https://calendar.google.com/calendar/ical/…/basic.ics")
+					.setValue(this.plugin.local.calendarUrl)
+					.onChange(async (v) => {
+						this.plugin.local.calendarUrl = v.trim();
 						await this.plugin.saveLocal();
 					})
 			);
