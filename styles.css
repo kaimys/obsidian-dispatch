@@ -251,62 +251,38 @@
 
 /* ---------- Meetings tab ---------- */
 
-.dispatch-upcoming {
-	margin: var(--size-4-3) var(--size-4-3) 0;
-	max-width: 900px;
-	border: 1px dashed var(--interactive-accent);
-	border-radius: var(--radius-m);
-	padding: var(--size-4-2) var(--size-4-3);
-}
-
 .dispatch-upcoming-title {
 	font-size: var(--font-ui-smaller);
 	font-weight: 600;
 	color: var(--text-accent);
-	margin-bottom: 4px;
-}
-
-.dispatch-upcoming-row {
-	display: flex;
-	align-items: baseline;
-	gap: 12px;
-	padding: 3px 0;
-	font-size: var(--font-ui-small);
-}
-
-.dispatch-upcoming-clickable {
-	cursor: pointer;
-}
-
-.dispatch-upcoming-clickable:hover .dispatch-upcoming-what {
-	text-decoration: underline;
-}
-
-.dispatch-upcoming-when {
-	color: var(--text-muted);
-	font-variant-numeric: tabular-nums;
-	flex-shrink: 0;
-}
-
-.dispatch-upcoming-what {
-	flex: 1;
-	min-width: 0;
+	margin: 2px 0;
 }
 
 .dispatch-upcoming-agenda {
-	color: var(--color-green, #4caf50);
-	font-size: var(--font-ui-smaller);
+	background: var(--color-green, #4caf50);
+	color: var(--text-on-accent);
 }
 
 .dispatch-upcoming-noagenda {
+	background: transparent;
+	border: 1px dashed var(--text-faint);
 	color: var(--text-faint);
-	font-size: var(--font-ui-smaller);
 }
 
 .dispatch-upcoming-error {
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 	font-style: italic;
+}
+
+.dispatch-noclick {
+	cursor: default;
+}
+
+.dispatch-meeting-divider {
+	border: none;
+	border-top: 1px solid var(--background-modifier-border);
+	margin: var(--size-4-2) 0;
 }
 
 .dispatch-meeting-list {
