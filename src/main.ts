@@ -168,6 +168,7 @@ export default class DispatchPlugin extends Plugin {
 			board: { ...DEFAULT_SHARED.board, ...data.board },
 			milestones: { ...DEFAULT_SHARED.milestones, ...data.milestones },
 			meetings: { ...DEFAULT_SHARED.meetings, ...data.meetings },
+			todos: { ...DEFAULT_SHARED.todos, ...data.todos },
 			chips: { ...DEFAULT_SHARED.chips, ...data.chips },
 		};
 		// Pre-0.3: single postDropHook — migrate into the automations list.

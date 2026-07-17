@@ -137,10 +137,24 @@ export interface MeetingSettings {
 	templates: ChipTemplate[];
 }
 
+export interface TodoSettings {
+	/**
+	 * Vault folders (root only) scanned for todo items. Empty = tab hidden.
+	 */
+	folders: string[];
+	/**
+	 * Section headings (case-insensitive prefix match) whose unchecked
+	 * `- [ ]` items count as todos — scoping keeps acceptance criteria and
+	 * test plans off the board unless explicitly allowlisted.
+	 */
+	sections: string[];
+}
+
 export interface SharedSettings {
 	board: BoardSettings;
 	milestones: MilestoneSettings;
 	meetings: MeetingSettings;
+	todos: TodoSettings;
 	chips: {
 		/** Tool used when a chip block does not specify one. */
 		defaultTool: string;
@@ -205,6 +219,10 @@ export const DEFAULT_SHARED: SharedSettings = {
 		participantsProperty: "participants",
 		actionsProperty: "open_actions",
 		templates: [],
+	},
+	todos: {
+		folders: [],
+		sections: ["Action items", "Open action items"],
 	},
 	chips: {
 		defaultTool: "claude",

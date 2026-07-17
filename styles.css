@@ -301,6 +301,41 @@
 	border-color: var(--interactive-accent);
 }
 
+/* ---------- Todos tab ---------- */
+
+.dispatch-todo-card {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	cursor: pointer;
+}
+
+.dispatch-todo-check {
+	color: var(--text-faint);
+	flex-shrink: 0;
+	font-size: 15px;
+	line-height: 1.3;
+}
+
+.dispatch-todo-main {
+	min-width: 0;
+}
+
+.dispatch-todo-text {
+	font-size: var(--font-ui-small);
+}
+
+.dispatch-todo-source {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	margin-top: 4px;
+}
+
+.dispatch-todo-unassigned-label {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
 /* ---------- Milestone forecast ---------- */
 
 .dispatch-forecast {

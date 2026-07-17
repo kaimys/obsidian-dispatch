@@ -102,6 +102,12 @@ Right-click a card to run any chip template (see below) or edit the size / badge
 
 ## Meetings tab
 
+## Todos tab
+
+The **Todos** tab collects every open action item across your configured folders (meeting notes, tickets, any docs) into **one column per person**, with *(unassigned)* last. Items are unchecked `- [ ]` lines inside **allowlisted sections** (default: "Action items", "Open action items") — so acceptance criteria and test plans stay off the board unless you allowlist them. Owner attribution follows the standard convention (bold owner lines / inline `**Kai:** …` prefixes), with a ticket's `assignee` as fallback. **Clicking an item deep-links into the note at that exact line** — ticking happens in the document, where context and evidence notes live; the board follows within a second. Collection is cache-layered (metadata-cache pre-filter → content read only for changed files, memoized by mtime), so renders stay cheap in large vaults.
+
+## Meetings tab
+
 Point **Meetings folder** at a folder of meeting notes (root only) and a third tab appears: **one row per meeting, newest (incl. upcoming) at the top** — upcoming meetings get a dashed accent border. Each row shows date + participants and **that meeting's open action items broken down per person** (unchecked `- [ ]` items; owner from a bold-only section line (`**Kai**`) or an inline `- [ ] **Kai:** …` prefix; ownerless items count as *unassigned*; a green check marks meetings with nothing open). Meeting cards get their own chip templates (e.g. "Read transcript" → your meeting-report workflow).
 
 ## Chips

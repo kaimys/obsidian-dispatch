@@ -433,6 +433,43 @@ export class DispatchSettingTab extends PluginSettingTab {
 		automationError = containerEl.createEl("p", { cls: "dispatch-settings-error", text: "" });
 
 		// ------------------------------------------------------------------
+		new Setting(containerEl).setName("Todos").setHeading();
+		containerEl.createEl("p", {
+			cls: "setting-item-description",
+			text:
+				"The Todos tab collects unchecked '- [ ]' items from allowlisted sections across the folders below into one column per person. " +
+				"Clicking an item opens its note at the exact line — ticking happens in the document, the board follows.",
+		});
+
+		new Setting(containerEl)
+			.setName("Todo folders")
+			.setDesc("Vault folders (root only) scanned for todo items, one per line. Empty = tab hidden.")
+			.addTextArea((ta) =>
+				ta
+					.setPlaceholder("08_Meetings-and-Workshop-Notes\n02_Requirements/User-Stories")
+					.setValue(this.plugin.shared.todos.folders.join("\n"))
+					.onChange(async (v) => {
+						this.plugin.shared.todos.folders = splitLines(v);
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Todo sections")
+			.setDesc(
+				"Section headings whose unchecked items count as todos (case-insensitive prefix match), one per line — keeps acceptance criteria and test plans off the board unless allowlisted."
+			)
+			.addTextArea((ta) =>
+				ta
+					.setPlaceholder("Action items\nOpen action items")
+					.setValue(this.plugin.shared.todos.sections.join("\n"))
+					.onChange(async (v) => {
+						this.plugin.shared.todos.sections = splitLines(v);
+						await this.plugin.saveShared();
+					})
+			);
+
+		// ------------------------------------------------------------------
 		new Setting(containerEl).setName("Chips").setHeading();
 
 		new Setting(containerEl)
