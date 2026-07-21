@@ -60,13 +60,20 @@ function unescapeText(value: string): string {
 		.replace(/\\\\/g, "\\");
 }
 
-function emitEvent(props: EventProps, from: Date, to: Date, out: CalendarEvent[]): void {
+function emitEvent(
+	props: EventProps,
+	from: Date,
+	to: Date,
+	out: CalendarEvent[],
+	overrides: Set<string>
+): void {
 	if (props.STATUS?.[0]?.value === "CANCELLED") return;
 	const dtstart = props.DTSTART?.[0];
 	if (!dtstart) return;
 	const parsed = parseIcsDate(dtstart.params, dtstart.value);
 	if (!parsed) return;
 	const title = unescapeText(props.SUMMARY?.[0]?.value ?? "(untitled)");
+	const uid = props.UID?.[0]?.value ?? "";
 
 	const exdates = new Set<number>();
 	for (const ex of props.EXDATE ?? []) {
@@ -145,6 +152,9 @@ function emitEvent(props: EventProps, from: Date, to: Date, out: CalendarEvent[]
 		emitted++;
 		if (count !== null && emitted > count) break;
 		if (occ > to) break;
+		// Skip occurrences replaced by a RECURRENCE-ID exception VEVENT
+		// (that modified instance is emitted from its own VEVENT instead).
+		if (overrides.has(`${uid}|${occ.getTime()}`)) continue;
 		if (occ >= from && !exdates.has(occ.getTime())) {
 			out.push({ start: occ, title, allDay: parsed.allDay });
 		}
@@ -152,7 +162,9 @@ function emitEvent(props: EventProps, from: Date, to: Date, out: CalendarEvent[]
 }
 
 export function parseIcs(text: string, from: Date, to: Date): CalendarEvent[] {
-	const out: CalendarEvent[] = [];
+	// Collect all VEVENTs first — a two-pass is needed so a master's RRULE
+	// expansion can be suppressed for occurrences that have an exception.
+	const vevents: EventProps[] = [];
 	let current: EventProps | null = null;
 	for (const line of unfoldLines(text)) {
 		if (line === "BEGIN:VEVENT") {
@@ -160,7 +172,7 @@ export function parseIcs(text: string, from: Date, to: Date): CalendarEvent[] {
 			continue;
 		}
 		if (line === "END:VEVENT") {
-			if (current) emitEvent(current, from, to, out);
+			if (current) vevents.push(current);
 			current = null;
 			continue;
 		}
@@ -174,8 +186,28 @@ export function parseIcs(text: string, from: Date, to: Date): CalendarEvent[] {
 		const params = semi === -1 ? "" : left.slice(semi + 1);
 		(current[name] ??= []).push({ params, value });
 	}
+
+	// Occurrences overridden by an exception instance (UID + original time).
+	const overrides = new Set<string>();
+	for (const props of vevents) {
+		const rid = props["RECURRENCE-ID"]?.[0];
+		if (!rid) continue;
+		const p = parseIcsDate(rid.params, rid.value);
+		if (p) overrides.add(`${props.UID?.[0]?.value ?? ""}|${p.date.getTime()}`);
+	}
+
+	const out: CalendarEvent[] = [];
+	for (const props of vevents) emitEvent(props, from, to, out, overrides);
+
+	// Belt-and-suspenders: collapse any remaining same-instant, same-title dups.
 	out.sort((a, b) => a.start.getTime() - b.start.getTime());
-	return out;
+	const seen = new Set<string>();
+	return out.filter((e) => {
+		const key = `${e.start.getTime()}|${e.title}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
 }
 
 /** Fetch + parse the feed. Throws on network/HTTP errors — caller handles. */
