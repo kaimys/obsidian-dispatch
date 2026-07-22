@@ -525,6 +525,34 @@ export class DispatchSettingTab extends PluginSettingTab {
 					})
 			);
 
+		new Setting(containerEl)
+			.setName("Assignees")
+			.setDesc(
+				"Known assignees, one per line (e.g. team members). A bold owner label (**Kai** / **Kai:** …) counts only if it matches one, so ticket refs or dates in a bold prefix aren't mistaken for owners. Empty = accept any label."
+			)
+			.addTextArea((ta) =>
+				ta
+					.setPlaceholder("Kai\nFelix\nRouwen")
+					.setValue(this.plugin.shared.todos.assignees.join("\n"))
+					.onChange(async (v) => {
+						this.plugin.shared.todos.assignees = splitLines(v);
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Fallback assignee")
+			.setDesc("Column/label for items with no known assignee.")
+			.addText((t) =>
+				t
+					.setPlaceholder("Team")
+					.setValue(this.plugin.shared.todos.fallbackAssignee)
+					.onChange(async (v) => {
+						this.plugin.shared.todos.fallbackAssignee = v.trim() || "Team";
+						await this.plugin.saveShared();
+					})
+			);
+
 		// ------------------------------------------------------------------
 		new Setting(containerEl).setName("Chips").setHeading();
 

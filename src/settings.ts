@@ -154,6 +154,14 @@ export interface TodoSettings {
 	 * test plans off the board unless explicitly allowlisted.
 	 */
 	sections: string[];
+	/**
+	 * Known assignees (e.g. team members). A bold owner label counts only if
+	 * it matches one (by full or first-word match), so ticket refs / dates in
+	 * a `**…:**` prefix aren't mistaken for owners. Empty = accept any label.
+	 */
+	assignees: string[];
+	/** Column/label for items with no known assignee (e.g. "Team"). */
+	fallbackAssignee: string;
 }
 
 export interface SharedSettings {
@@ -243,6 +251,8 @@ export const DEFAULT_SHARED: SharedSettings = {
 	todos: {
 		folders: [],
 		sections: ["Action items", "Open action items"],
+		assignees: [],
+		fallbackAssignee: "Team",
 	},
 	chips: {
 		defaultTool: "claude",
