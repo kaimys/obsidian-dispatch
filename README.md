@@ -8,7 +8,7 @@ Your coding agents ship faster than you can decide. **You are now the bottleneck
 
 - **Refinement is the new development.** The agent posts a ticket's open questions into your team chat (Slack via MCP), the team answers where it already talks, and the answers flow back into the spec. Every card shows its refinement state as a `? N` badge that burns down to green — green means build-ready.
 - **Release planning is drag & drop.** The Release Plan view groups tickets by target version: live weighted progress per release, velocity-based forecasts that accumulate across versions, linked release notes for everything shipped. Drag a card — the plan is up to date the moment you drop it.
-- **Meetings run themselves around you.** The agenda is prepared from the board; after the call, a NoteTaker transcript (e.g. Google Gemini) becomes an interpreted report in your vault, decisions are folded into the affected tickets automatically, and action items are tracked per person on the Meetings tab.
+- **Meetings run themselves around you.** The agenda is prepared from the board; after the call, a NoteTaker transcript (e.g. Google Gemini) becomes an interpreted report in your vault, decisions are folded into the affected tickets automatically, and the action items it produced show up per person on the Meetings and Todos tabs.
 - **Testing works like refinement.** Manual test plans cover only what the automated suites don't; a `✓ N` badge counts the open checks through review and turns green when a ticket is safe to ship.
 - **Claude Skills and MCP are the glue.** Chips on the board are one-liners (`/refine US00042`); the workflow logic behind them lives as Claude skills in your code repository — versioned with the code, reviewed like code, shared through git — while MCP connects the agent to your team's Slack, your tracker and your NoteTaker. Wiki, team and codebase become one loop, and the agents run it with you.
 
@@ -20,8 +20,8 @@ Dispatch splits its configuration into two layers so a vault can be shared acros
 
 | Layer | Stored in | Synced? | Contains |
 | --- | --- | --- | --- |
-| **Shared** | `data.json` (normal plugin settings) | yes, with the vault | folders, status property, columns, hook command, default tool |
-| **This device** | `~/.dispatch/<vault>-<hash>.json` (user profile, **outside the vault**) | never | repo alias → absolute path, tool command templates, opt-in toggles |
+| **Shared** | `data.json` (normal plugin settings) | yes, with the vault | folders, properties, columns, chip templates, automation rules, default tool |
+| **This device** | `~/.dispatch/<vault>-<hash>.json` (user profile, **outside the vault**) | never | repo alias → absolute path, tool command templates, calendar URL, opt-in toggles |
 
 Notes and shared settings never contain absolute paths. They reference repositories by **alias** (e.g. `my-project`), and each team member maps that alias to a local path once in *Settings → Dispatch → This device*.
 
@@ -41,23 +41,28 @@ Configure in *Settings → Dispatch*:
 - **Open-tests property** — numeric counter of open manual test-plan items (e.g. `open_tests`, set when the test plan is written) rendered as a `✓ N` badge: purple while checks remain, green at 0 (manual review complete)
 - **Discussion property** — a thread URL (e.g. Slack) rendered as a chat icon in the card title that opens the link
 
-Open the board via the ribbon icon or the command *Dispatch: Open board*. Click a card to open the note; drag it to a column to change its status, or within a column to change its position (typically used as a priority order).
+Open the board via the ribbon icon or the command *Dispatch: Open board*. Click a card to open the note; drag it to a column to change its status, or within a column to change its position (typically used as a priority order). The **⟳ button** in the tab bar re-reads settings and rescans the vault — use it after editing notes outside Obsidian (a git pull, an agent run) instead of restarting the app.
+
+The tab bar carries **Kanban** and **Release Plan** always, plus **Meetings** and **Todos** once their folders are configured.
 
 ### Sort order within a column
 
 Card order is data, so it lives in the notes and syncs with the vault: dropping a card writes a numeric position into the order property. Ranks are assigned with gaps (1024 apart) and inserts take the midpoint, so a reorder normally rewrites **only the moved note**. When a column contains unranked cards or a gap is exhausted, the whole column is renormalized once (only notes whose value changes are written). Cards without a rank sort below ranked ones, alphabetically.
 
-## Release Plan
+### WIP limits, slice-by, keyboard
 
-Next to **Kanban** (status columns) sits the **Release Plan** tab — a roadmap view where columns are target versions and dragging a card between columns updates the version property immediately. (Its settings live under "Milestones".)
+- **WIP limits**: the fourth segment of a *Columns* line (`In progress | | 50 | 5`) sets a limit — the header shows `count/limit`, the column outlines amber at the limit and red above it.
+- **Slice-by bar**: pick a property in the bar above the board — assignee, **status**, or any badge property (type, priority, …) — and click a value chip to filter both ticket tabs to matching cards; click again to clear. Counts are shown per value; missing values group under "(none)". Status chips read in pipeline order (the *Columns* order, not alphabetical) and show each column's display label, which makes the Release Plan answer "what in this release is still in Refinement / waiting for review?".
+- **Column chips**: click a Kanban column header for batch chips — one agent session working through every ticket in the column sequentially (`{{ids}}`, `{{status}}`, `{{count}}` variables; the repo busy-gate and queue apply as usual).
+- **Keyboard**: arrow keys move the card focus, `Enter`/`o` opens the note, `[` / `]` move the focused card one column left/right (Kanban: status change; Release Plan: version change).
 
-- A built-in **(archive)** column sits on the far left: cards whose status is excluded from progress (e.g. Rejected) plus completed cards without a version. Display-only (no drop target) — it keeps *(no version)* a pure pool of unscheduled open work.
-- Other non-version planned values ("Icebox") become **special columns** left of the versions, in their *Planned versions* order. Version columns are keyed by **major.minor**: `v1.2.0`, `1.2.0` and `1.2.1` all group into the column `1.2`, so inconsistent formatting doesn't split a milestone. Dropping writes the canonical value from *Planned versions* (or the plain `major.minor` for auto-discovered columns); dropping on *(no version)* removes the property.
-- **Planned versions** (settings) are always shown, even when empty — that's how you plan a future release before any ticket is assigned.
-- Each version can carry one **tag** ("MVP", "Closed Beta", …) — click the tag chip in the column header to edit it; tags are shared settings, keyed by `major.minor`.
-- With a **Release notes folder** configured, a column whose initial (x.y.0) release note exists shows its linked release date instead of an estimate — forecasts only appear for unreleased versions.
-- The header shows a **progress bar**: `Σ(size × status progress) / Σ(size)`. Status progress comes from the third segment of the *Columns* setting (e.g. `Development | | 55`, `Done | | 100`, `Rejected | | -` to exclude); size comes from a numeric frontmatter property (default `size`, missing = 1).
-- Within a version column, cards sort by workflow progress (status order, then rank) — there is no manual ordering on this tab, and drops only change the version, never status or rank.
+### Problems panel
+
+If *Required properties* is configured (e.g. `id, status, updated`), the board shows a ⚠ badge when card notes are missing values, carry unrendered template stubs (`{ date:… }`), or use a status that isn't a configured column. Click it for the list with direct links — malformed tickets become visible the moment they appear instead of in next week's report.
+
+### Card context menu
+
+Right-click a card to run any chip template (see below) or edit the size / badge properties inline (empty value removes the property) — the quickest way to keep milestone weights and priorities populated.
 
 ### Automations
 
@@ -76,40 +81,33 @@ Rules evaluated when a card **enters a column** (settings → Automations, JSON)
 - `set` — frontmatter assignments written **atomically with the status change** (values support `{{date}}`, `{{datetime}}`, `{{from}}`, `{{to}}`). Great for stamping completion dates.
 - `command` — optional shell command run in the `repo` alias, e.g. to mirror the move into Asana/Jira/Linear. Variables: `{{file}}`, `{{from}}`, `{{to}}`, `{{cwd}}` (quoted; append `Raw` for unquoted). Commands are **shared** config but run only on devices that opt in (*This device → Enable automation commands*); `set` assignments always apply.
 
-### WIP limits, slice-by, keyboard
+## Release Plan
 
-- **WIP limits**: the fourth segment of a *Columns* line (`In progress | | 50 | 5`) sets a limit — the header shows `count/limit`, the column outlines amber at the limit and red above it.
-- **Slice-by bar**: pick a property in the bar above the board — assignee, **status**, or any badge property (type, priority, …) — and click a value chip to filter both tabs to matching cards; click again to clear. Counts are shown per value; missing values group under "(none)". Status chips read in pipeline order (the *Columns* order, not alphabetical) and show each column's display label, which makes the Release Plan answer "what in this release is still in Refinement / waiting for review?".
-- **Column chips**: click a Kanban column header for batch chips — one agent session working through every ticket in the column sequentially (`{{ids}}`, `{{status}}`, `{{count}}` variables; the repo busy-gate and queue apply as usual).
-- **Keyboard**: arrow keys move the card focus, `Enter`/`o` opens the note, `[` / `]` move the focused card one column left/right (Kanban: status change; Milestones: version change).
+Next to **Kanban** (status columns) sits the **Release Plan** tab — a roadmap view where columns are target versions and dragging a card between columns updates the version property immediately. (Its settings live under "Milestones".)
+
+- A built-in **(archive)** column sits on the far left: cards whose status is excluded from progress (e.g. Rejected) plus completed cards without a version. Display-only (no drop target) — it keeps *(no version)* a pure pool of unscheduled open work.
+- Other non-version planned values ("Icebox") become **special columns** left of the versions, in their *Planned versions* order. Version columns are keyed by **major.minor**: `v1.2.0`, `1.2.0` and `1.2.1` all group into the column `1.2`, so inconsistent formatting doesn't split a milestone. Dropping writes the canonical value from *Planned versions* (or the plain `major.minor` for auto-discovered columns); dropping on *(no version)* removes the property.
+- **Planned versions** (settings) are always shown, even when empty — that's how you plan a future release before any ticket is assigned.
+- Each version can carry one **tag** ("MVP", "Closed Beta", …) — click the tag chip in the column header to edit it; tags are shared settings, keyed by `major.minor`.
+- With a **Release notes folder** configured, a column whose initial (x.y.0) release note exists shows its linked release date instead of an estimate — forecasts only appear for unreleased versions.
+- The header shows a **progress bar**: `Σ(size × status progress) / Σ(size)`. Status progress comes from the third segment of the *Columns* setting (e.g. `Development | | 55`, `Done | | 100`, `Rejected | | -` to exclude); size comes from a numeric frontmatter property (default `size`, missing = 1).
+- Within a version column, cards sort by workflow progress (status order, then rank) — there is no manual ordering on this tab, and drops only change the version, never status or rank.
+
+### Patch versions: expand and collapse
+
+A version line stays one column until you want the detail. When a line has more than one patch release, its header carries a **`+` button**: click it and `1.4` splits into one column per patch — `1.4.0`, `1.4.1`, `1.4.2` … — each with its own progress bar, drop target and (for shipped ones) its own linked release note. A **`−` button** on any of those patch columns collapses the line back. Dropping onto a patch column writes the full `x.y.z` value (keeping your `v` prefix convention from *Planned versions*), so "this goes into the next hotfix, not the next minor" is a drag, not an edit. The expanded state is per view, not stored in the vault — nobody else's board changes because you opened a line.
 
 ### Release forecast
 
-With a **Completed property** configured (e.g. `deployed`, stamped by an automation rule), release headers show a velocity-based ETA. Estimates **accumulate along the version pipeline**: a version’s ETA covers the remaining weight `Σ size × (1 − progress)` of **all earlier version lines** (including leftovers in released ones) plus its own, divided by the completed weight per day over the look-back window (default 28 days) — so a later version can never be forecast before an earlier one. Hover for the assumptions and an optimistic/pessimistic range (±40%). No completions in the window = no forecast — the feature never guesses.
-
-### Run lifecycle (chips → board)
-
-When a chip launches a tool, Dispatch records the run in a machine-local file (`~/.dispatch/runs/…jsonl`) and passes `DISPATCH_RUN_ID`, `DISPATCH_RUNS_FILE`, `DISPATCH_NOTE`, `DISPATCH_LABEL`, `DISPATCH_STARTED` to the process. Lifecycle hooks in the target repo (e.g. Claude Code `SessionStart`/`SessionEnd` hooks calling a three-line script) append `running`/`done` records — the board shows a live badge on the card (started → running ⇄ waiting → done; "waiting" = the agent finished its turn and the session needs you; done fades after 24 h; click a badge to mark a ghost run done or clear it), and on completion the hook appends a run-log line to the note's `## Dispatch runs` section. The plugin only *observes*: live state stays on the machine that runs the agent; durable outcomes land in the note and sync with the vault.
-
-**One agent per working tree:** launching a chip into a repo that already has an active run opens a choice — **Queue** (starts automatically when the blocking session ends), **Run anyway**, or cancel. The queue is in-memory (unstarted entries are marked cancelled after an Obsidian restart), and staleness caps (2 h for launched, 24 h for running) keep a killed terminal from blocking a repo forever.
-
-### Problems panel
-
-If *Required properties* is configured (e.g. `id, status, updated`), the board shows a ⚠ badge when card notes are missing values, carry unrendered template stubs (`{ date:… }`), or use a status that isn't a configured column. Click it for the list with direct links — malformed tickets become visible the moment they appear instead of in next week's report.
-
-### Card context menu
-
-Right-click a card to run any chip template (see below) or edit the size / badge properties inline (empty value removes the property) — the quickest way to keep milestone weights and priorities populated.
+With a **Completed property** configured (e.g. `deployed`, stamped by an automation rule), release headers show a velocity-based ETA. Estimates **accumulate along the version pipeline**: a version's ETA covers the remaining weight `Σ size × (1 − progress)` of **all earlier version lines** (including leftovers in released ones) plus its own, divided by the completed weight per day over the look-back window (default 28 days) — so a later version can never be forecast before an earlier one. Hover for the assumptions and an optimistic/pessimistic range (±40%). No completions in the window = no forecast — the feature never guesses.
 
 ## Meetings tab
+
+Point **Meetings folder** at a folder of meeting notes (root only) and a **Meetings** tab appears: **one row per meeting, newest (incl. upcoming) at the top** — upcoming meetings get a dashed accent border. Each row shows date + participants and **that meeting's open action items broken down per person** (unchecked `- [ ]` items; owner from a bold-only section line (`**Kai**`) or an inline `- [ ] **Kai:** …` prefix; ownerless items count as *unassigned*; a green check marks meetings with nothing open). Meeting cards get their own chip templates (e.g. "Read transcript" → your meeting-report workflow), and upcoming calendar cards get their own **event chips** (`{{date}}`/`{{title}}` variables — e.g. "Prepare agenda"). With a **Calendar ICS URL** configured (device-local — e.g. Google Calendar's secret iCal address), an **Upcoming strip** on top shows the next events (DAILY/WEEKLY recurrence expanded, optional title filter): events whose date already has a meeting note link to it („agenda ✓"), the rest show „no agenda yet".
 
 ## Todos tab
 
 The **Todos** tab collects every open action item across your configured folders (meeting notes, tickets, any docs) into **two columns**: **Assigned** (everything with a named owner) and the fallback column (default *Team*) for shared items with no owner. A **slice bar** above the board filters the assigned column to one person — click a name, click again to clear; the Team column always stays visible, since shared work is everyone's. Because the column no longer names the person, each assigned card carries an **owner pill**. Items are unchecked `- [ ]` lines inside **allowlisted sections** (default: "Action items", "Open action items") — so acceptance criteria and test plans stay off the board unless you allowlist them. Owner attribution follows the standard convention (bold owner lines / inline `**Kai:** …` prefixes), with a ticket's `assignee` as fallback. Configure an **Assignees** list (e.g. `Kai, Felix, Rouwen`) so only real names count — a bold prefix that isn't one (a ticket ref like `**US00055:**`, a day like `**Friday:**`) is left as item text and the item lands in the Team column instead of inventing an owner. **Clicking an item deep-links into the note at that exact line** — ticking happens in the document, where context and evidence notes live; the board follows within a second. Collection is cache-layered (metadata-cache pre-filter → content read only for changed files, memoized by mtime), so renders stay cheap in large vaults.
-
-## Meetings tab
-
-Point **Meetings folder** at a folder of meeting notes (root only) and a third tab appears: **one row per meeting, newest (incl. upcoming) at the top** — upcoming meetings get a dashed accent border. Each row shows date + participants and **that meeting's open action items broken down per person** (unchecked `- [ ]` items; owner from a bold-only section line (`**Kai**`) or an inline `- [ ] **Kai:** …` prefix; ownerless items count as *unassigned*; a green check marks meetings with nothing open). Meeting cards get their own chip templates (e.g. "Read transcript" → your meeting-report workflow), and upcoming calendar cards get their own **event chips** (`{{date}}`/`{{title}}` variables — e.g. "Prepare agenda"). With a **Calendar ICS URL** configured (device-local — e.g. Google Calendar's secret iCal address), an **Upcoming strip** on top shows the next events (DAILY/WEEKLY recurrence expanded, optional title filter): events whose date already has a meeting note link to it („agenda ✓"), the rest show „no agenda yet".
 
 ## Chips
 
@@ -157,6 +155,12 @@ claude = osascript -e 'tell app "Terminal" to do script "cd " & quoted form of {
 ```
 
 Template variables: `{{cwd}}`, `{{prompt}}`, `{{promptFile}}` (prompt written to a temp file — use it for long/multiline prompts). All are expanded as quoted arguments; append `Raw` for unquoted (there is deliberately **no** `{{promptRaw}}`).
+
+### Run lifecycle (chips → board)
+
+When a chip launches a tool, Dispatch records the run in a machine-local file (`~/.dispatch/runs/…jsonl`) and passes `DISPATCH_RUN_ID`, `DISPATCH_RUNS_FILE`, `DISPATCH_NOTE`, `DISPATCH_LABEL`, `DISPATCH_STARTED` to the process. Lifecycle hooks in the target repo (e.g. Claude Code `SessionStart`/`SessionEnd` hooks calling a three-line script) append `running`/`done` records — the board shows a live badge on the card (started → running ⇄ waiting → done; "waiting" = the agent finished its turn and the session needs you; done fades after 24 h; click a badge to mark a ghost run done or clear it), and on completion the hook appends a run-log line to the note's `## Dispatch runs` section. The plugin only *observes*: live state stays on the machine that runs the agent; durable outcomes land in the note and sync with the vault.
+
+**One agent per working tree:** launching a chip into a repo that already has an active run opens a choice — **Queue** (starts automatically when the blocking session ends), **Run anyway**, or cancel. The queue is in-memory (unstarted entries are marked cancelled after an Obsidian restart), and staleness caps (2 h for launched, 24 h for running) keep a killed terminal from blocking a repo forever.
 
 ## Security model
 
@@ -208,10 +212,10 @@ Symlink or copy the repo folder into a test vault's `.obsidian/plugins/dispatch/
 ## Roadmap
 
 - Multiple named boards
-- Column WIP limits and colors
-- Card filtering
+- Column colors
 - Milestone burndown over time
 - Chip runs with inline output (headless mode) instead of opening a terminal
+- Worktree-isolated runs, so two agents can work one repo in parallel
 
 ## License
 
