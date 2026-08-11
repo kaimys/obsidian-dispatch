@@ -79,7 +79,7 @@ Rules evaluated when a card **enters a column** (settings → Automations, JSON)
 ### WIP limits, slice-by, keyboard
 
 - **WIP limits**: the fourth segment of a *Columns* line (`In progress | | 50 | 5`) sets a limit — the header shows `count/limit`, the column outlines amber at the limit and red above it.
-- **Slice-by bar**: pick a badge property (type, priority, …) in the bar above the board and click a value chip to filter both tabs to matching cards; click again to clear. Counts are shown per value; missing values group under "(none)".
+- **Slice-by bar**: pick a property in the bar above the board — assignee, **status**, or any badge property (type, priority, …) — and click a value chip to filter both tabs to matching cards; click again to clear. Counts are shown per value; missing values group under "(none)". Status chips read in pipeline order (the *Columns* order, not alphabetical) and show each column's display label, which makes the Release Plan answer "what in this release is still in Refinement / waiting for review?".
 - **Column chips**: click a Kanban column header for batch chips — one agent session working through every ticket in the column sequentially (`{{ids}}`, `{{status}}`, `{{count}}` variables; the repo busy-gate and queue apply as usual).
 - **Keyboard**: arrow keys move the card focus, `Enter`/`o` opens the note, `[` / `]` move the focused card one column left/right (Kanban: status change; Milestones: version change).
 
