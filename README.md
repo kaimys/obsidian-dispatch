@@ -14,6 +14,8 @@ Your coding agents ship faster than you can decide. **You are now the bottleneck
 
 Under the hood, two primitives: **boards** (kanban views driven by note properties — drag & drop writes frontmatter) and **chips** (buttons that launch coding agents with the ticket as context). Desktop only — chips and automations spawn local processes.
 
+New to the wiki side of this? [docs/example-wiki.md](docs/example-wiki.md) is the structure Dispatch was built against, generalized for a new project — folders, the immutable raw-sources layer, `index.md`/`log.md` conventions, and the ticket frontmatter the boards read.
+
 ## Team-safe configuration model
 
 Dispatch splits its configuration into two layers so a vault can be shared across a team without leaking machine-specific paths:
