@@ -373,6 +373,25 @@
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
 	margin-top: 4px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+/* Two-column Todos layout: fewer, wider columns than the ticket board. */
+.dispatch-todo-column {
+	flex: 1 1 380px;
+	max-width: 560px;
+}
+
+.dispatch-todo-owner {
+	background: var(--background-modifier-hover);
+	border-radius: 999px;
+	padding: 0 8px;
+	color: var(--text-normal);
+	font-weight: 600;
+	flex-shrink: 0;
 }
 
 .dispatch-todo-unassigned-label {
