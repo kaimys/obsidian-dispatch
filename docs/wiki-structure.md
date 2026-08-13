@@ -31,7 +31,7 @@ The **schema layer** is the part most projects forget. Conventions that every wo
 02_Product/        vision · scope definition · success metrics
   Reports/         dated, recurring analyses (scope gaps, doc↔code drift, market news)
     _definitions/  the rulebooks those reports are generated from
-03_Legal/          the guardrails your domain imposes
+03_Legal/          the documents that bind you and the constraints you work under
                    (rename per project: Clinical, Safety, Regulatory, Editorial …)
 04_Discovery/      research, product ideas, evaluations, benchmarks — and anything
                    not yet sorted
@@ -64,7 +64,7 @@ Numbers are sort keys, not law. Rename and merge freely — but **don't renumber
 | `02_Product/` | Why the product exists, what is in scope, how success is measured | humans, agent-assisted | refinement, planning |
 | `02_Product/Reports/` | Dated snapshots: scope gaps, doc↔code inconsistencies, market news | agent (recurring jobs) | the team; the next run compares against the last |
 | `02_Product/Reports/_definitions/` | One page per recurring report: what it measures, what counts, how it ranks | humans | the maintenance skill that runs the job |
-| `03_Legal/` | The constraints a feature may never quietly cross | domain experts | every ticket that touches them |
+| `03_Legal/` | Published commitments (privacy declaration, terms), the constraints you work under, generated license inventories — see [page types](page-types.md#legal-and-domain-documents) | product + counsel, agent for the generated ones | every ticket that touches them |
 | `04_Discovery/` | Research and evaluation that isn't a decision yet — plus the unsorted pile | humans + agent | product planning |
 | `05_Requirements/Tickets/` | **The tickets.** One note = one story, bug or task: full spec + frontmatter | agent (from intake) + humans | **the Dispatch board**, every workflow skill |
 | `05_Requirements/Non-Functional/` | Cross-cutting requirements no single ticket owns | humans, agent-assisted | planning, review |
@@ -84,7 +84,8 @@ Everything the wiki is derived from, in its original form:
   Meeting Transcripts/   2026-08-04 - Product Weekly - NoteTaker.md
   Feedback/              2026-07-19 - Beta tester - chat issues.md
   Research/              2026-06-30 - <vendor> pricing page.html
-  Domain/                regulations, guidelines, standards (PDF is fine)
+  Domain/                regulations, guidelines, standards, counsel's standard
+                         drafts and signed finals (PDF is fine)
   Exports/               analytics dumps, CSVs, tracker exports
   Assets/                screenshots and recordings referenced by reports
 ```
@@ -125,10 +126,12 @@ The index answers *what exists*; the log answers *what happened and why*. Agents
 
 Documents will contradict each other. Write the order down once, in `00_Start-Here/`, so nobody re-litigates it per conflict. A reasonable default:
 
-> **Decisions (ADRs) → Requirements → Legal/Domain → UX → Engineering → Delivery/QA.**
+> **External constraints → published commitments → Decisions (ADRs) → Requirements → UX → Engineering → Delivery/QA.**
 > Meeting notes, research, inbox items and drafts are never authoritative.
 
-**But the order is a statement about how your team works, not a universal truth.** If your domain expert reviews changes *after* product proposes them rather than constraining them up front, that back-and-forth is the real process and the order should say so. Decide it deliberately, write it down, and revisit it when the team changes.
+**But the order is a statement about how your team works, not a universal truth**, and it is finer-grained than folder names suggest. Legal is the clearest case: a regulation is imposed on you and outranks every plan, while a privacy declaration or terms of use is *drafted from* the product — counsel supplies a standard document, you say what you actually want, counsel checks whether it's legally available. During that back-and-forth the product leads. Once the text is published and users have agreed to it, it binds the product instead, and a mismatch is the code's problem, not the document's. One folder, two precedence positions, decided by whether the thing has shipped. See [legal and domain documents](page-types.md#legal-and-domain-documents).
+
+Decide your order deliberately, write it down, and revisit it when the team changes.
 
 ADRs sit on top for a reason: they record the decisions that were already argued, including the rejected alternatives. A change that contradicts one is a decision to reopen with the team — not a detail to work around.
 

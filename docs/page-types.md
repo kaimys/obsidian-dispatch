@@ -156,6 +156,35 @@ open_items: 3
 
 Meeting notes are never authoritative. Durable outcomes get promoted — into tickets, or into an ADR — and the note stays as the record of when it was said.
 
+## Legal and domain documents
+
+One folder, three kinds of document that behave nothing like each other. Getting them confused is why "legal outranks product" feels wrong to anyone who has actually shipped a privacy declaration.
+
+| Kind | Example | Where it comes from | Precedence |
+| --- | --- | --- | --- |
+| **External constraints** | GDPR, AI Act, medical-device rules, app-store policy | imposed on you; the text lives in `01_Sources/Domain/` | above everything — no decision of yours changes it |
+| **Negotiated commitments** | privacy declaration, terms of use, data-processing agreement | *derived from* your product: counsel supplies a standard document, you state the deltas you need, counsel checks what is legally available | product leads while drafting; **binds the product once published** |
+| **Generated inventories** | open-source licenses and attributions | derived mechanically from the dependency tree | a [derived page](#derived-pages) — regenerate, never hand-edit |
+
+The middle row is the one that needs a contract, because it changes direction the moment it ships:
+
+```yaml
+---
+status: approved
+source_of_truth: true
+owner: Rouwen              # the accountable person on your side, not the lawyer
+counsel: <firm or person>  # who reviewed it
+published: 2026-08-07      # the date this text went live
+binds: v1.4.5              # the release whose users agreed to this text
+supersedes: [[Privacy Declaration v1.3]]
+---
+```
+
+- **A published legal text is never edited in place.** Publish a new version and keep the previous one verbatim — "what did this user agree to in March?" is a question you must be able to answer per release, and consent records point at a version. Same shape as the [ticket freeze](#the-freeze-rule): a document is freely editable until something depends on it, then changes become a deliberate, versioned act.
+- **The drift check runs backwards.** For most engineering docs you ask "does the doc still match the code". For a published commitment you ask "**does the code still match what we promised**" — and when it doesn't, the code is the defect. Give that check a recurring job, because it is the one place where a documentation gap is a liability rather than an inconvenience.
+- **Owner is internal.** The lawyer authored the text; they are not the person who notices that a shipped feature contradicts it. That is someone on your team, and their name goes in `owner:`.
+- **The source artifacts belong in `01_Sources/`** — counsel's standard draft, the signed final, the regulation itself. The wiki page is your working version; the artifact is what you were actually given.
+
 ## Reports
 
 Dated, recurring analyses in `02_Product/Reports/` — scope gaps, doc↔code drift, market scans. Derived pages, so they carry `derived_from` and `maintained_by`.
