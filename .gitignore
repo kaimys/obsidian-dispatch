@@ -13,3 +13,6 @@ local.json
 # OS noise
 .DS_Store
 Thumbs.db
+
+# working file, deliberately not published
+docs/architecture.svg
