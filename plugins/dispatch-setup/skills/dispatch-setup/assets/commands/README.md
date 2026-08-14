@@ -30,6 +30,18 @@ Every project-specific value is a `<<PLACEHOLDER>>` token. Replace all of them, 
 
 **If there is no tracker or no chat**, replace `<<TRACKER>>`/`<<CHAT>>` with `none` and delete the steps that use them — don't leave an instruction the agent can't satisfy. The wiki is then the only system, which is simpler, not worse.
 
+### Never substitute a person
+
+Notice that **no placeholder is a name.** That is deliberate: commands encode *process*, the vault encodes *who*. Write "the ticket's `assignee`", "the requester", "whoever launched this chip" and let it resolve at runtime from:
+
+| Source | Answers |
+| --- | --- |
+| `assignee:` frontmatter (the board's `assigneeProperty`) | who is doing *this ticket* |
+| `owner:` → the team folder | who is accountable for *this page* |
+| `todos.assignees` in `data.json` | the known people attribution matches against |
+
+A name hardcoded in prose merely goes stale when someone joins or leaves. A name hardcoded in **generated content** does damage: the Todos tab attributes `- [ ] **Name:**` items by that prefix, so a fixed name in `/test-plan` books the whole team's manual checks to one person. And even on a one-person project the command cannot know who clicked the chip — "the assignee" is the more accurate phrase from day one.
+
 ## What's here
 
 | Command | Chip | Does |

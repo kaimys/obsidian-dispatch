@@ -59,7 +59,7 @@ Every open action item across your configured folders, in **two columns**: **Ass
 ![Open Task Board](assets/Todos-Teaser.png)
 
 - **Items are unchecked `- [ ]` lines inside allowlisted sections** (default: "Action items", "Open action items"), so acceptance criteria and test plans don't flood the board.
-- **Owner attribution** follows the convention meeting notes already use — a bold owner line (`**Kai**`) or an inline `- [ ] **Kai:** …` prefix — with a ticket's assignee as fallback. Configure the list of real names, and a bold prefix that isn't one (`**US00055:**`, `**Friday:**`) stays item text instead of inventing a person.
+- **Owner attribution** follows the convention meeting notes already use — a bold owner line (`**Alex**`) or an inline `- [ ] **Alex:** …` prefix — with a ticket's assignee as fallback. Configure the list of real names, and a bold prefix that isn't one (`**US00055:**`, `**Friday:**`) stays item text instead of inventing a person.
 - **Clicking an item deep-links into the note at that line.** Ticking happens in the document, where the context and evidence live; the board follows within a second. There is deliberately no write path from the board into your notes here.
 
 Collection is cache-layered — a metadata pre-filter, then content reads only for files that changed, memoized by mtime — so the tab stays cheap in a large vault.

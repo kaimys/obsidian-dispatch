@@ -13,7 +13,7 @@ Property *names* are yours — Dispatch reads whatever you configure. The names 
 status: approved          # approved | draft | proposed
 source_of_truth: true     # authoritative only when both are set
 updated: 2026-08-13       # last meaningful change
-owner: Rouwen             # accountable human → 00_Start-Here/Team/
+owner: Morgan             # accountable human → 00_Start-Here/Team/
 ---
 ```
 
@@ -54,7 +54,7 @@ priority: high
 rank: 2048
 version_target: v1.4.0
 size: 3
-assignee: Kai
+assignee: Alex
 open_questions: 0
 open_tests: 5
 discussion: https://…          # the thread where the team talked
@@ -113,7 +113,7 @@ id: ADR-0012
 status: accepted            # proposed | accepted | superseded
 date: 2026-05-14
 superseded_by: ADR-0031     # only when status: superseded
-owner: Kai
+owner: Alex
 ---
 ```
 
@@ -131,7 +131,7 @@ One note per release, in `08_Delivery-and-QA/Releases/`. The Release Plan tab re
 version: v1.4.0
 date: 2026-08-07
 status: released            # planned | released
-owner: Kai
+owner: Alex
 ---
 ```
 
@@ -144,7 +144,7 @@ One note per meeting, in `09_Meetings/`, named `YYYY-MM-DD - <meeting>.md`. Feed
 ```yaml
 ---
 date: 2026-08-04
-participants: [Kai, Felix, Rouwen]
+participants: [Alex, Robin, Morgan]
 discussion: https://…        # the thread where the agenda was announced
 decisions_folded: 2026-08-05 # when decisions were written into the tickets
 open_items: 3
@@ -174,7 +174,7 @@ The middle row is the one that needs a contract, because it changes direction th
 ---
 status: approved
 source_of_truth: true
-owner: Rouwen              # the accountable person on your side, not the lawyer
+owner: Morgan              # the accountable person on your side, not the lawyer
 counsel: <firm or person>  # who reviewed it
 published: 2026-08-07      # the date this text went live
 binds: v1.4.5              # the release whose users agreed to this text

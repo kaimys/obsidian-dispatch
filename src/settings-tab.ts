@@ -317,7 +317,7 @@ export class DispatchSettingTab extends PluginSettingTab {
 			cls: "setting-item-description",
 			text:
 				"The Meetings tab shows the notes of a folder (root only) in month columns — past and upcoming — with an open-action-items badge per meeting and per-person totals. " +
-				"Unchecked '- [ ]' items count; a bold-only line (**Kai**) sets the owner for following items, '- [ ] **Kai:** …' overrides, no owner = unassigned.",
+				"Unchecked '- [ ]' items count; a bold-only line (**Alex**) sets the owner for following items, '- [ ] **Alex:** …' overrides, no owner = unassigned.",
 		});
 
 		new Setting(containerEl)
@@ -528,11 +528,11 @@ export class DispatchSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Assignees")
 			.setDesc(
-				"Known assignees, one per line (e.g. team members). A bold owner label (**Kai** / **Kai:** …) counts only if it matches one, so ticket refs or dates in a bold prefix aren't mistaken for owners. Empty = accept any label."
+				"Known assignees, one per line (e.g. team members). A bold owner label (**Alex** / **Alex:** …) counts only if it matches one, so ticket refs or dates in a bold prefix aren't mistaken for owners. Empty = accept any label."
 			)
 			.addTextArea((ta) =>
 				ta
-					.setPlaceholder("Kai\nFelix\nRouwen")
+					.setPlaceholder("Alex\nRobin\nMorgan")
 					.setValue(this.plugin.shared.todos.assignees.join("\n"))
 					.onChange(async (v) => {
 						this.plugin.shared.todos.assignees = splitLines(v);

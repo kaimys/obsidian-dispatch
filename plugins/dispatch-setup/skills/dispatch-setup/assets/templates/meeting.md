@@ -40,7 +40,7 @@ open_items: 0
 
 <!-- GUIDE: THE TODOS TAB PARSES THIS SECTION. Keep the exact format: `- [ ]` checkbox
      lines, with the owner as a bold line above a group or as an inline `**Name:**`
-     prefix. Prose ("Kai will look into X") is invisible to the board. The section
+     prefix. Prose ("Alex will look into X") is invisible to the board. The section
      heading must stay in the configured allowlist. Keep `open_items:` equal to the
      number of unchecked lines. -->
 
