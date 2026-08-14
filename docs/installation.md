@@ -38,6 +38,8 @@ Notes and shared settings never contain absolute paths. They reference repositor
 
 Because the device layer lives outside the vault (Windows: `%USERPROFILE%\.dispatch\`), it works with **any** sync — Obsidian Sync, Google Drive, git — without exclusion rules, and teammates can never overwrite each other's device config. The exact path is shown in the settings tab. A `local.json` from older versions found next to the plugin is migrated there and removed from the vault automatically.
 
+The sections below describe both layers as the **settings UI** presents them. If you (or an agent) write the files directly, read [The config files on disk](#the-config-files-on-disk) — the stored JSON does not have the same shape as the UI's compact input forms.
+
 ## Board settings
 
 - **Source folders** — vault folders scanned for cards (one per line)
@@ -115,7 +117,7 @@ Variables: `{{cwd}}`, `{{prompt}}`, `{{promptFile}}` (the prompt written to a te
 
 When a chip launches a tool, Dispatch records the run in a machine-local file (`~/.dispatch/runs/…jsonl`) and passes `DISPATCH_RUN_ID`, `DISPATCH_RUNS_FILE`, `DISPATCH_NOTE`, `DISPATCH_LABEL` and `DISPATCH_STARTED` into the process.
 
-Lifecycle hooks in the target repo — Claude Code `SessionStart`/`Stop`/`SessionEnd` hooks calling a three-line script — append records back. The board then shows a live badge on the card: **started → running ⇄ waiting → done**, where *waiting* means the agent finished its turn and the session needs you. Done fades after 24 h; clicking a badge clears a ghost run. On completion the hook appends a run-log line to the note's `## Dispatch runs` section.
+Lifecycle hooks in the target repo — Claude Code `SessionStart`/`Stop`/`SessionEnd` hooks calling a small script — append records back. A ready-to-copy implementation ships with the setup plugin: [`plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs`](https://github.com/kaimys/obsidian-dispatch/blob/main/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs) — drop it into the target repo (e.g. `scripts/dispatch/run-state.mjs`) and wire the four events in that repo's `.claude/settings.json`. The board then shows a live badge on the card: **started → running ⇄ waiting → done**, where *waiting* means the agent finished its turn and the session needs you. Done fades after 24 h; clicking a badge clears a ghost run. On completion the hook appends a run-log line to the note's `## Dispatch runs` section.
 
 The plugin only *observes*: live state stays on the machine running the agent, durable outcomes land in the note and sync with the vault.
 
@@ -137,6 +139,123 @@ Rules evaluated when a card **enters a column** (settings → Automations, JSON)
 - `when` — statuses that trigger the rule; empty = every status change.
 - `set` — frontmatter assignments written **atomically with the status change** (`{{date}}`, `{{datetime}}`, `{{from}}`, `{{to}}`). This is how `deployed:` gets stamped, which in turn feeds the release forecast.
 - `command` — optional shell command run in the `repo` alias, e.g. to mirror the move into your tracker. Variables: `{{file}}`, `{{from}}`, `{{to}}`, `{{cwd}}` (quoted; append `Raw` for unquoted). Commands are **shared** config but run only on devices that opt in (*This device → Enable automation commands*); `set` assignments always apply.
+
+## The config files on disk
+
+Everything in the settings tab is stored as JSON. The UI's compact forms — pipe-delimited column lines, `tool = command` lines — are **input conveniences**; on disk the shapes differ. This matters when an agent or a script writes the files directly. After editing either file outside Obsidian, click the board's ↻ reload button.
+
+### `<vault>/.obsidian/plugins/dispatch/data.json` — shared
+
+Missing keys fall back to the defaults in `src/settings.ts`, but writing the full object keeps the file readable and diffable:
+
+```json
+{
+  "board": {
+    "sourceFolders": ["05_Requirements/Tickets"],
+    "statusProperty": "status",
+    "orderProperty": "rank",
+    "columns": [
+      { "value": "draft", "label": "Draft", "progress": 0 },
+      { "value": "Ready for Refinement", "progress": 20 },
+      { "value": "Refinement", "progress": 44, "wip": 5 },
+      { "value": "Ready for Dev", "progress": 55 },
+      { "value": "Development", "progress": 63, "wip": 4 },
+      { "value": "Ready for Review", "progress": 86, "wip": 8 },
+      { "value": "Deployed", "progress": 100 },
+      { "value": "Rejected", "excluded": true }
+    ],
+    "titleProperty": "id",
+    "assigneeProperty": "assignee",
+    "badgeProperties": ["type", "priority", "version_target"],
+    "questionsProperty": "open_questions",
+    "testsProperty": "open_tests",
+    "discussionProperty": "discussion",
+    "requiredProperties": ["id", "status", "updated"],
+    "automations": [
+      { "when": ["Deployed"], "set": { "deployed": "{{date}}" }, "repo": "", "command": "" },
+      { "when": [], "set": {}, "repo": "my-app", "command": "node scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
+    ]
+  },
+  "milestones": {
+    "versionProperty": "version_target",
+    "plannedVersions": ["v1.1.0", "v1.2.0", "v1.3.0"],
+    "tags": { "1.2": "Beta" },
+    "sizeProperty": "size",
+    "completedProperty": "deployed",
+    "velocityWindowDays": 28,
+    "releaseNotesFolder": "08_Delivery-and-QA/Releases"
+  },
+  "meetings": {
+    "folder": "09_Meetings",
+    "dateProperty": "meeting_date",
+    "participantsProperty": "participants",
+    "actionsProperty": "open_actions",
+    "templates": [
+      { "label": "Write meeting report", "tool": "claude", "repo": "my-app", "prompt": "/meeting report {{title}}" }
+    ],
+    "calendarFilter": "",
+    "calendarLookaheadDays": 14,
+    "calendarChips": [
+      { "label": "Prepare agenda", "tool": "claude", "repo": "my-app", "prompt": "/meeting agenda {{date}} {{title}}" }
+    ]
+  },
+  "todos": {
+    "folders": ["09_Meetings", "05_Requirements/Tickets"],
+    "sections": ["Action items", "Open action items"],
+    "assignees": ["Alex", "Robin"],
+    "fallbackAssignee": "Team"
+  },
+  "chips": {
+    "defaultTool": "claude",
+    "templates": [
+      { "label": "Start refinement", "tool": "claude", "repo": "my-app", "prompt": "/refine {{id}}" },
+      { "label": "Start development", "tool": "claude", "repo": "my-app", "prompt": "/develop {{id}}" }
+    ],
+    "columnTemplates": [
+      { "label": "Refine all tickets", "tool": "claude", "repo": "my-app", "prompt": "Work through these tickets sequentially with the full /refine workflow: {{ids}}." }
+    ]
+  }
+}
+```
+
+Where the stored shape differs from the settings UI:
+
+- **Columns are objects, not `value | Label | progress | WIP` strings.** `label` may be omitted (the `value` is then displayed), an omitted `wip` means no limit, and the UI's `-` progress becomes `"excluded": true` — *not* `"progress": "-"`.
+- **`chips.templates` and `chips.columnTemplates` are separate lists** — card chips vs. batch chips on a column header. Identical object shape (`label`, `tool`, `repo`, `prompt`); only the column prompts get `{{ids}}`, `{{status}}` and `{{count}}`.
+- **Empty means off, and hides the tab.** `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` turns the forecast off, `board.orderProperty: ""` disables manual ordering, and an empty `assigneeProperty`/`questionsProperty`/`testsProperty`/`discussionProperty` drops that badge.
+- **`milestones.tags` is keyed by normalized `major.minor`** (`"1.2": "Beta"`), while `plannedVersions` holds the canonical *write* form (`"v1.2.0"`) — dropping a card writes that exact string.
+- **Automation rules always carry all four keys.** A `set`-only rule keeps `"repo": ""` and `"command": ""`; an empty `when` means every status change.
+
+### `~/.dispatch/<vault>-<hash>.json` — this device
+
+```json
+{
+  "repos": {
+    "my-app": "C:\\Users\\me\\Workspace\\my-app"
+  },
+  "tools": {
+    "claude": { "command": "start \"Dispatch\" /d {{cwd}} cmd /k claude {{prompt}}" },
+    "codex": { "command": "start \"Dispatch\" /d {{cwd}} cmd /k codex {{prompt}}" }
+  },
+  "calendarUrl": "",
+  "enableHooks": false,
+  "confirmBeforeRun": true
+}
+```
+
+- **`tools` maps a name to an *object*, not to a string** — `{"claude": {"command": "…"}}`. A bare string is not a valid tool entry.
+- `repos` is the only place absolute paths may appear anywhere in Dispatch's configuration.
+- `enableHooks` gates automation **commands** on this machine; the `set` assignments of an automation rule always apply.
+
+The filename is `<vault name>-<hash>.json`: the vault name with every run of non-`[\w.-]` characters replaced by `_`, and a djb2 hash of the vault's **absolute path** (backslashes included on Windows) as unsigned 32-bit hex:
+
+```js
+let hash = 5381;
+for (let i = 0; i < vaultPath.length; i++) hash = ((hash << 5) + hash + vaultPath.charCodeAt(i)) >>> 0;
+const filename = `${vaultName}-${hash.toString(16)}.json`;
+```
+
+*Settings → Dispatch → This device* prints the resolved path — prefer reading it there; the derivation above is for headless setup. The runs file that lifecycle hooks append to sits beside it, under the same basename: `~/.dispatch/runs/<vault>-<hash>.jsonl`.
 
 ## Security model
 

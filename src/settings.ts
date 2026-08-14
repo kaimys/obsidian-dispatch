@@ -6,9 +6,11 @@
  *   never contain machine-specific absolute paths. Repositories are referenced
  *   by ALIAS only.
  *
- * - LocalSettings — stored in local.json next to the plugin, meant to be
- *   excluded from vault sync / git. Maps repo aliases to absolute paths on
- *   this machine and defines which tool commands exist here.
+ * - LocalSettings — stored OUTSIDE the vault, in the user profile at
+ *   ~/.dispatch/<vault>-<hash>.json, so no sync/git exclusion is needed and
+ *   teammates cannot overwrite each other. Maps repo aliases to absolute paths
+ *   on this machine and defines which tool commands exist here. (A local.json
+ *   from before 0.2, found next to the plugin, is migrated there on load.)
  */
 
 export interface ColumnConfig {
