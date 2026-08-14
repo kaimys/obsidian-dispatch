@@ -15,6 +15,8 @@ Which frontmatter properties drive all this is up to you; see [page-types.md](pa
 
 Columns are the values of your **status** property, in the order you configure — which means the column order *is* your pipeline, and Dispatch never invents one for you. A status found in a note but not configured shows up as an extra column at the end, so nothing silently disappears.
 
+![Kanban Board](assets/Kanban-Teaser.png)
+
 - **Drag between columns** to change status; **drag within a column** to change priority. Order is data: it's written back into a `rank` property with gaps of 1024 and midpoint inserts, so a reorder normally rewrites only the moved note.
 - **Cards show what you configure**: a title (optionally prefixed by the ticket `id`), badges for any property (type, priority, size), an accent-outlined `@Name` for the assignee, and a chat icon linking to the discussion thread.
 - **Two counters get their own badges** because they gate the workflow rather than describe it: `? N` for open refinement questions (amber → green at 0) and `✓ N` for open manual test items (purple → green at 0). Green on both means a ticket is build-ready and review-ready respectively.
@@ -27,6 +29,8 @@ Columns are the values of your **status** property, in the order you configure �
 ## Release Plan
 
 The same cards, grouped by **target version** instead of status. Dragging a card between columns changes only the version — never its status or rank.
+
+![Release Board](assets/Release-Teaser.png)
 
 - **Version columns are keyed by `major.minor`**, so `v1.2.0`, `1.2.0` and `1.2.1` all land in the same `1.2` column. Inconsistent formatting in your notes doesn't split a milestone.
 - **Planned versions are always shown**, even when empty — that's how you plan a release before any ticket is assigned to it. Non-version planned values ("Icebox") become special columns on the left.
@@ -42,6 +46,8 @@ Cards inside a version column sort by workflow progress — furthest-along first
 
 One row per meeting, newest first, upcoming ones marked with a dashed border. Each row shows the date, the participants, and **that meeting's open action items broken down per person** — not a total, because "7 open" tells you nothing about whether it's your problem. A green check marks a meeting with nothing outstanding.
 
+![Meeting Board](assets/Meeting-Teaser.png)
+
 Meeting rows get their own chips (e.g. "Write the report from the transcript"), and calendar events get **event chips** with `{{date}}`/`{{title}}` variables (e.g. "Prepare agenda") — both as right-click menus, so a chip never has to be pasted into a note.
 
 With a **calendar ICS URL** configured (device-local — a Google Calendar secret address works), an upcoming strip sits on top: recurring events expanded, filtered by title if you want. An event whose date already has a meeting note links to it (*agenda ✓*); the rest say *no agenda yet*, which is the entire status report you need before a week starts.
@@ -49,6 +55,8 @@ With a **calendar ICS URL** configured (device-local — a Google Calendar secre
 ## Todos board
 
 Every open action item across your configured folders, in **two columns**: **Assigned** (items with a named owner) and a fallback column — *Team* by default — for shared items nobody owns yet. A slice bar filters the assigned column to one person; the Team column always stays visible, because shared work is everyone's.
+
+![Open Task Board](assets/Todos-Teaser.png)
 
 - **Items are unchecked `- [ ]` lines inside allowlisted sections** (default: "Action items", "Open action items"), so acceptance criteria and test plans don't flood the board.
 - **Owner attribution** follows the convention meeting notes already use — a bold owner line (`**Kai**`) or an inline `- [ ] **Kai:** …` prefix — with a ticket's assignee as fallback. Configure the list of real names, and a bold prefix that isn't one (`**US00055:**`, `**Friday:**`) stays item text instead of inventing a person.

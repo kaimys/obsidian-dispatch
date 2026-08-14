@@ -2,7 +2,7 @@
 
 **The agentic ticket board for Obsidian.**
 
-![Dispatch — Kanban board and Release Plan](docs/release-plan.gif)
+![Dispatch Boards](docs/assets/animation.gif)
 
 Your coding agents ship faster than you can decide. **You are now the bottleneck** — what remains of the development cycle is deciding *what* to build, agreeing on it as a team, and reviewing what comes back. Dispatch turns an agent-friendly wiki (à la [Karpathy's LLM wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)) into the cockpit for that human side: tickets are plain notes, boards are live views over their frontmatter, and every card can dispatch a coding agent — Claude Code, Codex, any CLI — into the right repository.
 

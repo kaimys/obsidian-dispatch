@@ -106,11 +106,9 @@ Two pages in `00_Start-Here/` carry the pattern's bookkeeping. They are the reas
 
 **`index.md` — the catalog.** Every page, grouped by folder, with a one-line summary and its status. Read first in any session. Updated in the same step as the page it describes, never in a separate cleanup pass — that pass never happens.
 
-```markdown
 | Document | Status | Description |
 |----------|--------|-------------|
 | [Product Vision](../02_Product/Product-Vision.md) | approved | One-line summary of what this page says |
-```
 
 **`log.md` — the ledger.** Append-only, newest first, grep-friendly headers:
 

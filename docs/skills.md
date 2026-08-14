@@ -28,6 +28,8 @@ The core loop. Each one is wired to a chip on the ticket card, so the board is t
 | `/test-plan <id>` | the ticket, the automated suites | the manual plan (only what automation doesn't cover), `open_tests` | — |
 | `/fix-bug <report>` | a bug report, a thread, or a description | a bug ticket in both systems, then the fix through the same loop | chat MCP, tracker MCP |
 
+<img src="assets/Tickets.png" alt="Tickets" width="33%" style="float: right; margin:10px" />
+
 Three things make this loop hold together:
 
 - **Counters are gates, not decoration.** `open_questions: 0` is what lets a ticket leave refinement; `open_tests: 0` is what lets it leave review. Because they're frontmatter, the gate is visible on the board as a badge instead of living in someone's head.

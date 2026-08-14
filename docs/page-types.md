@@ -64,6 +64,8 @@ frozen: 2026-08-05             # stamped when the spec closes (see below)
 ---
 ```
 
+<img src="assets/Frontmatter.png" alt="Tickets" width="33%" style="float: right; margin:10px" />
+
 | Property | Read by |
 | --- | --- |
 | `id` | card title prefix; the `{{id}}` chip variable — a ticket without one drops out of every batch chip |
