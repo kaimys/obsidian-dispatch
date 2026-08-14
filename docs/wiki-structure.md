@@ -108,7 +108,7 @@ Two pages in `00_Start-Here/` carry the pattern's bookkeeping. They are the reas
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [Product Vision](../02_Product/Product-Vision.md) | approved | One-line summary of what this page says |
+| [[Product Vision]] | approved | One-line summary of what this page says |
 
 **`log.md` — the ledger.** Append-only, newest first, grep-friendly headers:
 
