@@ -207,20 +207,9 @@ Decide with the user which side is the **source of truth** (recommend: the vault
 So board cards show launched → running ⇄ waiting → done and completed runs log back into the note:
 
 1. **Copy the reference implementation that ships with this skill** — `assets/run-state.mjs` in this skill's own directory — into the target repo as `scripts/dispatch/run-state.mjs`. It is dependency-free, fully synchronous and needs no edits. (What it does: appends `{id, state, ts}` to `$DISPATCH_RUNS_FILE`; on `done` also appends a run-log line plus an excerpt of the agent's final message — read from the `transcript_path` in the hook's **stdin JSON**, not from an env var — to `$DISPATCH_NOTE` under `## Dispatch runs`, newest first; silent no-op when `DISPATCH_RUN_ID` is unset, so normal sessions are undisturbed. Contract: [`installation.md` → Run lifecycle](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/installation.md#run-lifecycle).)
-2. Wire the four events in the **target repo's** `.claude/settings.json` — merge into an existing file, never overwrite it:
+2. Wire the four events in the **target repo's** `.claude/settings.json` by **copying `assets/claude-settings-hooks.json`** from this skill's directory and merging it into any existing file (never overwrite one). It maps `SessionStart` and `UserPromptSubmit` → `running`, `Stop` → `waiting`, `SessionEnd` → `done`, using the `command` + `args` form, which survives spaces in the project path.
 
-```json
-{
-  "hooks": {
-    "SessionStart": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "running"] }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "running"] }] }],
-    "Stop": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "waiting"] }] }],
-    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "done"] }] }]
-  }
-}
-```
-
-   Prefer this `command` + `args` form over a single command string — it survives spaces in the project path.
+   ⚠️ **Copy that file — do not retype the JSON from memory or from anything quoted in these instructions.** Each hook path must remain the *literal, unexpanded* project-directory variable (the `CLAUDE_PROJECT_DIR` name in dollar-brace form, exactly as the file has it). That variable is **substituted when this skill is rendered**, so instructions that inline the JSON can reach you with a real absolute path already baked in — and writing that into `.claude/settings.json` hardcodes one machine into a file the whole team commits. After merging, grep the result for the drive letter or home directory: if you find one, you retyped it instead of copying it.
 3. **Verify it without Obsidian** before the smoke test: set the five `DISPATCH_*` variables by hand, run the script for `running`, `waiting` and `done` (piping `{"transcript_path":"…"}` on stdin for the last), then check that the runs file gained three records and a scratch note gained its `## Dispatch runs` entry. On Windows pass **native paths** (`C:\…`) — a Git-Bash `/c/…` path makes the note lookup silently no-op and looks like a broken hook.
 4. Semantics to explain: **done fires when the claude process exits** (`/exit`), not when it finishes answering — that's what `waiting` is for. Ghost badges (killed terminals) are cleared via badge-click → menu.
 
@@ -234,6 +223,7 @@ So board cards show launched → running ⇄ waiting → done and completed runs
 - `milestones.completedProperty` is actually stamped by an automation rule, and matches the completion property in the ticket templates;
 - **no `<<PLACEHOLDER>>` survived** in the scaffolded commands or templates — `grep -r '<<' .claude/commands <vault>/<templates>` must come back empty;
 - every chip prompt names a command that exists in the repo;
+- **`.claude/settings.json` contains no absolute path** — the hook paths must still be the unexpanded project-directory variable (step 7.2). A drive letter or home directory in there is the single easiest way to commit one machine's layout to the whole team;
 - the run-state hook behaves (step 7.3).
 
 Then walk the user through the UI, verifying each:
