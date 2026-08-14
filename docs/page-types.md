@@ -143,11 +143,11 @@ One note per meeting, in `09_Meetings/`, named `YYYY-MM-DD - <meeting>.md`. Feed
 
 ```yaml
 ---
-date: 2026-08-04
+meeting_date: 2026-08-04
 participants: [Alex, Robin, Morgan]
 discussion: https://…        # the thread where the agenda was announced
 decisions_folded: 2026-08-05 # when decisions were written into the tickets
-open_items: 3
+open_actions: 3
 ---
 ```
 
