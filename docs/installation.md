@@ -279,6 +279,8 @@ Caveat: commands run through your system shell. On Windows (`cmd.exe`), `%VAR%` 
 npm install
 npm run dev     # watch build (main.js with inline sourcemap)
 npm run build   # type-check + production build
+npm test        # vitest suite against the fixture wiki in test/vault
+npm run lint    # Obsidian's own plugin ruleset (what the directory review runs)
 ```
 
 Symlink or copy the repo folder into a test vault's `.obsidian/plugins/dispatch/`, then use Obsidian's "Reload app without saving" command after a build.
