@@ -3,12 +3,23 @@ import { launchChip, launchColumnChip, launchEventChip } from "./chips";
 import { runHook, shellVars, substitute } from "./exec";
 import type DispatchPlugin from "./main";
 import {
+	buildCard,
+	cardProblems,
+	inFolders,
+	indexReleases,
+	milestonePercent,
+	normalizeFolders,
+	releaseNoteFrom,
+	sortByRank,
+	velocityPerDay,
+} from "./cards";
+import type { CardData, CardSettings, ReleaseNote } from "./cards";
+import {
 	comparePatchKeys,
 	compareRanks,
 	parseOpenActionOwners,
 	parseTodoItems,
 	patchKey,
-	resolveAssignee,
 	sliceKey,
 	versionKey,
 } from "./parse";
@@ -52,34 +63,7 @@ interface MeetingCard {
 	warning?: string;
 }
 
-interface Card {
-	file: TFile;
-	status: string;
-	/** Display label of the card's status (column label if configured). */
-	statusLabel: string;
-	/** Position of the card's status in the configured column order (for milestone sorting). */
-	statusIdx: number;
-	title: string;
-	badges: string[];
-	rank?: number;
-	version: string;
-	size: number;
-	/** Assignee (from the assignee property). */
-	assignee?: string;
-	/** Unanswered refinement questions (from the questions property). */
-	questions?: number;
-	/** Open manual test-plan items (from the tests property). */
-	tests?: number;
-	/** Discussion thread URL (from the discussion property). */
-	discussion?: string;
-	/** Completion contribution (0–100) of the card's status, per column config. */
-	progress?: number;
-	excludedFromProgress: boolean;
-	/** Parsed completion date (ms) from the milestone completedProperty. */
-	completedAt?: number;
-	/** Raw frontmatter — used by the slice-by filter. */
-	raw: Record<string, unknown>;
-}
+type Card = CardData<TFile>;
 
 interface MilestoneColumn {
 	/** Normalized major.minor key ("" = no version). */
@@ -95,13 +79,7 @@ interface MilestoneColumn {
 	line?: string;
 }
 
-interface ReleaseInfo {
-	file: TFile;
-	date: string;
-	version: string;
-	/** True for the initial x.y.0 release of the line. */
-	initial: boolean;
-}
+type ReleaseInfo = ReleaseNote<TFile>;
 
 /**
  * Special (non-version) columns like "Rejected" or "Icebox" sort leftmost, in
@@ -163,127 +141,46 @@ export class BoardView extends ItemView {
 
 	// ------------------------------------------------------------------ data
 
-	private collectCards(): Card[] {
-		const {
-			sourceFolders,
-			statusProperty,
-			titleProperty,
-			assigneeProperty,
-			badgeProperties,
-			questionsProperty,
-			discussionProperty,
-			testsProperty,
-			orderProperty,
-			columns,
-		} = this.plugin.shared.board;
-
-		const parseCount = (raw: unknown): number | undefined => {
-			if (raw === "" || raw === null || raw === undefined) return undefined;
-			const n = typeof raw === "number" ? raw : Number(raw);
-			return Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined;
+	private cardSettings(): CardSettings {
+		const b = this.plugin.shared.board;
+		const m = this.plugin.shared.milestones;
+		return {
+			statusProperty: b.statusProperty,
+			titleProperty: b.titleProperty,
+			assigneeProperty: b.assigneeProperty,
+			badgeProperties: b.badgeProperties,
+			questionsProperty: b.questionsProperty,
+			testsProperty: b.testsProperty,
+			discussionProperty: b.discussionProperty,
+			orderProperty: b.orderProperty,
+			columns: b.columns,
+			versionProperty: m.versionProperty,
+			sizeProperty: m.sizeProperty,
+			completedProperty: m.completedProperty,
 		};
-		const { versionProperty, sizeProperty } = this.plugin.shared.milestones;
-		const statusMeta = new Map(
-			columns.map((c, i) => [
-				c.value,
-				{ idx: i, label: c.label, progress: c.progress, excluded: c.excluded === true },
-			])
-		);
-		const folders = sourceFolders
-			.map((f) => f.replace(/^\/+|\/+$/g, ""))
-			.filter((f) => f.length > 0);
-		const files = this.app.vault
+	}
+
+	/** Notes in the configured source folders, with their frontmatter. */
+	private sourceNotes(): { file: TFile; fm: Record<string, unknown> }[] {
+		const folders = normalizeFolders(this.plugin.shared.board.sourceFolders);
+		return this.app.vault
 			.getMarkdownFiles()
-			.filter((file) => folders.some((folder) => file.path.startsWith(folder + "/")));
-
-		return files.map((file) => {
-			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-			const rawStatus = fm[statusProperty];
-			const status = typeof rawStatus === "string" ? rawStatus.trim() : "";
-			const id = fm[titleProperty];
-			const title =
-				id !== undefined && id !== null && id !== ""
-					? `${String(id)} · ${file.basename}`
-					: file.basename;
-			const badges = badgeProperties
-				.map((p) => fm[p])
-				.filter((v) => v !== undefined && v !== null && v !== "")
-				.map(String);
-
-			let rank: number | undefined;
-			if (orderProperty) {
-				const raw = fm[orderProperty];
-				if (typeof raw === "number" && Number.isFinite(raw)) rank = raw;
-				else if (typeof raw === "string" && raw.trim() !== "" && !Number.isNaN(Number(raw)))
-					rank = Number(raw);
-			}
-
-			const rawVersion = fm[versionProperty];
-			const version =
-				typeof rawVersion === "string"
-					? rawVersion.trim()
-					: typeof rawVersion === "number"
-						? String(rawVersion)
-						: "";
-
-			let size = 1;
-			if (sizeProperty) {
-				const rawSize = fm[sizeProperty];
-				const n = typeof rawSize === "number" ? rawSize : Number(rawSize);
-				if (Number.isFinite(n) && n > 0) size = n;
-			}
-
-			const questions = questionsProperty ? parseCount(fm[questionsProperty]) : undefined;
-			const tests = testsProperty ? parseCount(fm[testsProperty]) : undefined;
-			const rawAssignee = assigneeProperty ? fm[assigneeProperty] : undefined;
-			const assignee =
-				typeof rawAssignee === "string" && rawAssignee.trim() !== ""
-					? rawAssignee.trim()
-					: undefined;
-
-			let discussion: string | undefined;
-			if (discussionProperty) {
-				const rawUrl = fm[discussionProperty];
-				if (typeof rawUrl === "string" && /^https?:\/\//.test(rawUrl.trim()))
-					discussion = rawUrl.trim();
-			}
-
-			let completedAt: number | undefined;
-			const { completedProperty } = this.plugin.shared.milestones;
-			if (completedProperty) {
-				const rawCompleted = fm[completedProperty];
-				const parsed = typeof rawCompleted === "string" ? Date.parse(rawCompleted) : NaN;
-				if (Number.isFinite(parsed)) completedAt = parsed;
-			}
-
-			const meta = statusMeta.get(status);
-			return {
+			.filter((file) => inFolders(file.path, folders))
+			.map((file) => ({
 				file,
-				status,
-				statusLabel: meta?.label ?? (status || "(no status)"),
-				statusIdx: meta?.idx ?? Number.MAX_SAFE_INTEGER,
-				title,
-				badges,
-				rank,
-				version,
-				size,
-				assignee,
-				questions,
-				tests,
-				discussion,
-				progress: meta?.progress,
-				excludedFromProgress: meta?.excluded ?? false,
-				completedAt,
-				raw: fm as Record<string, unknown>,
-			};
-		});
+				fm: (this.app.metadataCache.getFileCache(file)?.frontmatter ??
+					{}) as Record<string, unknown>,
+			}));
+	}
+
+	private collectCards(): Card[] {
+		const settings = this.cardSettings();
+		return this.sourceNotes().map(({ file, fm }) => buildCard(file, fm, settings));
 	}
 
 	/** Ranked cards first (ascending), unranked after them (by title). */
 	private sortCards(cards: Card[]): Card[] {
-		return [...cards].sort(
-			(a, b) => compareRanks(a.rank, b.rank) || a.title.localeCompare(b.title)
-		);
+		return sortByRank(cards);
 	}
 
 	// ---------------------------------------------------------------- render
@@ -481,38 +378,19 @@ export class BoardView extends ItemView {
 	 * one, the earliest-dated note of the line is used.
 	 */
 	private collectReleases(): { byLine: Map<string, ReleaseInfo>; byPatch: Map<string, ReleaseInfo> } {
-		const byLine = new Map<string, ReleaseInfo>();
-		const byPatch = new Map<string, ReleaseInfo>();
 		const folder = this.plugin.shared.milestones.releaseNotesFolder.replace(/^\/+|\/+$/g, "");
-		if (!folder) return { byLine, byPatch };
+		if (!folder) return { byLine: new Map(), byPatch: new Map() };
+		const notes: ReleaseInfo[] = [];
 		for (const file of this.app.vault.getMarkdownFiles()) {
 			if (!file.path.startsWith(folder + "/")) continue;
-			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-			const version = typeof fm.version === "string" ? fm.version.trim() : "";
-			if (!version) continue;
-			const key = versionKey(version);
-			const date = typeof fm.date === "string" ? fm.date.trim() : String(fm.date ?? "");
-			const initial = /^[vV]?\d+\.\d+\.0$/.test(version);
-			const info: ReleaseInfo = { file, date, version, initial };
-
-			// Per patch: each release note owns its own version (1.4.1, 1.4.2 …).
-			const pKey = patchKey(version);
-			const prevPatch = byPatch.get(pKey);
-			if (!prevPatch || (date !== "" && prevPatch.date !== "" && date < prevPatch.date)) {
-				byPatch.set(pKey, info);
-			}
-
-			// Per line: the initial x.y.0 note wins; else the earliest-dated one.
-			const existing = byLine.get(key);
-			if (
-				!existing ||
-				(!existing.initial &&
-					(initial || (date !== "" && existing.date !== "" && date < existing.date)))
-			) {
-				byLine.set(key, info);
-			}
+			const fm = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<
+				string,
+				unknown
+			>;
+			const note = releaseNoteFrom(file, fm);
+			if (note) notes.push(note);
 		}
-		return { byLine, byPatch };
+		return indexReleases(notes);
 	}
 
 	private renderMilestoneBoard(root: HTMLElement, cards: Card[], allCards: Card[]): void {
@@ -706,17 +584,7 @@ export class BoardView extends ItemView {
 	 */
 	private velocityPerDay(allCards: Card[]): { perDay: number; samples: number } | null {
 		const { completedProperty, velocityWindowDays } = this.plugin.shared.milestones;
-		if (!completedProperty || velocityWindowDays <= 0) return null;
-		const cutoff = Date.now() - velocityWindowDays * 86_400_000;
-		let weight = 0;
-		let samples = 0;
-		for (const card of allCards) {
-			if (card.completedAt === undefined || card.completedAt < cutoff) continue;
-			weight += card.size;
-			samples++;
-		}
-		if (samples === 0 || weight <= 0) return null;
-		return { perDay: weight / velocityWindowDays, samples };
+		return velocityPerDay(allCards, { completedProperty, velocityWindowDays });
 	}
 
 	/**
@@ -758,15 +626,7 @@ export class BoardView extends ItemView {
 	 * skipping excluded statuses. Null when nothing is measurable.
 	 */
 	private milestonePercent(cards: Card[]): number | null {
-		let weight = 0;
-		let done = 0;
-		for (const c of cards) {
-			if (c.excludedFromProgress) continue;
-			weight += c.size;
-			done += (c.size * (c.progress ?? 0)) / 100;
-		}
-		if (weight === 0) return null;
-		return Math.round((100 * done) / weight);
+		return milestonePercent(cards);
 	}
 
 	private renderVersionTag(parent: HTMLElement, col: MilestoneColumn): void {
@@ -1736,33 +1596,11 @@ export class BoardView extends ItemView {
 	// ------------------------------------------------------------- problems
 
 	private collectProblems(): { file: TFile; message: string }[] {
-		const { sourceFolders, statusProperty, columns, requiredProperties } =
-			this.plugin.shared.board;
-		const folders = sourceFolders
-			.map((f) => f.replace(/^\/+|\/+$/g, ""))
-			.filter((f) => f.length > 0);
-		const files = this.app.vault
-			.getMarkdownFiles()
-			.filter((file) => folders.some((folder) => file.path.startsWith(folder + "/")));
-		const known = new Set(columns.map((c) => c.value));
-
+		const { statusProperty, columns, requiredProperties } = this.plugin.shared.board;
 		const problems: { file: TFile; message: string }[] = [];
-		for (const file of files) {
-			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-			for (const prop of requiredProperties) {
-				const value = fm[prop];
-				if (value === undefined || value === null || value === "") {
-					problems.push({ file, message: `missing required property "${prop}"` });
-				} else if (typeof value === "string" && /\{.+\}/.test(value)) {
-					problems.push({
-						file,
-						message: `unrendered template value in "${prop}": ${value}`,
-					});
-				}
-			}
-			const status = fm[statusProperty];
-			if (typeof status === "string" && status.trim() !== "" && !known.has(status.trim())) {
-				problems.push({ file, message: `status "${status}" is not a configured column` });
+		for (const { file, fm } of this.sourceNotes()) {
+			for (const message of cardProblems(fm, { statusProperty, columns, requiredProperties })) {
+				problems.push({ file, message });
 			}
 		}
 		return problems;

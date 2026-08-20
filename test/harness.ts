@@ -10,7 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { load } from "js-yaml";
+import { parse } from "yaml";
 
 export interface VaultFile {
 	/** Vault-relative, forward-slashed — the form the plugin's settings use. */
@@ -27,7 +27,7 @@ const VAULT = fileURLToPath(new URL("./vault", import.meta.url));
 function parseFrontmatter(text: string): Record<string, unknown> {
 	const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
 	if (!m) return {};
-	const parsed = load(m[1]);
+	const parsed = parse(m[1]) as unknown;
 	return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
 }
 
@@ -83,4 +83,27 @@ export const SETTINGS = {
 	assignees: ["Alex", "Robin", "Morgan"],
 	fallbackAssignee: "Team",
 	todoSections: new Set(["action items", "open action items"]),
+};
+
+/** Board + milestone settings in the shape the card builder takes. */
+export const CARD_SETTINGS = {
+	statusProperty: 'status',
+	titleProperty: 'id',
+	assigneeProperty: 'assignee',
+	badgeProperties: ['type', 'priority'],
+	questionsProperty: 'open_questions',
+	testsProperty: 'open_tests',
+	discussionProperty: 'discussion',
+	orderProperty: 'rank',
+	columns: SETTINGS.columns,
+	versionProperty: 'version_target',
+	sizeProperty: 'size',
+	completedProperty: 'deployed',
+};
+
+/** What the problems panel checks. */
+export const PROBLEM_SETTINGS = {
+	statusProperty: 'status',
+	columns: SETTINGS.columns,
+	requiredProperties: ['id', 'status', 'updated'],
 };

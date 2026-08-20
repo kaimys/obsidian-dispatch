@@ -7,7 +7,7 @@
  * logic that needs the real API belongs behind the ports in `test/harness.ts`,
  * not in a fake Obsidian.
  */
-import { load } from "js-yaml";
+import { parse } from "yaml";
 
 export class TFile {
 	path = "";
@@ -47,7 +47,7 @@ export type App = unknown;
 export type WorkspaceLeaf = unknown;
 
 export function parseYaml(text: string): unknown {
-	return load(text);
+	return parse(text) as unknown;
 }
 
 export function setIcon(): void {}
