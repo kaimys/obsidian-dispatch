@@ -2,6 +2,16 @@ import { App, ItemView, Menu, Modal, Notice, TFile, WorkspaceLeaf, debounce, set
 import { launchChip, launchColumnChip, launchEventChip } from "./chips";
 import { runHook, shellVars, substitute } from "./exec";
 import type DispatchPlugin from "./main";
+import {
+	comparePatchKeys,
+	compareRanks,
+	parseOpenActionOwners,
+	parseTodoItems,
+	patchKey,
+	resolveAssignee,
+	sliceKey,
+	versionKey,
+} from "./parse";
 import type { ColumnConfig } from "./settings";
 
 export const VIEW_TYPE_BOARD = "dispatch-board";
@@ -22,63 +32,6 @@ const ARCHIVE_KEY = "\u0000archive";
 
 type BoardMode = "status" | "milestone" | "meetings" | "todos";
 
-/**
- * Resolve a bold owner label to a canonical assignee. With a configured
- * `assignees` list, only names matching one (by full or first-word match)
- * count — so `**US00055:**` / `**Friday:**` are NOT owners. Empty list =
- * permissive (any bold label is accepted, as before). null = no match.
- */
-function resolveAssignee(
-	candidate: string | null | undefined,
-	assignees: string[]
-): string | null {
-	if (!candidate) return null;
-	const c = candidate.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-	if (!c) return null;
-	if (assignees.length === 0) return candidate.trim(); // permissive
-	const first = c.split(" ")[0];
-	for (const a of assignees) {
-		const an = a.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-		if (an === c || an.split(" ")[0] === first) return a;
-	}
-	return null;
-}
-
-/**
- * Owners of unchecked action items in a meeting note: a bold-only line
- * (`**Alex**`) sets the owner context for following items; an inline
- * `- [ ] **Alex:** …` prefix overrides. Anything not resolving to a known
- * assignee falls back to `fallback` (e.g. "Team").
- */
-function parseOpenActionOwners(
-	content: string,
-	assignees: string[],
-	fallback: string
-): string[] {
-	const owners: string[] = [];
-	let context: string | null = null;
-	for (const line of content.split(/\r?\n/)) {
-		if (/^#{1,6}\s/.test(line)) {
-			context = null;
-			continue;
-		}
-		const section = line.match(/^\*\*([^*:]{1,40}?):?\*\*\s*$/);
-		if (section) {
-			// A bold-only line is a section header — it always (re)sets the
-			// owner: to the known assignee, or null (→ fallback) when it's
-			// something like **Team** or **US00055** that isn't one.
-			context = resolveAssignee(section[1], assignees);
-			continue;
-		}
-		const task = line.match(/^\s*[-*]\s+\[ \]\s+(.*)$/);
-		if (!task) continue;
-		const inlineM = task[1].match(/^\*\*([^*:]{1,40}?):?\*\*/);
-		const inline = inlineM ? resolveAssignee(inlineM[1], assignees) : null;
-		owners.push(inline ?? context ?? fallback);
-	}
-	return owners;
-}
-
 interface TodoItem {
 	file: TFile;
 	/** 0-based line index of the checkbox in the source note. */
@@ -87,59 +40,6 @@ interface TodoItem {
 	owner: string;
 	/** Short source label (ticket id or note basename). */
 	source: string;
-}
-
-/**
- * Unchecked `- [ ]` items inside allowlisted sections. Owner attribution:
- * bold-only line (`**Alex**`) sets the context, inline `**Alex:**` prefix
- * overrides, then the note-level assignee, then `fallback` — but only labels
- * resolving to a known assignee count (a non-matching inline prefix like
- * `**US00055:**` stays as item text).
- */
-function parseTodoItems(
-	content: string,
-	sections: Set<string>,
-	assignees: string[],
-	fallback: string,
-	noteAssignee: string | null
-): { line: number; text: string; owner: string }[] {
-	const out: { line: number; text: string; owner: string }[] = [];
-	let inSection = false;
-	let context: string | null = null;
-	const noteOwner = resolveAssignee(noteAssignee, assignees);
-	const lines = content.split(/\r?\n/);
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-		const heading = line.match(/^#{1,6}\s+(.*?)\s*$/);
-		if (heading) {
-			const title = heading[1].replace(/[*_`]/g, "").trim().toLowerCase();
-			inSection = [...sections].some((s) => title.startsWith(s));
-			context = null;
-			continue;
-		}
-		if (!inSection) continue;
-		const bold = line.match(/^\*\*([^*:]{1,40}?):?\*\*\s*$/);
-		if (bold) {
-			// Section header always resets the owner (null → fallback for
-			// **Team** and other non-assignee headers).
-			context = resolveAssignee(bold[1], assignees);
-			continue;
-		}
-		const task = line.match(/^\s*[-*]\s+\[ \]\s+(.*)$/);
-		if (!task) continue;
-		let text = task[1].trim();
-		const inlineM = text.match(/^\*\*([^*:]{1,40}?):?\*\*\s*/);
-		let inlineOwner: string | null = null;
-		if (inlineM) {
-			const r = resolveAssignee(inlineM[1], assignees);
-			if (r) {
-				inlineOwner = r;
-				text = text.slice(inlineM[0].length).trim(); // strip only a real owner prefix
-			}
-		}
-		out.push({ line: i, text, owner: inlineOwner ?? context ?? noteOwner ?? fallback });
-	}
-	return out;
 }
 
 interface MeetingCard {
@@ -181,12 +81,6 @@ interface Card {
 	raw: Record<string, unknown>;
 }
 
-/** Slice key for a frontmatter value: empty/missing collapses to "(none)". */
-function sliceKey(value: unknown): string {
-	if (value === undefined || value === null || value === "") return "(none)";
-	return String(value);
-}
-
 interface MilestoneColumn {
 	/** Normalized major.minor key ("" = no version). */
 	key: string;
@@ -209,30 +103,6 @@ interface ReleaseInfo {
 	initial: boolean;
 }
 
-/** Normalize a version value to its major.minor key ("v1.2.0" → "1.2"). */
-function versionKey(raw: string): string {
-	const m = raw.trim().match(/^[vV]?(\d+)\.(\d+)/);
-	return m ? `${m[1]}.${m[2]}` : raw.trim();
-}
-
-/**
- * Full version key including the patch ("v1.4.2" → "1.4.2"). A value without
- * a patch component collapses to its line key ("v1.4" → "1.4"), so it still
- * gets a column of its own when the line is expanded.
- */
-function patchKey(raw: string): string {
-	const m = raw.trim().match(/^[vV]?(\d+)\.(\d+)(?:\.(\d+))?/);
-	if (!m) return raw.trim();
-	return m[3] !== undefined ? `${m[1]}.${m[2]}.${m[3]}` : `${m[1]}.${m[2]}`;
-}
-
-/** Order patch keys within a line; the bare line key ("1.4") sorts first. */
-function comparePatchKeys(a: string, b: string): number {
-	const pa = Number(a.split(".")[2] ?? -1);
-	const pb = Number(b.split(".")[2] ?? -1);
-	return pa - pb;
-}
-
 /**
  * Special (non-version) columns like "Rejected" or "Icebox" sort leftmost, in
  * their plannedVersions order; semver columns follow, ascending.
@@ -243,13 +113,6 @@ function compareMilestoneColumns(a: MilestoneColumn, b: MilestoneColumn): number
 	if (!pa !== !pb) return pa ? 1 : -1;
 	if (pa && pb) return Number(pa[1]) - Number(pb[1]) || Number(pa[2]) - Number(pb[2]);
 	return a.order - b.order || a.key.localeCompare(b.key);
-}
-
-function compareRanks(a?: number, b?: number): number {
-	if (a !== undefined && b !== undefined) return a - b;
-	if (a !== undefined) return -1;
-	if (b !== undefined) return 1;
-	return 0;
 }
 
 export class BoardView extends ItemView {
