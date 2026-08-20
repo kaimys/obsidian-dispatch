@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-dispatch",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Property-driven kanban board with drag & drop, plus chip buttons that dispatch prompts to AI coding agents like Claude Code or Codex.",
 	"main": "main.js",
 	"scripts": {
