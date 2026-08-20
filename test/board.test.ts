@@ -74,9 +74,10 @@ describe("building a card", () => {
 		expect(card("US00008").completedAt).toBe(Date.parse("2026-08-07"));
 	});
 
-	it("renders a nested object badge as [object Object] today", () => {
-		// Current behaviour, pinned so the typing pass has to change it on purpose.
-		expect(card("US00007").badges).toContain("[object Object]");
+	it("drops a nested object badge instead of rendering [object Object]", () => {
+		// US00007 has `priority: { level: high, reason: regression }`, which
+		// cannot be shown as a badge — the type badge is kept, that one is not.
+		expect(card("US00007").badges).toEqual(["story"]);
 	});
 });
 

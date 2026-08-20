@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
+import { displayValue } from "./parse";
 import type DispatchPlugin from "./main";
 
 export class DispatchSettingTab extends PluginSettingTab {
@@ -414,11 +415,11 @@ export class DispatchSettingTab extends PluginSettingTab {
 										? Object.fromEntries(
 												Object.entries(
 													(r as { set: Record<string, unknown> }).set
-												).map(([k, val]) => [k, String(val)])
+												).map(([k, val]) => [k, displayValue(val)])
 											)
 										: {},
-								command: String((r as { command?: unknown }).command ?? ""),
-								repo: String((r as { repo?: unknown }).repo ?? ""),
+								command: displayValue((r as { command?: unknown }).command),
+								repo: displayValue((r as { repo?: unknown }).repo),
 							}));
 							automationError?.setText("");
 							await this.plugin.saveShared();

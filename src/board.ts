@@ -15,6 +15,7 @@ import {
 } from "./cards";
 import type { CardData, CardSettings, ReleaseNote } from "./cards";
 import type { FrontmatterPatch } from "./moves";
+import { frontmatterIn, frontmatterOf, updateFrontmatter } from "./vault";
 import {
 	planStatusDrop,
 	planVersionDrop,
@@ -22,6 +23,7 @@ import {
 import {
 	comparePatchKeys,
 	compareRanks,
+	displayValue,
 	parseOpenActionOwners,
 	parseTodoItems,
 	patchKey,
@@ -168,11 +170,7 @@ export class BoardView extends ItemView {
 		return this.app.vault
 			.getMarkdownFiles()
 			.filter((file) => inFolders(file.path, folders))
-			.map((file) => ({
-				file,
-				fm: (this.app.metadataCache.getFileCache(file)?.frontmatter ??
-					{}) as Record<string, unknown>,
-			}));
+			.map((file) => ({ file, fm: frontmatterOf(this.app, file) }));
 	}
 
 	private collectCards(): Card[] {
@@ -343,8 +341,7 @@ export class BoardView extends ItemView {
 				const openMenu = (e: MouseEvent) => {
 					const ids = colCards
 						.map((c) => {
-							const v = c.raw[this.plugin.shared.board.titleProperty];
-							return v === undefined || v === null ? "" : String(v);
+							return displayValue(c.raw[this.plugin.shared.board.titleProperty]);
 						})
 						.filter((s) => s !== "");
 					const menu = new Menu();
@@ -385,10 +382,7 @@ export class BoardView extends ItemView {
 		const notes: ReleaseInfo[] = [];
 		for (const file of this.app.vault.getMarkdownFiles()) {
 			if (!file.path.startsWith(folder + "/")) continue;
-			const fm = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<
-				string,
-				unknown
-			>;
+			const fm = frontmatterOf(this.app, file);
 			const note = releaseNoteFrom(file, fm);
 			if (note) notes.push(note);
 		}
@@ -845,7 +839,7 @@ export class BoardView extends ItemView {
 		const meetings: MeetingCard[] = [];
 		for (const file of files) {
 			const cachedFm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-			const fm = cachedFm ?? {};
+			const fm = frontmatterIn(this.app.metadataCache.getFileCache(file));
 			const rawDate = fm[settings.dateProperty];
 			let date =
 				typeof rawDate === "string" && /^\d{4}-\d{2}-\d{2}/.test(rawDate.trim())
@@ -859,13 +853,13 @@ export class BoardView extends ItemView {
 					? "no frontmatter"
 					: rawDate === undefined || rawDate === null || rawDate === ""
 						? `missing ${settings.dateProperty}`
-						: `invalid ${settings.dateProperty}: ${String(rawDate)}`;
+						: `invalid ${settings.dateProperty}: ${displayValue(rawDate)}`;
 				const fromName = file.basename.match(/^(\d{4}-\d{2}-\d{2})/);
 				if (fromName) date = fromName[1];
 			}
 			const rawParticipants = fm[settings.participantsProperty];
 			const participants = Array.isArray(rawParticipants)
-				? rawParticipants.map(String)
+				? rawParticipants.map(displayValue)
 				: typeof rawParticipants === "string" && rawParticipants
 					? [rawParticipants]
 					: [];
@@ -1138,7 +1132,7 @@ export class BoardView extends ItemView {
 				continue;
 			}
 
-			const fm = cache.frontmatter ?? {};
+			const fm = frontmatterIn(cache);
 			const rawAssignee = assigneeProperty ? fm[assigneeProperty] : undefined;
 			const fallback =
 				typeof rawAssignee === "string" && rawAssignee.trim() !== ""
@@ -1164,9 +1158,8 @@ export class BoardView extends ItemView {
 				this.todoCache.set(file.path, entry);
 			}
 
-			const id = fm[titleProperty];
-			const source =
-				id !== undefined && id !== null && id !== "" ? String(id) : file.basename;
+			const id = displayValue(fm[titleProperty]);
+			const source = id !== "" ? id : file.basename;
 			for (const item of entry.items) {
 				out.push({ file, line: item.line, text: item.text, owner: item.owner, source });
 			}
@@ -1440,7 +1433,7 @@ export class BoardView extends ItemView {
 
 	/** Write one planned frontmatter change. */
 	private async applyPatch(patch: FrontmatterPatch<TFile>): Promise<void> {
-		await this.app.fileManager.processFrontMatter(patch.file, (fm: Record<string, unknown>) => {
+		await updateFrontmatter(this.app, patch.file, (fm) => {
 			for (const key of patch.unset ?? []) delete fm[key];
 			Object.assign(fm, patch.set);
 		});
@@ -1570,11 +1563,10 @@ class PropertyEditModal extends Modal {
 
 	onOpen(): void {
 		this.titleEl.setText(`${this.file.basename} — ${this.property}`);
-		const fm = this.app.metadataCache.getFileCache(this.file)?.frontmatter ?? {};
-		const current = fm[this.property];
+		const current = frontmatterOf(this.app, this.file)[this.property];
 		const input = this.contentEl.createEl("input", {
 			cls: "dispatch-property-input",
-			value: current === undefined || current === null ? "" : String(current),
+			value: displayValue(current),
 			attr: { placeholder: "empty = remove property" },
 		});
 		input.focus();
@@ -1582,7 +1574,7 @@ class PropertyEditModal extends Modal {
 
 		const save = async () => {
 			const raw = input.value.trim();
-			await this.app.fileManager.processFrontMatter(this.file, (frontmatter) => {
+			await updateFrontmatter(this.app, this.file, (frontmatter) => {
 				if (raw === "") delete frontmatter[this.property];
 				else if (!Number.isNaN(Number(raw))) frontmatter[this.property] = Number(raw);
 				else frontmatter[this.property] = raw;

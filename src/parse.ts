@@ -116,10 +116,32 @@ export function parseTodoItems(
 	return out;
 }
 
+/**
+ * Render a frontmatter value as display text. Frontmatter is whatever the
+ * writer typed, so a value can be a nested object — which must never reach the
+ * UI as "[object Object]". Lists render as their items; objects render as
+ * nothing, which the callers treat as "no value".
+ */
+export function displayValue(value: unknown): string {
+	if (value === undefined || value === null) return "";
+	if (Array.isArray(value)) {
+		return value
+			.map(displayValue)
+			.filter((s) => s !== "")
+			.join(",");
+	}
+	if (typeof value === "string") return value;
+	if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+		return String(value);
+	}
+	// objects, symbols, functions: nothing a person would want to read
+	return "";
+}
+
 /** Slice key for a frontmatter value: empty/missing collapses to "(none)". */
 export function sliceKey(value: unknown): string {
-	if (value === undefined || value === null || value === "") return "(none)";
-	return String(value);
+	const text = displayValue(value);
+	return text === "" ? "(none)" : text;
 }
 
 /** Normalize a version value to its major.minor key ("v1.2.0" → "1.2"). */

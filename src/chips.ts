@@ -1,5 +1,7 @@
 import { App, Modal, Notice, TFile, parseYaml, setIcon } from "obsidian";
 import { launchDetached, quoteArg, shellVars, substitute, writePromptFile } from "./exec";
+import { displayValue } from "./parse";
+import { frontmatterOf } from "./vault";
 import type DispatchPlugin from "./main";
 import type { ChipTemplate } from "./settings";
 
@@ -67,10 +69,8 @@ export function registerChipProcessor(plugin: DispatchPlugin): void {
 /** Resolve + launch a chip (from a code block or a template) for a note. */
 export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePath: string): void {
 	const file = plugin.app.vault.getAbstractFileByPath(sourcePath);
-	const fm =
-		file instanceof TFile
-			? plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {}
-			: {};
+	const fm: Record<string, unknown> =
+		file instanceof TFile ? frontmatterOf(plugin.app, file) : {};
 	const id = fm[plugin.shared.board.titleProperty];
 	const status = fm[plugin.shared.board.statusProperty];
 	const title = sourcePath.replace(/^.*\//, "").replace(/\.md$/, "");
@@ -78,7 +78,7 @@ export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePat
 		file: sourcePath,
 		title,
 		vault: plugin.getVaultBasePath(),
-		id: id === undefined || id === null ? "" : String(id),
+		id: displayValue(id),
 		status: typeof status === "string" ? status : "",
 	};
 

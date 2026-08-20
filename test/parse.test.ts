@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	compareRanks,
+	displayValue,
 	comparePatchKeys,
 	patchKey,
 	resolveAssignee,
@@ -81,6 +82,27 @@ describe("compareRanks", () => {
 	});
 });
 
+describe("displayValue", () => {
+	it("renders the scalars people put in frontmatter", () => {
+		expect(displayValue("high")).toBe("high");
+		expect(displayValue(3)).toBe("3");
+		expect(displayValue(0)).toBe("0"); // not "" — a real zero must survive
+		expect(displayValue(false)).toBe("false");
+	});
+
+	it("renders a list as its items", () => {
+		expect(displayValue(["a", "b"])).toBe("a,b");
+		expect(displayValue([])).toBe("");
+	});
+
+	it("renders nothing for values a person cannot read", () => {
+		expect(displayValue(undefined)).toBe("");
+		expect(displayValue(null)).toBe("");
+		expect(displayValue({ level: "high" })).toBe("");
+		expect(displayValue([{ a: 1 }, "keep"])).toBe("keep"); // objects drop out of a list
+	});
+});
+
 describe("sliceKey", () => {
 	it("collapses missing and empty values into one bucket", () => {
 		expect(sliceKey(undefined)).toBe("(none)");
@@ -95,9 +117,10 @@ describe("sliceKey", () => {
 		expect(sliceKey(["a", "b"])).toBe("a,b");
 	});
 
-	it("renders a nested object as [object Object] today", () => {
-		// Documents current behaviour, not desired behaviour: the typing pass
-		// replaces this with an empty string so the UI can't show that string.
-		expect(sliceKey({ level: "high" })).toBe("[object Object]");
+	it("groups a nested object under (none) rather than showing [object Object]", () => {
+		// Frontmatter holds whatever the writer typed. A slice chip labelled
+		// "[object Object]" is never useful, so an object counts as no value.
+		expect(sliceKey({ level: "high" })).toBe("(none)");
+		expect(sliceKey([{ a: 1 }])).toBe("(none)");
 	});
 });

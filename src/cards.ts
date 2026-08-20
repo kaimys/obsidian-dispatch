@@ -6,7 +6,7 @@
  * so these rules — which status counts, how a version is normalized, what
  * makes a ticket malformed — can be tested against fixture notes.
  */
-import { compareRanks, patchKey, versionKey } from "./parse";
+import { compareRanks, displayValue, patchKey, versionKey } from "./parse";
 import type { ColumnConfig } from "./settings";
 
 /** The little Obsidian gives us about a file that this layer needs. */
@@ -104,16 +104,10 @@ export function buildCard<F extends FileRef>(
 	const rawStatus = fm[s.statusProperty];
 	const status = typeof rawStatus === "string" ? rawStatus.trim() : "";
 
-	const id = fm[s.titleProperty];
-	const title =
-		id !== undefined && id !== null && id !== ""
-			? `${String(id)} · ${file.basename}`
-			: file.basename;
+	const id = displayValue(fm[s.titleProperty]);
+	const title = id !== "" ? `${id} · ${file.basename}` : file.basename;
 
-	const badges = s.badgeProperties
-		.map((p) => fm[p])
-		.filter((v) => v !== undefined && v !== null && v !== "")
-		.map(String);
+	const badges = s.badgeProperties.map((p) => displayValue(fm[p])).filter((v) => v !== "");
 
 	let rank: number | undefined;
 	if (s.orderProperty) {
@@ -210,7 +204,7 @@ export function releaseNoteFrom<F extends FileRef>(
 ): ReleaseNote<F> | null {
 	const version = typeof fm.version === "string" ? fm.version.trim() : "";
 	if (!version) return null;
-	const date = typeof fm.date === "string" ? fm.date.trim() : String(fm.date ?? "");
+	const date = typeof fm.date === "string" ? fm.date.trim() : displayValue(fm.date);
 	return { file, date, version, initial: /^[vV]?\d+\.\d+\.0$/.test(version) };
 }
 
