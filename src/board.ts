@@ -14,6 +14,11 @@ import {
 	velocityPerDay,
 } from "./cards";
 import type { CardData, CardSettings, ReleaseNote } from "./cards";
+import type { FrontmatterPatch } from "./moves";
+import {
+	planStatusDrop,
+	planVersionDrop,
+} from "./moves";
 import {
 	comparePatchKeys,
 	compareRanks,
@@ -26,9 +31,6 @@ import {
 import type { ColumnConfig } from "./settings";
 
 export const VIEW_TYPE_BOARD = "dispatch-board";
-
-/** Spacing between freshly assigned ranks — leaves room for midpoint inserts. */
-const RANK_GAP = 1024;
 
 /**
  * Sentinel key for the built-in archive column of the milestone board.
@@ -1424,107 +1426,26 @@ export class BoardView extends ItemView {
 
 	private async moveCard(path: string, newStatus: string, insertIndex: number): Promise<void> {
 		const board = this.plugin.shared.board;
-		const cards = this.collectCards();
-		const moved = cards.find((c) => c.file.path === path);
-		if (!moved) return;
-
-		const oldStatus = moved.status;
-		const statusChanged = oldStatus !== newStatus;
-
-		const ruleSets = statusChanged ? this.ruleSetsFor(oldStatus, newStatus) : {};
-
-		// Ordering disabled — drops only change status.
-		if (!board.orderProperty) {
-			if (!statusChanged) return;
-			await this.app.fileManager.processFrontMatter(moved.file, (fm) => {
-				fm[board.statusProperty] = newStatus;
-				Object.assign(fm, ruleSets);
-			});
-			this.notifyStatusChange(moved.file, oldStatus, newStatus);
-			return;
+		const plan = planStatusDrop(this.collectCards(), path, newStatus, insertIndex, {
+			statusProperty: board.statusProperty,
+			orderProperty: board.orderProperty,
+			automations: board.automations,
+		});
+		if (!plan) return;
+		for (const patch of plan.patches) await this.applyPatch(patch);
+		if (plan.statusChanged) {
+			this.notifyStatusChange(plan.moved.file, plan.oldStatus, newStatus);
 		}
-
-		const columnCards = this.sortCards(
-			cards.filter((c) => c.status === newStatus && c.file.path !== path)
-		);
-
-		// The visual index counts the moved card itself on same-column drags.
-		let idx = insertIndex;
-		let origIdx = -1;
-		if (!statusChanged) {
-			const visual = this.sortCards(cards.filter((c) => c.status === newStatus));
-			origIdx = visual.findIndex((c) => c.file.path === path);
-			if (origIdx !== -1 && origIdx < idx) idx--;
-		}
-		idx = Math.max(0, Math.min(idx, columnCards.length));
-		if (!statusChanged && idx === origIdx) return;
-
-		const prev = idx > 0 ? columnCards[idx - 1] : undefined;
-		const next = idx < columnCards.length ? columnCards[idx] : undefined;
-
-		const strictlyRanked =
-			columnCards.every((c) => c.rank !== undefined) &&
-			columnCards.every(
-				(c, i) => i === 0 || (columnCards[i - 1].rank as number) < (c.rank as number)
-			);
-
-		// Preferred path: touch only the moved note.
-		let singleRank: number | undefined;
-		if (strictlyRanked) {
-			if (prev && next) {
-				if ((next.rank as number) - (prev.rank as number) > 1) {
-					singleRank = Math.floor(((prev.rank as number) + (next.rank as number)) / 2);
-				}
-			} else if (prev) singleRank = (prev.rank as number) + RANK_GAP;
-			else if (next) singleRank = (next.rank as number) - RANK_GAP;
-			else singleRank = RANK_GAP;
-		}
-
-		if (singleRank !== undefined) {
-			await this.app.fileManager.processFrontMatter(moved.file, (fm) => {
-				if (statusChanged) {
-					fm[board.statusProperty] = newStatus;
-					Object.assign(fm, ruleSets);
-				}
-				fm[board.orderProperty] = singleRank;
-			});
-		} else {
-			// Column has unranked/duplicate ranks or the gap is exhausted:
-			// renormalize, writing only notes whose rank actually changes.
-			const desired = [...columnCards.slice(0, idx), moved, ...columnCards.slice(idx)];
-			for (let i = 0; i < desired.length; i++) {
-				const card = desired[i];
-				const rank = (i + 1) * RANK_GAP;
-				const isMoved = card.file.path === path;
-				if (!isMoved && card.rank === rank) continue;
-				await this.app.fileManager.processFrontMatter(card.file, (fm) => {
-					if (isMoved && statusChanged) {
-						fm[board.statusProperty] = newStatus;
-						Object.assign(fm, ruleSets);
-					}
-					fm[board.orderProperty] = rank;
-				});
-			}
-		}
-
-		if (statusChanged) this.notifyStatusChange(moved.file, oldStatus, newStatus);
 	}
 
-	/** Frontmatter assignments from all automation rules matching the target status. */
-	private ruleSetsFor(from: string, to: string): Record<string, string> {
-		const out: Record<string, string> = {};
-		const now = new Date();
-		const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-			now.getDate()
-		).padStart(2, "0")}`;
-		for (const rule of this.plugin.shared.board.automations) {
-			if (rule.when.length > 0 && !rule.when.includes(to)) continue;
-			for (const [key, value] of Object.entries(rule.set ?? {})) {
-				out[key] = substitute(value, { date, datetime: now.toISOString(), from, to });
-			}
-		}
-		return out;
+	/** Write one planned frontmatter change. */
+	private async applyPatch(patch: FrontmatterPatch<TFile>): Promise<void> {
+		await this.app.fileManager.processFrontMatter(patch.file, (fm: Record<string, unknown>) => {
+			for (const key of patch.unset ?? []) delete fm[key];
+			Object.assign(fm, patch.set);
+		});
 	}
+
 
 	// ----------------------------------------------------- version drag&drop
 
@@ -1547,20 +1468,13 @@ export class BoardView extends ItemView {
 	}
 
 	private async moveCardToVersion(path: string, col: MilestoneColumn): Promise<void> {
-		const file = this.app.vault.getAbstractFileByPath(path);
-		if (!(file instanceof TFile)) return;
-		const prop = this.plugin.shared.milestones.versionProperty;
-		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-		const current = typeof fm[prop] === "string" ? (fm[prop] as string).trim() : "";
-		// Same column — keep the raw value untouched (no format rewrite).
-		if (versionKey(current) === col.key) return;
-		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-			if (col.writeValue === "") delete frontmatter[prop];
-			else frontmatter[prop] = col.writeValue;
-		});
-		new Notice(
-			`${file.basename}: ${versionKey(current) || "(no version)"} → ${col.display}`
-		);
+		const card = this.collectCards().find((c) => c.file.path === path);
+		if (!card) return;
+		const patch = planVersionDrop(card, col, this.plugin.shared.milestones.versionProperty);
+		// Same column — the raw value stays untouched (no format rewrite).
+		if (!patch) return;
+		await this.applyPatch(patch);
+		new Notice(`${card.file.basename}: ${versionKey(card.version) || "(no version)"} → ${col.display}`);
 	}
 
 	// ------------------------------------------------------------------ misc
