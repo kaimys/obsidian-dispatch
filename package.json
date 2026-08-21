@@ -8,6 +8,7 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "eslint .",
+		"install:docs": "node -e \"for (const f of ['main.js','manifest.json','styles.css']) require('fs').copyFileSync(f, 'docs/.obsidian/plugins/dispatch/' + f)\"",
 		"test": "vitest run",
 		"test:watch": "vitest"
 	},

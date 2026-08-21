@@ -1,0 +1,48 @@
+{
+	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node",
+						"args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "running"]
+					}
+				]
+			}
+		],
+		"UserPromptSubmit": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node",
+						"args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "running"]
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node",
+						"args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "waiting"]
+					}
+				]
+			}
+		],
+		"SessionEnd": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node",
+						"args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "done"]
+					}
+				]
+			}
+		]
+	}
+}

@@ -15,4 +15,5 @@ local.json
 Thumbs.db
 
 # working file, deliberately not published
-docs/architecture.svg
+docs/.obsidian
+docs/wiki

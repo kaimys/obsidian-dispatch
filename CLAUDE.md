@@ -33,6 +33,48 @@ No test suite yet. `npm run build` is the minimum verification for every change.
 - Hooks/chips execute commands only from LocalSettings (or the shared hook command gated by the per-device `enableHooks` toggle).
 - `isDesktopOnly: true` — Node APIs (`child_process`, `fs`, `os`) are allowed, but only via `src/exec.ts`.
 
+## The project wiki (`docs/`)
+
+The repo dogfoods its own plugin: `docs/` is an Obsidian vault (git-ignored, along with
+`docs/.obsidian`), and `docs/wiki/` holds the project's tickets, ADRs and release notes.
+Board config: `docs/.obsidian/plugins/dispatch/data.json`; this machine's paths and tool
+commands: `~/.dispatch/docs-e7f737f3.json`. The plugin files in
+`docs/.obsidian/plugins/dispatch/` are a **copy**, not a symlink — run `npm run install:docs`
+after `npm run build` to test a change on this board. (A symlink would point the vault at the
+repo that contains it, and would share one `data.json` with the other vault. The live symlinked
+dev install is that other vault; the repo-root `data.json` belongs to it, not to this one.)
+
+- **Tickets** `docs/wiki/02_Requirements/Tickets` — columns `Backlog → In progress → Review → Done`,
+  plus `Rejected` (excluded from progress). Templates in `docs/wiki/00_Start-Here/Templates`.
+- **Workflow commands** `.claude/commands/*.md`, launched from card chips as `/refine US00042`.
+  Process lives in the repo, state lives in the wiki — never the other way round.
+- **Tracker** GitHub Issues. A ticket links to its issue through `discussion:`;
+  `scripts/dispatch/move-ticket.mjs` reads that property on drag. Only `Done`/`Rejected` have a
+  GitHub counterpart (close/close-not-planned) — the rest just mean "open".
+
+### Workflow invariants
+
+- **Board automations fire on a board drag, not on frontmatter an agent writes.** A command that
+  sets `status: Done` itself must also stamp `completed:` and update the GitHub issue, or the
+  velocity forecast and the tracker silently drift.
+- **The ticket freeze.** Once a ticket leaves `In progress`, its contract zone (goal/symptom,
+  acceptance criteria, open questions, scope, implementation plan) is read-only; stamp `frozen:`.
+  New information goes to the record zone as a dated entry; a wrong frozen statement gets an
+  annotation (`> ⚠️ Correction <date>: …`) beneath it, never a rewrite; new scope becomes a new
+  linked ticket. A spec that can change after the code was built against it makes every later
+  spec↔code mismatch unexplainable.
+- **Gates are gates.** `open_questions: 0` before development starts, `open_tests: 0` before a
+  ticket leaves `Review`. No command crosses a gated boundary on its own. This board has no
+  refinement column — the counters *are* the gate.
+- **Ownership.** Every page carries `owner:`, a person resolving to `docs/wiki/00_Start-Here/Team/`,
+  never a team. A derived page also carries `derived_from:` and `maintained_by:`, and a command
+  that creates one must register its refresh — if no recurring job owns it, it may not create it.
+- **Precedence.** ADRs in `docs/wiki/05_Engineering/Decisions` outrank ticket prose; ticket prose
+  outranks a stale wiki page; the code outranks any claim about the code. On a wiki ↔ GitHub
+  disagreement the **wiki wins** — the issue is a mirror, not the source of truth.
+- **Never name a person in a command.** Attribution resolves at runtime from `assignee:`, `owner:`,
+  and `todos.assignees` — a hardcoded name books the whole team's work to one person.
+
 ## Releasing
 
 Bump with `npm version patch|minor|major` (updates manifest.json + versions.json
