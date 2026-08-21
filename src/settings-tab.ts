@@ -1,5 +1,17 @@
+/**
+ * Most strings here are example DATA, not prose, which is why this file
+ * carries ~26 `ui/sentence-case` warnings that are deliberately left standing.
+ * Placeholders show frontmatter KEYS (`open_questions`, `assignee`), which YAML
+ * matches case-sensitively; folder names; status values; version patterns; and
+ * people's names. Sentence-casing them would make every example wrong, and the
+ * rule cannot be suppressed — eslint-plugin-obsidianmd puts `obsidianmd/*` on
+ * `eslint-comments/no-restricted-disable`. New PROSE here should still be
+ * sentence case.
+ */
 import { App, PluginSettingTab, Setting } from "obsidian";
+import type { SettingDefinitionItem } from "obsidian";
 import { displayValue } from "./parse";
+import { SETTING_INDEX } from "./settings-index";
 import type DispatchPlugin from "./main";
 
 export class DispatchSettingTab extends PluginSettingTab {
@@ -8,6 +20,25 @@ export class DispatchSettingTab extends PluginSettingTab {
 	constructor(app: App, plugin: DispatchPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	/**
+	 * Makes these settings findable from Obsidian's settings search (1.13+).
+	 *
+	 * Deliberately metadata only. The app calls this when the tab is added, to
+	 * build the search index, and rendering still happens in `display()` below
+	 * — which is what keeps the tab working on 1.7.2, the version the manifest
+	 * actually promises (ADR-0017). Migrating the 37 rows to declarative
+	 * controls would mean requiring 1.13.
+	 *
+	 * The duplication this creates is guarded by `test/settings-index.test.ts`.
+	 */
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return SETTING_INDEX.map((group) => ({
+			type: "group",
+			heading: group.heading,
+			items: group.items.map((item) => ({ name: item.name, desc: item.desc })),
+		}));
 	}
 
 	display(): void {

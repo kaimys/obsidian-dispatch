@@ -1,0 +1,11 @@
+{
+	// The community-directory review type-checks this plugin WITHOUT
+	// @types/node — it supplies Obsidian's typings but not Node's. That turns
+	// every child_process/fs/os/path value into `any` and produced ~60
+	// unsafe-any warnings on the public review page.
+	//
+	// This config reproduces that environment so the problem is catchable here
+	// instead of on the listing. Used by `npm run lint:review`.
+	"extends": "./tsconfig.json",
+	"compilerOptions": { "types": [] }
+}

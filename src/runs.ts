@@ -1,5 +1,15 @@
-import { FSWatcher, appendFileSync, existsSync, mkdirSync, readFileSync, watch, writeFileSync } from "fs";
-import { dirname, join, basename } from "path";
+import {
+	appendFileSync,
+	basename,
+	dirname,
+	existsSync,
+	join,
+	mkdirSync,
+	readFileSync,
+	watch,
+	writeFileSync,
+} from "./node";
+import type { FileWatcher } from "./node";
 import type DispatchPlugin from "./main";
 
 /**
@@ -35,7 +45,7 @@ const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class RunTracker {
 	private plugin: DispatchPlugin;
-	private watcher: FSWatcher | null = null;
+	private watcher: FileWatcher | null = null;
 	private cache: { byFile: Map<string, RunStatus>; all: RunStatus[] } | null = null;
 
 	constructor(plugin: DispatchPlugin) {

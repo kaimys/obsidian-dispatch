@@ -1,7 +1,4 @@
-import { exec, spawn } from "child_process";
-import { writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { environment, exec, join, spawn, tmpdir, writeFileSync } from "./node";
 
 /** Replace {{var}} placeholders. Unknown placeholders are left untouched. */
 export function substitute(template: string, vars: Record<string, string>): string {
@@ -51,7 +48,7 @@ export function launchDetached(
 		cwd,
 		detached: true,
 		stdio: "ignore",
-		env: env ? { ...process.env, ...env } : undefined,
+		env: env ? { ...environment(), ...env } : undefined,
 	});
 	child.on("error", onError);
 	child.unref();

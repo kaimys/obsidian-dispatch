@@ -12,6 +12,7 @@
  *   on this machine and defines which tool commands exist here. (A local.json
  *   from before 0.2, found next to the plugin, is migrated there on load.)
  */
+import { platform } from "./node";
 
 export interface ColumnConfig {
 	/** The raw status value as it appears in frontmatter. */
@@ -268,7 +269,7 @@ export const DEFAULT_LOCAL: LocalSettings = {
 	tools:
 		// `start` respects the user's default terminal and, unlike wt.exe,
 		// does not parse ";" inside arguments as a tab separator.
-		process.platform === "win32"
+		platform() === "win32"
 			? { claude: { command: 'start "Dispatch" /d {{cwd}} cmd /k claude {{prompt}}' } }
 			: { claude: { command: "" } },
 	calendarUrl: "",

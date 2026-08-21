@@ -11,7 +11,12 @@
 		"importHelpers": true,
 		"isolatedModules": true,
 		"strict": true,
-		"lib": ["DOM", "ES5", "ES6", "ES7", "ES2018"]
+		// ES2020, because the source uses Object.fromEntries (ES2019) and
+		// String.matchAll (ES2020). Both resolved only by accident before:
+		// @types/node references newer lib files, so removing it turned them
+		// into errors. esbuild downlevels syntax, not built-ins, so the app has
+		// always needed a runtime that has them — Electron does.
+		"lib": ["DOM", "ES2020"]
 	},
 	"include": ["src/**/*.ts"]
 }

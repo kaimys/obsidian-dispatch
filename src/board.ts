@@ -129,7 +129,8 @@ export class BoardView extends ItemView {
 		return "kanban";
 	}
 
-	async onOpen(): Promise<void> {
+	// Returns a promise because ItemView declares one; nothing here awaits.
+	onOpen(): Promise<void> {
 		this.registerEvent(this.app.metadataCache.on("changed", () => this.requestRender()));
 		this.registerEvent(this.app.vault.on("create", () => this.requestRender()));
 		this.registerEvent(this.app.vault.on("delete", () => this.requestRender()));
@@ -137,6 +138,7 @@ export class BoardView extends ItemView {
 		this.contentEl.setAttr("tabindex", "0");
 		this.registerDomEvent(this.contentEl, "keydown", (e) => this.onKey(e));
 		this.render();
+		return Promise.resolve();
 	}
 
 	/** Re-render on demand (e.g. after settings changed). */
@@ -1565,7 +1567,7 @@ class PropertyEditModal extends Modal {
 		const input = this.contentEl.createEl("input", {
 			cls: "dispatch-property-input",
 			value: displayValue(current),
-			attr: { placeholder: "empty = remove property" },
+			attr: { placeholder: "Empty = remove property" },
 		});
 		input.focus();
 		input.select();

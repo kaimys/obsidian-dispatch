@@ -23,6 +23,7 @@ No test suite yet. `npm run build` is the minimum verification for every change.
 - `src/board.ts` — `BoardView` (ItemView) with two tabs. **Status**: groups notes by the status property, HTML5 drag & drop writes status via `app.fileManager.processFrontMatter`, optional post-drop hook command; in-column order = numeric rank frontmatter property (gap-based, RANK_GAP=1024, midpoint insert, renormalize on collision — steady state writes only the moved note). **Milestones**: groups by the version property normalized to major.minor (`versionKey`), drops write the canonical planned-version value (never rewrite same-column raw values), header shows editable tag (shared settings, keyed by major.minor) + weighted progress Σ(size × status progress)/Σ(size); no manual ordering on this tab, drops never touch status/rank; the post-drop hook fires for status changes only
 - `src/chips.ts` — ` ```dispatch ` code-block processor rendering chip buttons + `launchChip()` shared by block chips and virtual chip templates (settings-defined, rendered via card context menu and file-menu — computed from frontmatter, never stored in notes); chips reference tools/repos by name only (security boundary: note content must never carry commands or paths). Board automations: per-column rules with frontmatter `set` (applied atomically with the status write) and commands (gated per device via `enableHooks`); legacy single postDropHook is migrated into the rules list on load
 - `src/exec.ts` — template substitution, arg quoting, process spawning (chips detach; hooks run to completion and report via Notice)
+- `src/node.ts` — the typed edge of the Node API (companion to `src/vault.ts` for Obsidian's untyped frontmatter); `src/settings-index.ts` — setting names/descriptions for Obsidian 1.13+ settings search, kept in step with `display()` by a test
 - `src/runs.ts` — `RunTracker`: chip-run lifecycle OBSERVER (never a process supervisor). Launch records appended by the plugin, `running`/`done` appended by the launched agent's lifecycle hooks via `DISPATCH_*` env vars; JSONL at `~/.dispatch/runs/<vault>-<hash>.jsonl` (machine-local, fs.watch → board badges). Durable run-log lines are appended to the note by the hook script, not the plugin
 - Board extras: WIP limits (columns 4th segment), slice-by bar (badge properties), keyboard nav (arrows/Enter/`[`/`]`), velocity forecast (completedProperty dates within velocityWindowDays; renders nothing without data)
 
@@ -31,7 +32,13 @@ No test suite yet. `npm run build` is the minimum verification for every change.
 - Notes and SharedSettings are team-synced data: no absolute paths, no raw commands in either.
 - Prompts from notes are always inserted as quoted arguments — never add a `{{promptRaw}}` variable.
 - Hooks/chips execute commands only from LocalSettings (or the shared hook command gated by the per-device `enableHooks` toggle).
-- `isDesktopOnly: true` — Node APIs (`child_process`, `fs`, `os`) are allowed, but only via `src/exec.ts`.
+- `isDesktopOnly: true` — Node APIs (`child_process`, `fs`, `os`, `path`, `process`) are allowed, but
+  **every one of them is imported in `src/node.ts` and nowhere else.** That module asserts them into
+  hand-written signatures, because the community-directory review type-checks this plugin without
+  `@types/node`: importing `fs` anywhere else turns its values into `any` there and puts unsafe-any
+  warnings on the public listing. `npm run lint:review` reproduces that environment — a finding
+  outside `src/node.ts` means the boundary was bypassed. The assertions skip real type-checking, so
+  `test/node.test.ts` compares the boundary's behaviour against the real modules.
 
 ## The project wiki (`docs/`)
 

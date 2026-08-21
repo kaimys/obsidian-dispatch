@@ -1,6 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { homedir } from "os";
-import { dirname, join } from "path";
+import { dirname, existsSync, homedir, join, mkdirSync, readFileSync, writeFileSync } from "./node";
 import { FileSystemAdapter, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { BoardView, VIEW_TYPE_BOARD } from "./board";
 import { CalendarEvent, fetchCalendar } from "./calendar";
@@ -257,10 +255,13 @@ export default class DispatchPlugin extends Plugin {
 		this.refreshBoards();
 	}
 
-	async saveLocal(): Promise<void> {
+	// Returns a promise so callers can await it uniformly with saveSettings();
+	// the write itself is synchronous.
+	saveLocal(): Promise<void> {
 		const path = this.localSettingsPath();
 		mkdirSync(dirname(path), { recursive: true });
 		writeFileSync(path, JSON.stringify(this.local, null, 2), "utf8");
+		return Promise.resolve();
 	}
 
 	refreshBoards(): void {
