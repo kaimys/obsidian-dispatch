@@ -138,6 +138,20 @@ export function launchEventChip(
 	executeChip(plugin, spec, prompt, `(calendar) ${date}`, "");
 }
 
+/**
+ * Launch the setup skill from the unconfigured board.
+ *
+ * Not a settings-defined chip on purpose: this is the one launch that has to
+ * work with no configuration at all. It names no repo alias, so the working
+ * directory falls back to the vault folder, and it takes the default tool —
+ * everything else (confirmation, the one-agent-per-tree gate, the run record)
+ * is the ordinary chip path, so a setup run behaves like any other run.
+ */
+export function launchSetup(plugin: DispatchPlugin, prompt: string): void {
+	const spec: ChipTemplate = { label: "Set up Dispatch", prompt };
+	executeChip(plugin, spec, prompt, "(setup)", "");
+}
+
 /** Shared launch core: tool/repo resolution, command build, busy gate, confirm, run record. */
 function executeChip(
 	plugin: DispatchPlugin,

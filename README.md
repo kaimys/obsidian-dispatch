@@ -32,14 +32,22 @@ New to the idea? Read [Overview](docs/overview.md), then [Wiki structure](docs/w
 2. Point *Settings → Dispatch* at the folder holding your tickets and list your status values as columns.
 3. Map your repository alias to a local path under *This device*, and add one chip template.
 
-Or let an agent do it — in [Claude Code](https://claude.com/claude-code):
+Or skip steps 2 and 3 and let an agent do them. An unconfigured board says so and offers
+a **Set up with claude** button, which starts [Claude Code](https://claude.com/claude-code)
+in your vault folder with the right prompt — it shows you the exact command first, and there
+is a *Copy the prompt* button if you would rather paste it into an agent you already have open.
+
+The skill it uses lives in this repo's plugin marketplace:
 
 ```
 /plugin marketplace add kaimys/obsidian-dispatch
 /plugin install dispatch-setup
 ```
 
-…then say "set up Dispatch for this project". Details in [Installation & configuration](docs/installation.md).
+The prompt carries those two lines itself, so the button also works before you have installed
+the skill. It interviews you about your wiki, writes both config layers, scaffolds ticket
+templates and workflow commands, and verifies the result. Details in
+[Installation & configuration](docs/installation.md).
 
 ## Roadmap
 

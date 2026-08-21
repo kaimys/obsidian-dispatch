@@ -1,6 +1,7 @@
 import { App, ItemView, Menu, Modal, Notice, TFile, WorkspaceLeaf, debounce, setIcon } from "obsidian";
 import { launchChip, launchColumnChip, launchEventChip } from "./chips";
 import { runHook, shellVars, substitute } from "./exec";
+import { renderSetupPanel } from "./setup";
 import type DispatchPlugin from "./main";
 import {
 	buildCard,
@@ -223,10 +224,7 @@ export class BoardView extends ItemView {
 		}
 
 		if (this.plugin.shared.board.sourceFolders.length === 0) {
-			root.createDiv({
-				cls: "dispatch-board-empty",
-				text: "Configure source folders in Settings → Dispatch to populate the board.",
-			});
+			renderSetupPanel(root, this.plugin);
 			return;
 		}
 
