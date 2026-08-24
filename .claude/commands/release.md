@@ -11,7 +11,7 @@ Releases one version. `$ARGUMENTS` is the target version (e.g. `v1.4.0`); withou
 
 ## Scope the release
 
-1. **The release scope is what the board says it is:** every ticket whose `version_target` matches, in `docs/wiki/02_Requirements/Tickets`. Anything shipped without a ticket is invisible here — which is the practical argument for no-ticket-no-merge.
+1. **The release scope is what the board says it is:** every ticket whose `version_target` matches, in `docs/wiki/05_Requirements/Tickets`. Anything shipped without a ticket is invisible here — which is the practical argument for no-ticket-no-merge.
 2. Verify each in-scope ticket is actually ready: at `Review` or beyond with `open_tests: 0`. **List the ones that aren't and stop.** Either they get finished, or they get moved to the next version — both are the user's call, not yours.
 3. Confirm today's date with `date`.
 
@@ -27,7 +27,7 @@ Releases one version. `$ARGUMENTS` is the target version (e.g. `v1.4.0`); withou
 ## Cut it
 
 6. Bump the version in the project's manifest(s), consistently — one source of truth, everything else derived.
-7. **Write the release note** `docs/wiki/06_Delivery_and QA/Releases/<version>.md` from `docs/wiki/00_Start-Here/Templates/release-note.md`: `version:` and `date:` frontmatter exactly as the template shows — **the Release Plan tab parses these**, and a malformed one silently drops the release from the board. Contents: what shipped as **links to the tickets** (they carry the detail — don't restate it), build metadata, and what deliberately did not make it.
+7. **Write the release note** `docs/wiki/08_Delivery_and QA/Releases/<version>.md` from `docs/wiki/00_Start-Here/Templates/release-note.md`: `version:` and `date:` frontmatter exactly as the template shows — **the Release Plan tab parses these**, and a malformed one silently drops the release from the board. Contents: what shipped as **links to the tickets** (they carry the detail — don't restate it), build metadata, and what deliberately did not make it.
 8. Build, tag and publish per the project's process.
 
 ## Land it

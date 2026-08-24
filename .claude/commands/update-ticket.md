@@ -9,7 +9,7 @@ Brings one spec up to date with feedback that landed since its `updated:` date. 
 
 ## Resolve
 
-1. Find the spec (grep `id: $ARGUMENTS` in `docs/wiki/02_Requirements/Tickets`) and the task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI. Stop and report if either is missing.
+1. Find the spec (grep `id: $ARGUMENTS` in `docs/wiki/05_Requirements/Tickets`) and the task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI. Stop and report if either is missing.
 2. Note the current `updated:` date — it is the cutoff for everything below.
 3. **Check `frozen:`.** On a frozen ticket, feedback goes into the record zone as a dated entry; the contract zone stays as built. A wrong frozen statement gets an annotation beneath it (`> ⚠️ Correction <date>: …`), never a rewrite.
 

@@ -9,10 +9,10 @@ Produces the implementation plan for one refined ticket. `$ARGUMENTS` is the tic
 
 ## Prepare
 
-1. Resolve the ticket (spec via `id: $ARGUMENTS` in `docs/wiki/02_Requirements/Tickets`, task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI) and name the session `$ARGUMENTS <short name>`.
+1. Resolve the ticket (spec via `id: $ARGUMENTS` in `docs/wiki/05_Requirements/Tickets`, task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI) and name the session `$ARGUMENTS <short name>`.
 2. **Run the `/update-ticket` steps first.** Never plan against a stale spec — the thread usually moved after the last edit.
 3. **Verify ground truth**: read the code the ticket touches, not just the description of it. Check external contracts (APIs, schemas, designs) against their actual current state.
-4. **Read the ADR index** (`docs/wiki/05_Engineering/Decisions`) for the areas in scope. Plan *within* the accepted decisions. If the ticket requires contradicting one, that is a decision to reopen — surface it, don't quietly work around it.
+4. **Read the ADR index** (`docs/wiki/07_Engineering/Decisions`) for the areas in scope. Plan *within* the accepted decisions. If the ticket requires contradicting one, that is a decision to reopen — surface it, don't quietly work around it.
 5. Confirm refinement actually closed: `open_questions: 0`. If a decision the plan depends on is still open, finish refinement first rather than planning around a hole.
 
 ## Plan
@@ -35,7 +35,7 @@ Produces the implementation plan for one refined ticket. `$ARGUMENTS` is the tic
    - **still true** — it is the current decision, not a superseded step along the way
 
    Typical: data-model shape, privacy/safety rules, auth invariants, platform constraints and their workarounds, conventions later tickets must follow. **Not** ADRs: ticket-local detail, open questions, restatements of the code, or a decision that merely *applies* an existing ADR — link that ADR from the ticket instead.
-9. For each qualifying decision: write `docs/wiki/05_Engineering/Decisions/ADR-00xx - <Short title>.md` from `docs/wiki/00_Start-Here/Templates/adr.md` (next free number, `date` = when it was actually decided, `status: accepted` — or `proposed` if agreed but not yet built). **Record the rejected alternatives**; half an ADR's value is the deliberate "no". If it contradicts an existing ADR, mark the old one `superseded` with `superseded_by:` pointing forward — never delete it. Link the ADR from the ticket and the ticket from the ADR.
+9. For each qualifying decision: write `docs/wiki/07_Engineering/Decisions/ADR-00xx - <Short title>.md` from `docs/wiki/00_Start-Here/Templates/adr.md` (next free number, `date` = when it was actually decided, `status: accepted` — or `proposed` if agreed but not yet built). **Record the rejected alternatives**; half an ADR's value is the deliberate "no". If it contradicts an existing ADR, mark the old one `superseded` with `superseded_by:` pointing forward — never delete it. Link the ADR from the ticket and the ticket from the ADR.
 10. Name any ADRs created or superseded when you report. If a decision looks durable but is still contested, leave it in the ticket and flag it as needing a decision rather than minting an ADR that isn't settled.
 
 ## Close

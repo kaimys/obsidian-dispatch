@@ -9,7 +9,7 @@ Runs development for one ticket. `$ARGUMENTS` is the ticket id.
 
 ## Start
 
-1. Resolve the ticket (spec via `id: $ARGUMENTS` in `docs/wiki/02_Requirements/Tickets`, task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI) and name the session `$ARGUMENTS <short name>`.
+1. Resolve the ticket (spec via `id: $ARGUMENTS` in `docs/wiki/05_Requirements/Tickets`, task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI) and name the session `$ARGUMENTS <short name>`.
 2. **Pull the default branch first**, then branch off the freshly pulled tip. A stale base forces an avoidable merge later, and on a shared repo it happens within a day.
 3. **Preconditions** — expected status is `Backlog`, acceptance criteria are final, `open_questions: 0`, and for anything non-trivial an `## Implementation plan` exists. If something is missing, say so and suggest `/refine` or `/implementation-plan`. **Do not code around a missing decision** — that is how a guess becomes a shipped behaviour nobody chose.
 4. Move to `In progress` in both systems, set `assignee:` to whoever is doing the work, and strip leftover `<!-- GUIDE: … -->` from sections you finalise.
