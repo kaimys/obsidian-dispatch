@@ -9,7 +9,7 @@ Writes the manual test plan and performs the `In progress` → `Review` transiti
 
 ## Prepare
 
-1. Resolve the ticket (spec via `id: $ARGUMENTS` in `docs/wiki/05_Requirements/Tickets`, task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI) and name the session `$ARGUMENTS <short name>`.
+1. Resolve the ticket (spec via `id: $ARGUMENTS` in `docs/wiki/05_Requirements/Tickets`, task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI) and name the session `$ARGUMENTS - <shortened title>` (e.g. `US00042 - Import Meet transcripts`).
 2. **Preconditions:** the ticket is code-complete in `In progress` and the gates are green. This command performs the status move, so verify rather than assume — run them if unsure:
    ```
    npm run build && npm run lint && npm test

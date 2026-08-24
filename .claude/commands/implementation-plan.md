@@ -9,7 +9,7 @@ Produces the implementation plan for one refined ticket. `$ARGUMENTS` is the tic
 
 ## Prepare
 
-1. Resolve the ticket (spec via `id: $ARGUMENTS` in `docs/wiki/05_Requirements/Tickets`, task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI) and name the session `$ARGUMENTS <short name>`.
+1. Resolve the ticket (spec via `id: $ARGUMENTS` in `docs/wiki/05_Requirements/Tickets`, task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI) and name the session `$ARGUMENTS - <shortened title>` (e.g. `US00042 - Import Meet transcripts`).
 2. **Run the `/update-ticket` steps first.** Never plan against a stale spec — the thread usually moved after the last edit.
 3. **Verify ground truth**: read the code the ticket touches, not just the description of it. Check external contracts (APIs, schemas, designs) against their actual current state.
 4. **Read the ADR index** (`docs/wiki/07_Engineering/Decisions`) for the areas in scope. Plan *within* the accepted decisions. If the ticket requires contradicting one, that is a decision to reopen — surface it, don't quietly work around it.

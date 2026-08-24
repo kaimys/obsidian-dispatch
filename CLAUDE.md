@@ -89,6 +89,15 @@ dev install is that other vault; the repo-root `data.json` belongs to it, not to
   disagreement the **wiki wins** — the issue is a mirror, not the source of truth.
 - **Never name a person in a command.** Attribution resolves at runtime from `assignee:`, `owner:`,
   and `todos.assignees` — a hardcoded name books the whole team's work to one person.
+- **Name the session after the ticket: `<ID> - <shortened title>`.** As soon as a conversation is
+  identifiably about one ticket — a chip firing `/refine US00042`, or just "what's left on
+  BUG00007?" — set the session title to e.g. `US00042 - Import Meet transcripts`, via
+  `set_session_title` with `session_id: "self"`. Do it when the ID becomes known, not at the end:
+  the point is finding the session again in a list of twenty, and a session named at the end was
+  unfindable for its whole life. The second half is a *shortened* title — a few words, no repeated
+  ID, no `Story -`/`Bug -` prefix, not a copy of the note's filename. If a conversation turns out
+  to be about a different ticket, rename it; if it spans several, name it for the one that owns the
+  work; if it is about no ticket at all, leave it alone.
 
 ## Releasing
 
