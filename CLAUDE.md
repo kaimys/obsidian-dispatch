@@ -62,6 +62,11 @@ dev install is that other vault; the repo-root `data.json` belongs to it, not to
 - **Tickets** `docs/wiki/05_Requirements/Tickets` — columns
   `Backlog → Refinement → In progress → Review → Done`, plus `Rejected` (excluded from progress).
   Templates in `docs/wiki/00_Start-Here/Templates`.
+- **Ticket ids** are 5 digits behind a prefix matching `type:` — `US` story, `BUG` bug,
+  `SEC` security — and **each prefix numbers independently** (`SEC00001` exists while `US` is
+  in the teens). Nothing parses the shape: the board renders `id` through `titleProperty` and
+  `move-ticket.mjs` reads it as an opaque string, so a new prefix costs one line here and one in
+  `create-ticket.md`. The note is `<Type> - <ID> - <Short name>.md`.
 - **Workflow commands** `.claude/commands/*.md`, launched from card chips as `/refine US00042`.
   Process lives in the repo, state lives in the wiki — never the other way round.
 - **Tracker** GitHub Issues. A ticket links to its issue through `discussion:`;

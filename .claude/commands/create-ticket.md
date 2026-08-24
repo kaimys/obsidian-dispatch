@@ -12,7 +12,7 @@ Creates one ticket. `$ARGUMENTS` is a short description, ideally with a source p
 1. Confirm today's date with `date` — for `updated:` and the log entry. Never guess it.
 2. **Read the source** the description points at, plus the wiki pages and code it touches, so the spec carries real context instead of the one-liner. A ticket that only restates its title makes refinement start from zero.
 3. **Duplicate check:** search `docs/wiki/05_Requirements/Tickets` and the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI for the topic. If a matching ticket exists, stop and report it — do not create a near-duplicate.
-4. **Determine the id:** `US story / BUG bug, 5 digits (US00042, BUG00007)`, numbered highest-existing + 1. Check both systems, so a task created directly in the tracker doesn't collide.
+4. **Determine the id:** 5 digits, prefixed by `type` — `US` story · `BUG` bug · `SEC` security (`US00042`, `BUG00007`, `SEC00001`). **Each prefix counts separately**, so a new one starts at `00001`; number highest-existing-of-that-prefix + 1. Check both systems, so a task created directly in the tracker doesn't collide. Nothing parses the ID shape — `move-ticket.mjs` reads `id` as an opaque string — so a prefix is a naming convention, and adding one means updating this line and `CLAUDE.md`, nothing else. The file is named `<Type> - <ID> - <Short name>.md`, with `<Type>` matching `type:` (`Security - SEC00001 - …`).
 
 ## Create — both systems, never one-sided
 
