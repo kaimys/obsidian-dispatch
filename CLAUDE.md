@@ -71,7 +71,13 @@ dev install is that other vault; the repo-root `data.json` belongs to it, not to
   Process lives in the repo, state lives in the wiki — never the other way round.
 - **Tracker** GitHub Issues. A ticket links to its issue through `discussion:`;
   `scripts/dispatch/move-ticket.mjs` reads that property on drag. Only `Done`/`Rejected` have a
-  GitHub counterpart (close/close-not-planned) — the rest just mean "open".
+  GitHub counterpart (close/close-not-planned) — the rest just mean "open". The same script
+  mirrors `version_target` onto the issue as a **GitHub milestone** of the same name, creating
+  it on first use: per patch version (not per major.minor line, so one board column can span
+  several milestones), never with a due date, and an empty `version_target` skips the step
+  rather than un-assigning. **It only runs on a status drag** — the Milestones tab writes
+  `version_target` without firing automations, so a card moved between version columns is not
+  mirrored until its status next changes. Closing a milestone belongs to `/release`.
 
 ### Workflow invariants
 
