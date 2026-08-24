@@ -23,7 +23,7 @@ No test suite yet. `npm run build` is the minimum verification for every change.
 - `src/board.ts` — `BoardView` (ItemView) with two tabs. **Status**: groups notes by the status property, HTML5 drag & drop writes status via `app.fileManager.processFrontMatter`, optional post-drop hook command; in-column order = numeric rank frontmatter property (gap-based, RANK_GAP=1024, midpoint insert, renormalize on collision — steady state writes only the moved note). **Milestones**: groups by the version property normalized to major.minor (`versionKey`), drops write the canonical planned-version value (never rewrite same-column raw values), header shows editable tag (shared settings, keyed by major.minor) + weighted progress Σ(size × status progress)/Σ(size); no manual ordering on this tab, drops never touch status/rank; the post-drop hook fires for status changes only
 - `src/chips.ts` — ` ```dispatch ` code-block processor rendering chip buttons + `launchChip()` shared by block chips and virtual chip templates (settings-defined, rendered via card context menu and file-menu — computed from frontmatter, never stored in notes); chips reference tools/repos by name only (security boundary: note content must never carry commands or paths). Board automations: per-column rules with frontmatter `set` (applied atomically with the status write) and commands (gated per device via `enableHooks`); legacy single postDropHook is migrated into the rules list on load
 - `src/exec.ts` — template substitution, arg quoting, process spawning (chips detach; hooks run to completion and report via Notice)
-- `src/node.ts` — the typed edge of the Node API (companion to `src/vault.ts` for Obsidian's untyped frontmatter); `src/settings-index.ts` — setting names/descriptions for Obsidian 1.13+ settings search, kept in step with `display()` by a test
+- `src/node.ts` — the typed edge of the Node API (companion to `src/vault.ts` for Obsidian's untyped frontmatter)
 - `src/runs.ts` — `RunTracker`: chip-run lifecycle OBSERVER (never a process supervisor). Launch records appended by the plugin, `running`/`done` appended by the launched agent's lifecycle hooks via `DISPATCH_*` env vars; JSONL at `~/.dispatch/runs/<vault>-<hash>.jsonl` (machine-local, fs.watch → board badges). Durable run-log lines are appended to the note by the hook script, not the plugin
 - Board extras: WIP limits (columns 4th segment), slice-by bar (badge properties), keyboard nav (arrows/Enter/`[`/`]`), velocity forecast (completedProperty dates within velocityWindowDays; renders nothing without data)
 
@@ -32,6 +32,14 @@ No test suite yet. `npm run build` is the minimum verification for every change.
 - Notes and SharedSettings are team-synced data: no absolute paths, no raw commands in either.
 - Prompts from notes are always inserted as quoted arguments — never add a `{{promptRaw}}` variable.
 - Hooks/chips execute commands only from LocalSettings (or the shared hook command gated by the per-device `enableHooks` toggle).
+- **The settings tab renders through `display()`, and `DispatchSettingTab` must not implement
+  `getSettingDefinitions()`.** Obsidian 1.13+ renders the tab from those definitions and stops
+  calling `display()` as soon as the array is non-empty, so definitions carrying only name/desc
+  turn every row into a label with no input — the tab shipped read-only that way in 0.2.3. This
+  leaves Dispatch out of the 1.13+ settings search and keeps
+  `obsidianmd/settings-tab/prefer-setting-definitions` warning: accepted, not an oversight.
+  Adopting the API means porting all 37 rows to `control`/`render` definitions **and** raising
+  `minAppVersion` to 1.13 (ADR-0017) — one change, never a partial one.
 - `isDesktopOnly: true` — Node APIs (`child_process`, `fs`, `os`, `path`, `process`) are allowed, but
   **every one of them is imported in `src/node.ts` and nowhere else.** That module asserts them into
   hand-written signatures, because the community-directory review type-checks this plugin without
@@ -51,7 +59,7 @@ after `npm run build` to test a change on this board. (A symlink would point the
 repo that contains it, and would share one `data.json` with the other vault. The live symlinked
 dev install is that other vault; the repo-root `data.json` belongs to it, not to this one.)
 
-- **Tickets** `docs/wiki/02_Requirements/Tickets` — columns `Backlog → In progress → Review → Done`,
+- **Tickets** `docs/wiki/05_Requirements/Tickets` — columns `Backlog → In progress → Review → Done`,
   plus `Rejected` (excluded from progress). Templates in `docs/wiki/00_Start-Here/Templates`.
 - **Workflow commands** `.claude/commands/*.md`, launched from card chips as `/refine US00042`.
   Process lives in the repo, state lives in the wiki — never the other way round.
@@ -76,7 +84,7 @@ dev install is that other vault; the repo-root `data.json` belongs to it, not to
 - **Ownership.** Every page carries `owner:`, a person resolving to `docs/wiki/00_Start-Here/Team/`,
   never a team. A derived page also carries `derived_from:` and `maintained_by:`, and a command
   that creates one must register its refresh — if no recurring job owns it, it may not create it.
-- **Precedence.** ADRs in `docs/wiki/05_Engineering/Decisions` outrank ticket prose; ticket prose
+- **Precedence.** ADRs in `docs/wiki/07_Engineering/Decisions` outrank ticket prose; ticket prose
   outranks a stale wiki page; the code outranks any claim about the code. On a wiki ↔ GitHub
   disagreement the **wiki wins** — the issue is a mirror, not the source of truth.
 - **Never name a person in a command.** Attribution resolves at runtime from `assignee:`, `owner:`,

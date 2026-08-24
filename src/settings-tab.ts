@@ -9,9 +9,7 @@
  * sentence case.
  */
 import { App, PluginSettingTab, Setting } from "obsidian";
-import type { SettingDefinitionItem } from "obsidian";
 import { displayValue } from "./parse";
-import { SETTING_INDEX } from "./settings-index";
 import type DispatchPlugin from "./main";
 
 export class DispatchSettingTab extends PluginSettingTab {
@@ -23,24 +21,23 @@ export class DispatchSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Makes these settings findable from Obsidian's settings search (1.13+).
+	 * NEVER implement `getSettingDefinitions()` here without moving the whole
+	 * tab to declarative controls in the same change.
 	 *
-	 * Deliberately metadata only. The app calls this when the tab is added, to
-	 * build the search index, and rendering still happens in `display()` below
-	 * — which is what keeps the tab working on 1.7.2, the version the manifest
-	 * actually promises (ADR-0017). Migrating the 37 rows to declarative
-	 * controls would mean requiring 1.13.
+	 * Obsidian 1.13 renders the tab from those definitions and **stops calling
+	 * `display()` entirely** whenever the array comes back non-empty. Returning
+	 * name/desc metadata alone — which is what an earlier attempt at settings
+	 * search did — therefore renders every row as a label with no input, and
+	 * the whole tab becomes read-only prose. It shipped that way in 0.2.3.
 	 *
-	 * The duplication this creates is guarded by `test/settings-index.test.ts`.
+	 * So the tab renders imperatively below, on every supported version. The
+	 * cost is that Dispatch is invisible to the 1.13+ settings search, which is
+	 * what `obsidianmd/settings-tab/prefer-setting-definitions` warns about —
+	 * an accepted warning, not an oversight. Buying the search back means
+	 * porting all 37 rows to `control`/`render` definitions and raising
+	 * `minAppVersion` to 1.13 (ADR-0017), which is a deliberate decision, not a
+	 * lint fix.
 	 */
-	getSettingDefinitions(): SettingDefinitionItem[] {
-		return SETTING_INDEX.map((group) => ({
-			type: "group",
-			heading: group.heading,
-			items: group.items.map((item) => ({ name: item.name, desc: item.desc })),
-		}));
-	}
-
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
