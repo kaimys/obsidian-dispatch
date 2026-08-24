@@ -40,4 +40,4 @@ Produces the implementation plan for one refined ticket. `$ARGUMENTS` is the tic
 
 ## Close
 
-11. The ticket stays in `Backlog` once the plan is signed off — on this board the plan is a gate, not a column. Suggest `/develop $ARGUMENTS`.
+11. The ticket stays in `Refinement` once the plan is signed off — on this board the plan is a gate, not a column. Suggest `/develop $ARGUMENTS`.

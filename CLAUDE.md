@@ -59,8 +59,9 @@ after `npm run build` to test a change on this board. (A symlink would point the
 repo that contains it, and would share one `data.json` with the other vault. The live symlinked
 dev install is that other vault; the repo-root `data.json` belongs to it, not to this one.)
 
-- **Tickets** `docs/wiki/05_Requirements/Tickets` — columns `Backlog → In progress → Review → Done`,
-  plus `Rejected` (excluded from progress). Templates in `docs/wiki/00_Start-Here/Templates`.
+- **Tickets** `docs/wiki/05_Requirements/Tickets` — columns
+  `Backlog → Refinement → In progress → Review → Done`, plus `Rejected` (excluded from progress).
+  Templates in `docs/wiki/00_Start-Here/Templates`.
 - **Workflow commands** `.claude/commands/*.md`, launched from card chips as `/refine US00042`.
   Process lives in the repo, state lives in the wiki — never the other way round.
 - **Tracker** GitHub Issues. A ticket links to its issue through `discussion:`;
@@ -79,8 +80,9 @@ dev install is that other vault; the repo-root `data.json` belongs to it, not to
   linked ticket. A spec that can change after the code was built against it makes every later
   spec↔code mismatch unexplainable.
 - **Gates are gates.** `open_questions: 0` before development starts, `open_tests: 0` before a
-  ticket leaves `Review`. No command crosses a gated boundary on its own. This board has no
-  refinement column — the counters *are* the gate.
+  ticket leaves `Review`. No command crosses a gated boundary on its own. `Refinement` is the
+  column, but the counter is still the gate: a ticket sitting in `Refinement` with unanswered
+  questions is not buildable, and moving the card does not make it so.
 - **Ownership.** Every page carries `owner:`, a person resolving to `docs/wiki/00_Start-Here/Team/`,
   never a team. A derived page also carries `derived_from:` and `maintained_by:`, and a command
   that creates one must register its refresh — if no recurring job owns it, it may not create it.
