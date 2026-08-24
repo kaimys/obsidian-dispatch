@@ -94,4 +94,11 @@ dev install is that other vault; the repo-root `data.json` belongs to it, not to
 
 Bump with `npm version patch|minor|major` (updates manifest.json + versions.json
 via version-bump.mjs), push the tag — `.github/workflows/release.yml` builds and
-drafts a GitHub release with `main.js`, `manifest.json`, `styles.css`.
+drafts a GitHub release with `main.js`, `manifest.json`, `styles.css`. Publishing
+the draft stays manual (ADR-0018).
+
+- **Every release note carries a `## GitHub release body` section**, fenced so it copies
+  verbatim. The wiki is git-ignored, so that block may contain **no `[[wikilink]]` and no
+  `docs/wiki/…` path** — both are dead on GitHub. Tickets are referenced by their
+  `discussion:` issue URL, past releases by `…/releases/tag/<version>`, and ADRs are stated
+  in prose rather than linked, because ADRs are not published. Written by `/release` step 8.

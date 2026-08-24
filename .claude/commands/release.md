@@ -28,10 +28,11 @@ Releases one version. `$ARGUMENTS` is the target version (e.g. `v1.4.0`); withou
 
 6. Bump the version in the project's manifest(s), consistently — one source of truth, everything else derived.
 7. **Write the release note** `docs/wiki/08_Delivery_and QA/Releases/<version>.md` from `docs/wiki/00_Start-Here/Templates/release-note.md`: `version:` and `date:` frontmatter exactly as the template shows — **the Release Plan tab parses these**, and a malformed one silently drops the release from the board. Contents: what shipped as **links to the tickets** (they carry the detail — don't restate it), build metadata, and what deliberately did not make it.
-8. Build, tag and publish per the project's process.
+8. **Write the `## GitHub release body` section** into the same note — mandatory, and the only part written for people outside the team. Everything else in the note links into the vault; **the vault is git-ignored**, so a `[[wikilink]]` or a `docs/wiki/…` path pasted into GitHub is dead text or a 404. Inside a ```` fenced block (so it copies verbatim), translate every reference to an absolute GitHub URL: a ticket becomes its `discussion:` issue (`https://github.com/kaimys/obsidian-dispatch/issues/<n>`), a past release becomes `…/releases/tag/<version>`, a commit becomes `…/commit/<sha>`, a repo doc becomes `…/blob/<tag>/docs/<file>.md` — and an **ADR becomes prose**, because ADRs are not published. Write full URLs rather than bare `#5`. End with `**Full changelog:** …/compare/<previous>...<this>`. Never paste the internal note into GitHub instead.
+9. Build, tag and publish per the project's process.
 
 ## Land it
 
-9. **Promote the shipped tickets:** status → `Done`, and **stamp `completed: <today>` yourself** on each one. Dispatch's automations run on a board *drag*; frontmatter you write directly does not trigger them, so a promotion done here leaves `completed:` empty and the velocity forecast starves. Close the matching GitHub issue too (`gh issue close --reason completed`, or let the next drag do it). Anything deferred gets its `version_target` moved forward — not silently dropped.
-10. Announce in none with a link to the release note.
-11. Report: version, ticket count, anything deferred and why.
+10. **Promote the shipped tickets:** status → `Done`, and **stamp `completed: <today>` yourself** on each one. Dispatch's automations run on a board *drag*; frontmatter you write directly does not trigger them, so a promotion done here leaves `completed:` empty and the velocity forecast starves. Close the matching GitHub issue too (`gh issue close --reason completed`, or let the next drag do it). Anything deferred gets its `version_target` moved forward — not silently dropped.
+11. Announce in none with a link to the release note.
+12. Report: version, ticket count, anything deferred and why. Hand the user the `## GitHub release body` block to paste, with the link to the draft — publishing stays manual (ADR-0018).
