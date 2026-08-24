@@ -4,8 +4,15 @@ on:
   push:
     tags: ["*"]
 
+# `id-token` and `attestations` exist only for the attestation step below:
+# the first mints the OIDC token the signature is bound to, the second writes
+# the result to the repository's attestation store. Both are required — with
+# either missing the step fails rather than degrading, which is the behaviour
+# we want: an unattested asset should not reach a draft release.
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -21,6 +28,19 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      # Runs BEFORE the release is created, so a failed attestation stops the
+      # draft appearing at all rather than leaving unverifiable assets on it.
+      # All three uploaded files are attested, not just the built one: what a
+      # user verifies is the asset they downloaded, and manifest.json and
+      # styles.css are downloaded exactly like main.js.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
 
       - name: Create draft release
         env:
