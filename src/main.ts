@@ -30,7 +30,9 @@ export default class DispatchPlugin extends Plugin {
 		});
 
 		this.registerView(VIEW_TYPE_BOARD, (leaf) => new BoardView(leaf, this));
-		this.addRibbonIcon("kanban", "Open Dispatch board", () => void this.activateBoard());
+		// "play" is the outlined triangle of the Dispatch mark; BoardView.getIcon()
+		// returns the same name and the two must not drift apart.
+		this.addRibbonIcon("play", "Open Dispatch board", () => void this.activateBoard());
 		this.addCommand({
 			id: "open-board",
 			name: "Open board",

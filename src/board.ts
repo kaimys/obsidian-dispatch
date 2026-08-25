@@ -126,7 +126,11 @@ export class BoardView extends ItemView {
 	}
 
 	getIcon(): string {
-		return "kanban";
+		// The outlined play triangle of the Dispatch mark (▷, U+25B7), not a
+		// board glyph: the product is what a card dispatches, and the board is
+		// only where it is dispatched from. Keep in step with the ribbon icon
+		// in main.ts — the tab and the ribbon are the same thing to a user.
+		return "play";
 	}
 
 	// Returns a promise because ItemView declares one; nothing here awaits.
