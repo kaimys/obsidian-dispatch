@@ -1,5 +1,8 @@
 ![Dispatch](docs/assets/Dispatch-Logo-360x120.png)
 
+*"Obsidian is the IDE; the LLM is the programmer; the wiki is the codebase."*\
+— Andrej Karpathy, [LLM-Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+
 **Dispatch is a board for Obsidian that gives a small agent-native team a working
 process: skills that run through the wiki and the team chat, and a chip on every card
 that sends an agent at the work.**
