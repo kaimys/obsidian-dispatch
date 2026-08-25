@@ -26,11 +26,8 @@ The authoritative schema — every field, every default — is `src/settings.ts`
 ## 0 · Preflight
 
 1. Locate the **Obsidian vault** and confirm Dispatch is installed (`<vault>/.obsidian/plugins/dispatch/` with `main.js` + `manifest.json`) and enabled (`community-plugins.json`).
-   **Not installed? Install it right here** (no need to wait for the community directory):
-   - Fetch the latest release assets from `https://github.com/kaimys/obsidian-dispatch/releases/latest` — download `main.js`, `manifest.json`, `styles.css` (e.g. via `curl -L -o <file> https://github.com/kaimys/obsidian-dispatch/releases/latest/download/<file>`).
-   - Write them to `<vault>/.obsidian/plugins/dispatch/` (create the folder).
-   - Enabling: if `"dispatch"` is missing from `<vault>/.obsidian/community-plugins.json`, append it (create the file as `["dispatch"]` if absent), then have the user restart Obsidian — or simpler, have them toggle **Dispatch** in *Settings → Community plugins* themselves. Requires Restricted mode to be off; that switch is the user's to flip, never flip it for them silently.
-   - Alternative if the team prefers a managed updater: [BRAT](https://github.com/TfTHacker/obsidian42-brat) with the repo URL `kaimys/obsidian-dispatch`.
+   **Not installed? Have the user install it from the community directory** — *Settings → Community plugins → Browse*, search **Dispatch**, install and enable. Do not download release assets or write plugin files yourself: the directory build is signed for the user's Obsidian and updates itself, and a hand-placed copy silently stops receiving updates.
+   Requires Restricted mode to be off; that switch is the user's to flip, never flip it for them silently.
 2. Locate the **project repo(s)** the user's tickets refer to, their **issue tracker** (Asana/Jira/Linear/none), and their **agent CLI** (Claude Code, Codex, other).
 3. Desktop only: chips and automations spawn local processes — confirm the user runs Obsidian on desktop.
 

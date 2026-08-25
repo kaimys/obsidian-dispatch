@@ -4,13 +4,7 @@ Desktop only — chips and automations spawn local processes.
 
 ## Install
 
-Not yet in the community plugin directory. Until then:
-
-1. Download `main.js`, `manifest.json` and `styles.css` from a release (or build from source: `npm install && npm run build`).
-2. Copy them into `<vault>/.obsidian/plugins/dispatch/`.
-3. Enable **Dispatch** in *Settings → Community plugins*.
-
-Or install via [BRAT](https://github.com/TfTHacker/obsidian42-brat) with this repository's URL.
+Open *Settings → Community plugins → Browse* in Obsidian, search for **Dispatch**, then install and enable it. The [directory listing](https://community.obsidian.md/plugins/dispatch) is the same plugin.
 
 ### Guided setup
 

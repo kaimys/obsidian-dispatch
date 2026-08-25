@@ -1,6 +1,8 @@
-# Dispatch
+![Dispatch](docs/assets/Dispatch-Logo-360x120.png)
 
-**The agentic ticket board for Obsidian.**
+**Dispatch is a board for Obsidian that gives a small agent-native team a working
+process: skills that run through the wiki and the team chat, and a chip on every card
+that sends an agent at the work.**
 
 ![Dispatch Boards](docs/assets/animation.gif)
 
@@ -28,34 +30,28 @@ New to the idea? Read [Overview](docs/overview.md), then [Wiki structure](docs/w
 
 ## Quick start
 
-1. Download `main.js`, `manifest.json` and `styles.css` from a release (or build from source), copy them into `<vault>/.obsidian/plugins/dispatch/`, and enable **Dispatch** in *Settings → Community plugins*. [BRAT](https://github.com/TfTHacker/obsidian42-brat) works too.
-2. Point *Settings → Dispatch* at the folder holding your tickets and list your status values as columns.
-3. Map your repository alias to a local path under *This device*, and add one chip template.
+**1. Install.** Open *Settings → Community plugins → Browse*, search for **Dispatch**, install
+and enable it — or go straight to the
+[directory listing](https://community.obsidian.md/plugins/dispatch).
 
-Or skip steps 2 and 3 and let an agent do them. An unconfigured board says so and offers
-a **Set up with claude** button, which starts [Claude Code](https://claude.com/claude-code)
-in your vault folder with the right prompt — it shows you the exact command first, and there
-is a *Copy the prompt* button if you would rather paste it into an agent you already have open.
+**2. Let an agent set it up.** An unconfigured board says so and offers a
+**Set up with claude** button, which starts [Claude Code](https://claude.com/claude-code) in
+your vault folder with the right prompt. It shows you the exact command before running
+anything.
 
-The skill it uses lives in this repo's plugin marketplace:
+The skill behind that button lives in this repo's plugin marketplace:
 
 ```
 /plugin marketplace add kaimys/obsidian-dispatch
 /plugin install dispatch-setup
 ```
 
-The prompt carries those two lines itself, so the button also works before you have installed
-the skill. It interviews you about your wiki, writes both config layers, scaffolds ticket
-templates and workflow commands, and verifies the result. Details in
+The prompt carries those two lines itself, so the button works before you have installed the
+skill. The setup interviews you about your wiki, writes both configuration layers, scaffolds
+ticket templates and workflow commands, and verifies the result.
+
+Prefer to do it by hand? Every setting the skill writes is documented in
 [Installation & configuration](docs/installation.md).
-
-## Roadmap
-
-- Multiple named boards
-- Column colors
-- Milestone burndown over time
-- Chip runs with inline output (headless mode) instead of opening a terminal
-- Worktree-isolated runs, so two agents can work one repo in parallel
 
 ## License
 
