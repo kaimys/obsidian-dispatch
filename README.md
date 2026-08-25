@@ -59,3 +59,11 @@ Prefer to do it by hand? Every setting the skill writes is documented in
 ## License
 
 [MIT](LICENSE)
+
+
+## Conclusion
+
+In the words of Andrej Karpathy:
+
+"*... an internal wiki maintained by LLMs, fed by Slack threads, meeting transcripts, project documents, customer calls. Possibly with humans in the loop reviewing updates. The wiki stays current because the LLM does the maintenance that no one on the team wants to do.*"\
+— Andrej Karpathy, [LLM-Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
