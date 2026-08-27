@@ -28,6 +28,16 @@ interface ChipSpec {
 	prompt?: string;
 }
 
+/**
+ * The icon on every chip launch point — the code-block button, the card and
+ * meeting context menus, the column header menu and the file menu. It is the
+ * outlined play triangle of the Dispatch mark (▷, U+25B7), the same glyph the
+ * ribbon and the view tab carry: what a chip does is dispatch the note. One
+ * constant because a user reads all of these as the same button, and seven
+ * literals would drift.
+ */
+export const CHIP_ICON = "play";
+
 export function registerChipProcessor(plugin: DispatchPlugin): void {
 	plugin.registerMarkdownCodeBlockProcessor("dispatch", (source, el, ctx) => {
 		let spec: ChipSpec | null = null;
@@ -49,7 +59,7 @@ export function registerChipProcessor(plugin: DispatchPlugin): void {
 
 		const chip = el.createEl("button", { cls: "dispatch-chip" });
 		const icon = chip.createSpan({ cls: "dispatch-chip-icon" });
-		setIcon(icon, "zap");
+		setIcon(icon, CHIP_ICON);
 		chip.createSpan({ text: spec.label ?? spec.tool ?? "Run" });
 		chip.addEventListener("click", () =>
 			launchChip(

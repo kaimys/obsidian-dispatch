@@ -1,5 +1,5 @@
 import { App, ItemView, Menu, Modal, Notice, TFile, WorkspaceLeaf, debounce, setIcon } from "obsidian";
-import { launchChip, launchColumnChip, launchEventChip } from "./chips";
+import { CHIP_ICON, launchChip, launchColumnChip, launchEventChip } from "./chips";
 import { runHook, shellVars, substitute } from "./exec";
 import { renderSetupPanel } from "./setup";
 import type DispatchPlugin from "./main";
@@ -353,7 +353,7 @@ export class BoardView extends ItemView {
 						menu.addItem((item) =>
 							item
 								.setTitle(`${template.label} (${ids.length})`)
-								.setIcon("zap")
+								.setIcon(CHIP_ICON)
 								.onClick(() =>
 									launchColumnChip(this.plugin, template, ids, col.value)
 								)
@@ -808,7 +808,7 @@ export class BoardView extends ItemView {
 			menu.addItem((item) =>
 				item
 					.setTitle(template.label)
-					.setIcon("zap")
+					.setIcon(CHIP_ICON)
 					.onClick(() => launchChip(this.plugin, template, card.file.path))
 			);
 		}
@@ -1005,7 +1005,7 @@ export class BoardView extends ItemView {
 					menu.addItem((item) =>
 						item
 							.setTitle(chip.label)
-							.setIcon("zap")
+							.setIcon(CHIP_ICON)
 							.onClick(() => launchEventChip(this.plugin, chip, dateKey, event.title))
 					);
 				}
@@ -1089,7 +1089,7 @@ export class BoardView extends ItemView {
 				menu.addItem((item) =>
 					item
 						.setTitle(template.label)
-						.setIcon("zap")
+						.setIcon(CHIP_ICON)
 						.onClick(() => launchChip(this.plugin, template, meeting.file.path))
 				);
 			}

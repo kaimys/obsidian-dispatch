@@ -2,7 +2,7 @@ import { dirname, existsSync, homedir, join, mkdirSync, readFileSync, writeFileS
 import { FileSystemAdapter, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { BoardView, VIEW_TYPE_BOARD } from "./board";
 import { CalendarEvent, fetchCalendar } from "./calendar";
-import { launchChip, registerChipProcessor } from "./chips";
+import { CHIP_ICON, launchChip, registerChipProcessor } from "./chips";
 import { RunTracker } from "./runs";
 import { DispatchSettingTab } from "./settings-tab";
 import {
@@ -61,7 +61,7 @@ export default class DispatchPlugin extends Plugin {
 						menu.addItem((item) =>
 							item
 								.setTitle(`Dispatch: ${template.label}`)
-								.setIcon("zap")
+								.setIcon(CHIP_ICON)
 								.onClick(() => launchChip(this, template, file.path))
 						);
 					}
@@ -75,7 +75,7 @@ export default class DispatchPlugin extends Plugin {
 					menu.addItem((item) =>
 						item
 							.setTitle(`Dispatch: ${template.label}`)
-							.setIcon("zap")
+							.setIcon(CHIP_ICON)
 							.onClick(() => launchChip(this, template, file.path))
 					);
 				}
