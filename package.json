@@ -10,6 +10,7 @@
 		"lint": "eslint .",
 		"lint:review": "eslint src -c eslint.review.mjs",
 		"install:docs": "node -e \"for (const f of ['main.js','manifest.json','styles.css']) require('fs').copyFileSync(f, 'docs/.obsidian/plugins/dispatch/' + f)\"",
+		"deploy:docs": "npm run build && npm run install:docs",
 		"test": "vitest run",
 		"test:watch": "vitest"
 	},

@@ -54,10 +54,11 @@ The repo dogfoods its own plugin: `docs/` is an Obsidian vault (git-ignored, alo
 `docs/.obsidian`), and `docs/wiki/` holds the project's tickets, ADRs and release notes.
 Board config: `docs/.obsidian/plugins/dispatch/data.json`; this machine's paths and tool
 commands: `~/.dispatch/docs-e7f737f3.json`. The plugin files in
-`docs/.obsidian/plugins/dispatch/` are a **copy**, not a symlink — run `npm run install:docs`
-after `npm run build` to test a change on this board. (A symlink would point the vault at the
-repo that contains it, and would share one `data.json` with the other vault. The live symlinked
-dev install is that other vault; the repo-root `data.json` belongs to it, not to this one.)
+`docs/.obsidian/plugins/dispatch/` are a **copy**, not a symlink — run `npm run deploy:docs`
+(build + copy; `npm run install:docs` copies an existing build alone) to test a change on this
+board. (A symlink would point the vault at the repo that contains it, and would share one
+`data.json` with the other vault. The live symlinked dev install is that other vault; the
+repo-root `data.json` belongs to it, not to this one.)
 
 - **Tickets** `docs/wiki/05_Requirements/Tickets` — columns
   `Backlog → Refinement → In progress → Review → Done`, plus `Rejected` (excluded from progress).
