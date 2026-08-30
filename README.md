@@ -1,4 +1,4 @@
-![Dispatch](docs/assets/Dispatch-Logo-360x120.png)
+![Dispatch](docs/assets/Dispatch-Logo-OCR.png)
 
 *"Obsidian is the IDE; the LLM is the programmer; the wiki is the codebase."*\
 — Andrej Karpathy, [LLM-Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
