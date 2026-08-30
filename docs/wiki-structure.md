@@ -8,11 +8,11 @@ Nothing here is enforced by the plugin. Dispatch needs folder paths and property
 
 ## The three layers
 
-| Layer | Lives in | Written by | Rule |
-| --- | --- | --- | --- |
-| **Sources** | `01_Sources/` | humans (drop files in) | **Immutable.** Agents read them, never modify them. |
-| **Wiki** | everything else | agents, reviewed by humans | Interpretations of sources plus the project's own decisions. Rewritten freely. |
-| **Schema** | `CLAUDE.md` in the code repo, `00_Start-Here/` | humans | How the wiki is structured, what is authoritative, which rules are inviolable. |
+| Layer       | Lives in                                       | Written by                 | Rule                                                                           |
+| ----------- | ---------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------ |
+| **Sources** | `01_Sources/`                                  | humans (drop files in)     | **Immutable.** Agents read them, never modify them.                            |
+| **Wiki**    | everything else                                | agents, reviewed by humans | Interpretations of sources plus the project's own decisions. Rewritten freely. |
+| **Schema**  | `CLAUDE.md` in the code repo, `00_Start-Here/` | humans                     | How the wiki is structured, what is authoritative, which rules are inviolable. |
 
 > "Your curated collection of source documents. Articles, papers, images, data files. These are immutable — the LLM reads from them but never modifies them. This is your source of truth." — Karpathy
 
