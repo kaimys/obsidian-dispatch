@@ -28,7 +28,9 @@ import {
 	appendFileSync as nodeAppendFileSync,
 	existsSync as nodeExistsSync,
 	mkdirSync as nodeMkdirSync,
+	readdirSync as nodeReaddirSync,
 	readFileSync as nodeReadFileSync,
+	unlinkSync as nodeUnlinkSync,
 	watch as nodeWatch,
 	writeFileSync as nodeWriteFileSync,
 } from "fs";
@@ -101,6 +103,11 @@ export const mkdirSync = nodeMkdirSync as unknown as (
 	path: string,
 	options: { recursive: boolean }
 ) => void;
+
+/** Basenames only, like the real function with no options argument. */
+export const readdirSync = nodeReaddirSync as unknown as (path: string) => string[];
+
+export const unlinkSync = nodeUnlinkSync as unknown as (path: string) => void;
 
 /** Watch a single file. The listener takes no arguments Dispatch uses. */
 export const watch = nodeWatch as unknown as (

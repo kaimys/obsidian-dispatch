@@ -6,6 +6,7 @@ import {
 	join,
 	mkdirSync,
 	readFileSync,
+	unlinkSync,
 	watch,
 	writeFileSync,
 } from "./node";
@@ -57,6 +58,29 @@ export class RunTracker {
 		const settingsPath = this.plugin.localSettingsPath();
 		const base = basename(settingsPath).replace(/\.json$/, "");
 		return join(dirname(settingsPath), "runs", `${base}.jsonl`);
+	}
+
+	/**
+	 * Bring run history along when a device config is adopted from
+	 * `oldSettingsPath` (US00024) — the runs file lives next to it, derived
+	 * the same way `path()` derives the current one. Copies rather than
+	 * assumes a rename works across the same call this cheaply; deletes the
+	 * source once copied, since a stale copy left behind would still show up
+	 * next time something looks for it.
+	 */
+	adoptFrom(oldSettingsPath: string): void {
+		const oldBase = basename(oldSettingsPath).replace(/\.json$/, "");
+		const oldRuns = join(dirname(oldSettingsPath), "runs", `${oldBase}.jsonl`);
+		if (!existsSync(oldRuns)) return;
+		try {
+			const newPath = this.path();
+			mkdirSync(dirname(newPath), { recursive: true });
+			writeFileSync(newPath, readFileSync(oldRuns, "utf8"));
+			unlinkSync(oldRuns);
+			this.cache = null;
+		} catch (e) {
+			console.error("Dispatch: could not adopt run history", e);
+		}
 	}
 
 	start(onChange: () => void): void {

@@ -1,5 +1,17 @@
-import { dirname, existsSync, homedir, join, mkdirSync, readFileSync, writeFileSync } from "./node";
-import { FileSystemAdapter, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import {
+	basename,
+	dirname,
+	existsSync,
+	homedir,
+	join,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	unlinkSync,
+	writeFileSync,
+} from "./node";
+import { App, FileSystemAdapter, Modal, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { findAdoptionCandidate } from "./adoption";
 import { BoardView, VIEW_TYPE_BOARD } from "./board";
 import { CalendarEvent, fetchCalendar } from "./calendar";
 import { CHIP_ICON, launchChip, registerChipProcessor } from "./chips";
@@ -19,11 +31,21 @@ export default class DispatchPlugin extends Plugin {
 	local: LocalSettings = DEFAULT_LOCAL;
 	runs: RunTracker = new RunTracker(this);
 
+	/** Set by `loadAllSettings()` when a same-named device config was found
+	 * under a different hash — see `promptAdoption()`. */
+	adoptionCandidate: string | null = null;
+	/** Declined once this session; don't ask again until the app restarts. */
+	private adoptionDeclined = false;
+
 	/** In-memory FIFO of chip launches waiting for their repo to free up. */
 	private pendingRuns = new Map<string, { id: string; label: string; execute: () => void }[]>();
 
 	async onload(): Promise<void> {
 		await this.loadAllSettings();
+		// Resolved before runs.start(), which would otherwise create an empty
+		// runs file at the new path the instant it finds none there — turning a
+		// clean adoption into a merge.
+		if (this.adoptionCandidate) await this.promptAdoption();
 		this.runs.start(() => {
 			this.refreshBoards();
 			this.drainRunQueues();
@@ -220,6 +242,7 @@ export default class DispatchPlugin extends Plugin {
 		delete (this.shared.board as { postDropHook?: unknown }).postDropHook;
 
 		this.local = { ...DEFAULT_LOCAL };
+		this.adoptionCandidate = null;
 		const path = this.localSettingsPath();
 		try {
 			if (existsSync(path)) {
@@ -227,18 +250,67 @@ export default class DispatchPlugin extends Plugin {
 					...DEFAULT_LOCAL,
 					...(JSON.parse(readFileSync(path, "utf8")) as Partial<LocalSettings>),
 				};
-			} else {
-				await this.migrateLegacyLocalSettings(path);
+			} else if (!(await this.migrateLegacyLocalSettings(path))) {
+				this.adoptionCandidate = this.findAdoptionCandidatePath(path);
 			}
 		} catch (e) {
 			console.error("Dispatch: could not read device-local settings — using defaults", e);
 		}
 	}
 
-	/** One-time move of local.json out of the vault; removes the synced copy. */
-	private async migrateLegacyLocalSettings(newPath: string): Promise<void> {
+	/** A same-named `~/.dispatch/*.json` under a different hash than `path`, if exactly one exists. */
+	private findAdoptionCandidatePath(path: string): string | null {
+		const dir = dirname(path);
+		if (!existsSync(dir)) return null;
+		const name = this.app.vault.getName().replace(/[^\w.-]+/g, "_");
+		const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
+		const match = findAdoptionCandidate(files, name, basename(path));
+		return match ? join(dir, match) : null;
+	}
+
+	/**
+	 * Offers to adopt `adoptionCandidate` — a device config left behind by a
+	 * vault that kept its name but moved (US00024). Declining is not an error:
+	 * `this.local` stays `DEFAULT_LOCAL`, which already renders as visibly
+	 * unconfigured (`chips.ts`'s "repository alias … not configured" Notice).
+	 */
+	private async promptAdoption(): Promise<void> {
+		const candidate = this.adoptionCandidate;
+		if (!candidate || this.adoptionDeclined) return;
+		const name = basename(candidate).replace(/-[0-9a-f]+\.json$/, "");
+		await new Promise<void>((resolve) => {
+			new AdoptConfigModal(this.app, name, {
+				onAdopt: () => {
+					void this.adoptDeviceConfig(candidate).then(resolve);
+				},
+				onDecline: () => {
+					this.adoptionDeclined = true;
+					resolve();
+				},
+			}).open();
+		});
+	}
+
+	/** Copies `oldPath`'s settings and run history into place, then removes the old settings file. */
+	private async adoptDeviceConfig(oldPath: string): Promise<void> {
+		try {
+			this.local = {
+				...DEFAULT_LOCAL,
+				...(JSON.parse(readFileSync(oldPath, "utf8")) as Partial<LocalSettings>),
+			};
+			await this.saveLocal();
+			this.runs.adoptFrom(oldPath);
+			unlinkSync(oldPath);
+			new Notice(`Dispatch: adopted device settings from ${basename(oldPath)}`, 8000);
+		} catch (e) {
+			console.error("Dispatch: could not adopt device settings", e);
+		}
+	}
+
+	/** One-time move of local.json out of the vault; removes the synced copy. Returns whether it migrated anything. */
+	private async migrateLegacyLocalSettings(newPath: string): Promise<boolean> {
 		const legacy = this.legacyLocalSettingsPath();
-		if (!(await this.app.vault.adapter.exists(legacy))) return;
+		if (!(await this.app.vault.adapter.exists(legacy))) return false;
 		try {
 			const parsed = JSON.parse(
 				await this.app.vault.adapter.read(legacy)
@@ -247,8 +319,10 @@ export default class DispatchPlugin extends Plugin {
 			await this.saveLocal();
 			await this.app.vault.adapter.remove(legacy);
 			new Notice(`Dispatch: device settings moved out of the vault to ${newPath}`, 8000);
+			return true;
 		} catch (e) {
 			console.error("Dispatch: could not migrate legacy local.json — leaving it in place", e);
+			return false;
 		}
 	}
 
@@ -270,5 +344,38 @@ export default class DispatchPlugin extends Plugin {
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_BOARD)) {
 			if (leaf.view instanceof BoardView) leaf.view.refresh();
 		}
+	}
+}
+
+class AdoptConfigModal extends Modal {
+	constructor(
+		app: App,
+		private vaultName: string,
+		private actions: { onAdopt: () => void; onDecline: () => void }
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.titleEl.setText("Adopt device settings?");
+		this.contentEl.createEl("p", {
+			text: `Dispatch found device settings for a vault named "${this.vaultName}" that no longer matches this vault's location — it may have moved. Adopt them for this vault?`,
+		});
+
+		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
+		const adopt = row.createEl("button", { cls: "mod-cta", text: "Adopt" });
+		adopt.addEventListener("click", () => {
+			this.close();
+			this.actions.onAdopt();
+		});
+		const decline = row.createEl("button", { text: "Not now" });
+		decline.addEventListener("click", () => {
+			this.close();
+			this.actions.onDecline();
+		});
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
 	}
 }

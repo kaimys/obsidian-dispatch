@@ -7,10 +7,24 @@
  * A failure here means a declared signature has drifted from Node's, which the
  * type system will not catch anywhere else in the plugin.
  */
+import { readdirSync as realReaddirSync } from "node:fs";
 import { basename as realBasename, dirname as realDirname, join as realJoin } from "node:path";
 import { homedir as realHomedir, tmpdir as realTmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { basename, dirname, environment, homedir, join, platform, tmpdir } from "../src/node";
+import {
+	basename,
+	dirname,
+	environment,
+	existsSync,
+	homedir,
+	join,
+	mkdirSync,
+	platform,
+	readdirSync,
+	tmpdir,
+	unlinkSync,
+	writeFileSync,
+} from "../src/node";
 import { DEFAULT_LOCAL } from "../src/settings";
 
 describe("path helpers behave like node's", () => {
@@ -32,6 +46,26 @@ describe("os helpers", () => {
 	it("return the real home and temp directories", () => {
 		expect(homedir()).toBe(realHomedir());
 		expect(tmpdir()).toBe(realTmpdir());
+	});
+});
+
+describe("fs helpers behave like node's", () => {
+	it("lists directory entries the way readdirSync does", () => {
+		const dir = join(tmpdir(), `dispatch-node-test-${Date.now()}-readdir`);
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(join(dir, "a.json"), "{}");
+		writeFileSync(join(dir, "b.json"), "{}");
+		expect([...readdirSync(dir)].sort()).toEqual([...realReaddirSync(dir)].sort());
+	});
+
+	it("deletes a file the way unlinkSync does", () => {
+		const dir = join(tmpdir(), `dispatch-node-test-${Date.now()}-unlink`);
+		mkdirSync(dir, { recursive: true });
+		const file = join(dir, "gone.json");
+		writeFileSync(file, "{}");
+		expect(existsSync(file)).toBe(true);
+		unlinkSync(file);
+		expect(existsSync(file)).toBe(false);
 	});
 });
 
