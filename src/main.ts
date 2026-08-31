@@ -42,10 +42,6 @@ export default class DispatchPlugin extends Plugin {
 
 	async onload(): Promise<void> {
 		await this.loadAllSettings();
-		// Resolved before runs.start(), which would otherwise create an empty
-		// runs file at the new path the instant it finds none there — turning a
-		// clean adoption into a merge.
-		if (this.adoptionCandidate) await this.promptAdoption();
 		this.runs.start(() => {
 			this.refreshBoards();
 			this.drainRunQueues();
@@ -103,6 +99,17 @@ export default class DispatchPlugin extends Plugin {
 				}
 			})
 		);
+
+		// Deferred, never awaited: onload() must return promptly — blocking it
+		// on the modal here hung Obsidian's own plugin loader ("this plugin
+		// loads slowly, disable it?"), because early in startup a Modal isn't
+		// reliably interactive yet (found testing this feature, 2026-08-31).
+		// runs.start() above already ran by the time this fires, but
+		// adoptFrom() replaces the runs file wholesale rather than merging
+		// into it, so the ordering doesn't matter.
+		if (this.adoptionCandidate) {
+			this.app.workspace.onLayoutReady(() => void this.promptAdoption());
+		}
 	}
 
 	onunload(): void {
