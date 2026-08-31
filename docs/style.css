@@ -1,0 +1,134 @@
+/* Dispatch — published pages at https://eightnine.de/dispatch/
+   Deliberately self-contained: no build step, no framework, no external
+   requests. Superseded by US00018's generated site. */
+
+:root {
+	--bg: #fbfbfa;
+	--fg: #1f2328;
+	--muted: #59636e;
+	--rule: #d8dde3;
+	--accent: #7c5cff;
+	--code-bg: #f0f1f3;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #17181c;
+		--fg: #e6e6e6;
+		--muted: #9aa2ad;
+		--rule: #2e3138;
+		--accent: #9d86ff;
+		--code-bg: #23252b;
+	}
+}
+
+* { box-sizing: border-box; }
+
+body {
+	margin: 0;
+	padding: 3rem 1.5rem 5rem;
+	background: var(--bg);
+	color: var(--fg);
+	font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+		"Helvetica Neue", Arial, sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+
+main {
+	max-width: 44rem;
+	margin: 0 auto;
+}
+
+h1 {
+	font-size: 2rem;
+	line-height: 1.2;
+	letter-spacing: -0.02em;
+	margin: 0 0 1.25rem;
+}
+
+h2 {
+	font-size: 1.25rem;
+	letter-spacing: -0.01em;
+	margin: 2.75rem 0 0.75rem;
+	padding-top: 1.25rem;
+	border-top: 1px solid var(--rule);
+}
+
+h3 {
+	font-size: 1rem;
+	margin: 1.75rem 0 0.5rem;
+}
+
+p, li { margin: 0 0 0.9rem; }
+
+ul, ol { padding-left: 1.35rem; }
+
+a {
+	color: var(--accent);
+	text-decoration: none;
+	border-bottom: 1px solid transparent;
+}
+
+a:hover { border-bottom-color: currentColor; }
+
+code {
+	background: var(--code-bg);
+	border-radius: 4px;
+	padding: 0.12em 0.4em;
+	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+	font-size: 0.875em;
+	word-break: break-word;
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 1.25rem 0;
+	font-size: 0.9375rem;
+}
+
+th, td {
+	text-align: left;
+	vertical-align: top;
+	padding: 0.6rem 0.75rem;
+	border-bottom: 1px solid var(--rule);
+}
+
+th { font-weight: 600; }
+
+.table-scroll { overflow-x: auto; }
+
+.lede {
+	font-size: 1.0625rem;
+	color: var(--muted);
+	margin-bottom: 2rem;
+}
+
+.effective {
+	color: var(--muted);
+	font-size: 0.9375rem;
+	margin: -0.5rem 0 2rem;
+}
+
+.note {
+	border-left: 3px solid var(--accent);
+	padding: 0.1rem 0 0.1rem 1rem;
+	margin: 1.5rem 0;
+	color: var(--muted);
+}
+
+footer {
+	margin-top: 4rem;
+	padding-top: 1.25rem;
+	border-top: 1px solid var(--rule);
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+
+footer a { color: var(--muted); }
+
+nav.crumb {
+	margin-bottom: 2.5rem;
+	font-size: 0.875rem;
+	color: var(--muted);
+}

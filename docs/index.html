@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dispatch — the agentic ticket board for Obsidian</title>
+<meta name="description" content="Dispatch turns a folder of Obsidian notes into a live project board, and every card on it into a launcher for an AI coding agent.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+
+<h1>Dispatch</h1>
+
+<p class="lede"><strong>The agentic ticket board for <a href="https://obsidian.md">Obsidian</a>.</strong>
+A property-driven kanban, milestone, meeting and todo board over your own notes — where every
+card is also a launcher for an AI coding agent.</p>
+
+<h2>What it does</h2>
+
+<p>Two primitives carry the whole plugin:</p>
+
+<ul>
+<li><strong>Boards</strong> are views over note frontmatter. Drag a card and the frontmatter is
+written immediately. There is no separate database; the notes <em>are</em> the board, so
+everything a board shows stays greppable, diffable and syncable.</li>
+<li><strong>Chips</strong> are buttons that launch an agent — Claude Code, Codex, any CLI — in the
+right repository, with the ticket as context. The board knows what the agent is doing; the
+note keeps what it did.</li>
+</ul>
+
+<p>Four tabs sit above the board. <strong>Kanban</strong> and <strong>Release Plan</strong> are
+always there; <strong>Meetings</strong> and <strong>Todos</strong> appear once you point them at
+their folders. Which frontmatter properties drive all of it is up to you — Dispatch never
+invents a pipeline you did not configure.</p>
+
+<h2>Where your data goes</h2>
+
+<p>Nowhere. Dispatch has no server, no account and no telemetry. It reads and writes markdown
+files in your own vault and runs programs you configured on your own machine. The developer
+receives nothing. The one optional feature that talks to an external service — importing
+Google Meet transcripts — runs on your computer with your own credentials, and is described
+in full in the <a href="privacy.html">privacy policy</a>.</p>
+
+<p>Dispatch is desktop-only, free, and open-source under the
+<a href="https://github.com/kaimys/obsidian-dispatch/blob/main/LICENSE">MIT licence</a>.</p>
+
+<h2>Get it</h2>
+
+<ul>
+<li><strong>Obsidian community plugins</strong> — search for <em>Dispatch</em>, or open the
+<a href="https://community.obsidian.md/plugins/dispatch">directory listing</a>.</li>
+<li><strong>Source, documentation, issues and releases</strong> —
+<a href="https://github.com/kaimys/obsidian-dispatch">github.com/kaimys/obsidian-dispatch</a>.</li>
+</ul>
+
+<h2>Documentation</h2>
+
+<ul>
+<li><a href="https://github.com/kaimys/obsidian-dispatch/blob/main/docs/overview.md">Overview</a>
+— the boards, the chips, and what each tab does</li>
+<li><a href="https://github.com/kaimys/obsidian-dispatch/blob/main/docs/installation.md">Installation</a>
+— installing, and where each layer of settings lives</li>
+<li><a href="https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md">Page types</a>
+— the frontmatter contract a board reads</li>
+<li><a href="https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md">Skills</a>
+— the workflow commands agents run against your tickets</li>
+<li><a href="https://github.com/kaimys/obsidian-dispatch/blob/main/docs/wiki-structure.md">Wiki structure</a>
+— how a project wiki and its code repository fit together</li>
+</ul>
+
+<h2>Legal</h2>
+
+<ul>
+<li><a href="privacy.html">Privacy Policy</a></li>
+<li><a href="terms.html">Terms of Service</a></li>
+</ul>
+
+<footer>
+Built by <a href="https://eightnine.de/">Kai Mysliwiec</a> ·
+<a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a>
+</footer>
+
+</main>
+</body>
+</html>
