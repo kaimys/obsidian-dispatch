@@ -48,21 +48,28 @@ No test suite yet. `npm run build` is the minimum verification for every change.
   outside `src/node.ts` means the boundary was bypassed. The assertions skip real type-checking, so
   `test/node.test.ts` compares the boundary's behaviour against the real modules.
 
-## The project wiki (`docs/`)
+## The project wiki
 
-The repo dogfoods its own plugin: `docs/` is an Obsidian vault (git-ignored, along with
-`docs/.obsidian`), and `docs/wiki/` holds the project's tickets, ADRs and release notes.
-Board config: `docs/.obsidian/plugins/dispatch/data.json`; this machine's paths and tool
-commands: `~/.dispatch/docs-e7f737f3.json`. The plugin files in
-`docs/.obsidian/plugins/dispatch/` are a **copy**, not a symlink — run `npm run deploy:docs`
-(build + copy; `npm run install:docs` copies an existing build alone) to test a change on this
-board. (A symlink would point the vault at the repo that contains it, and would share one
-`data.json` with the other vault. The live symlinked dev install is that other vault; the
-repo-root `data.json` belongs to it, not to this one.)
+The repo dogfoods its own plugin. `docs/` holds only the plugin's published documentation
+(`overview.md`, `installation.md`, `page-types.md`, `skills.md`, `wiki-structure.md`, `assets/`).
+The project's tickets, ADRs and release notes live in their own Obsidian vault, `Dispatch-Wiki`,
+synced via Google Drive and reached from this repo through `wiki` — a git-ignored, repo-relative
+symlink ([[ADR-0025]]; `git ls-files wiki` is empty). `wiki/` holds `00_Start-Here/`,
+`05_Requirements/`, `07_Engineering/`, `.obsidian/` etc. directly, no nested `wiki/` level inside
+it.
 
-- **Tickets** `docs/wiki/05_Requirements/Tickets` — columns
+Board config: `wiki/.obsidian/plugins/dispatch/data.json`; this machine's paths and tool
+commands: `~/.dispatch/<vault name>-<hash>.json` (`src/main.ts:186` derives the exact name — see
+that file rather than hardcoding it here, since it is machine- and vault-specific). The plugin
+files in `wiki/.obsidian/plugins/dispatch/` are a **copy**, not a symlink — run `npm run deploy`
+(build + copy; `npm run install:wiki` copies an existing build alone) to test a change on this
+board. A symlink there would share one `data.json` with whatever other vault it also pointed at:
+Obsidian writes a plugin's `data.json` beside its `main.js`, so two vaults linked to the same
+checkout silently share one board's configuration ([[ADR-0026]]).
+
+- **Tickets** `wiki/05_Requirements/Tickets` — columns
   `Backlog → Refinement → In progress → Review → Done`, plus `Rejected` (excluded from progress).
-  Templates in `docs/wiki/00_Start-Here/Templates`.
+  Templates in `wiki/00_Start-Here/Templates`.
 - **Ticket ids** are 5 digits behind a prefix matching `type:` — `US` story, `BUG` bug,
   `SEC` security — and **each prefix numbers independently** (`SEC00001` exists while `US` is
   in the teens). Nothing parses the shape: the board renders `id` through `titleProperty` and
@@ -95,10 +102,10 @@ repo-root `data.json` belongs to it, not to this one.)
   ticket leaves `Review`. No command crosses a gated boundary on its own. `Refinement` is the
   column, but the counter is still the gate: a ticket sitting in `Refinement` with unanswered
   questions is not buildable, and moving the card does not make it so.
-- **Ownership.** Every page carries `owner:`, a person resolving to `docs/wiki/00_Start-Here/Team/`,
+- **Ownership.** Every page carries `owner:`, a person resolving to `wiki/00_Start-Here/Team/`,
   never a team. A derived page also carries `derived_from:` and `maintained_by:`, and a command
   that creates one must register its refresh — if no recurring job owns it, it may not create it.
-- **Precedence.** ADRs in `docs/wiki/07_Engineering/Decisions` outrank ticket prose; ticket prose
+- **Precedence.** ADRs in `wiki/07_Engineering/Decisions` outrank ticket prose; ticket prose
   outranks a stale wiki page; the code outranks any claim about the code. On a wiki ↔ GitHub
   disagreement the **wiki wins** — the issue is a mirror, not the source of truth.
 - **Never name a person in a command.** Attribution resolves at runtime from `assignee:`, `owner:`,
@@ -122,6 +129,6 @@ the draft stays manual (ADR-0018).
 
 - **Every release note carries a `## GitHub release body` section**, fenced so it copies
   verbatim. The wiki is git-ignored, so that block may contain **no `[[wikilink]]` and no
-  `docs/wiki/…` path** — both are dead on GitHub. Tickets are referenced by their
+  `wiki/…` path** — both are dead on GitHub. Tickets are referenced by their
   `discussion:` issue URL, past releases by `…/releases/tag/<version>`, and ADRs are stated
   in prose rather than linked, because ADRs are not published. Written by `/release` step 8.

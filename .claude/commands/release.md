@@ -11,7 +11,7 @@ Releases one version. `$ARGUMENTS` is the target version (e.g. `v1.4.0`); withou
 
 ## Scope the release
 
-1. **The release scope is what the board says it is:** every ticket whose `version_target` matches, in `docs/wiki/05_Requirements/Tickets`. Anything shipped without a ticket is invisible here — which is the practical argument for no-ticket-no-merge.
+1. **The release scope is what the board says it is:** every ticket whose `version_target` matches, in `wiki/05_Requirements/Tickets`. Anything shipped without a ticket is invisible here — which is the practical argument for no-ticket-no-merge.
 2. Verify each in-scope ticket is actually ready: at `Review` or beyond with `open_tests: 0`. **List the ones that aren't and stop.** Either they get finished, or they get moved to the next version — both are the user's call, not yours.
 3. Confirm today's date with `date`.
 
@@ -27,8 +27,8 @@ Releases one version. `$ARGUMENTS` is the target version (e.g. `v1.4.0`); withou
 ## Cut it
 
 6. Bump the version in the project's manifest(s), consistently — one source of truth, everything else derived.
-7. **Write the release note** `docs/wiki/08_Delivery_and QA/Releases/<version>.md` from `docs/wiki/00_Start-Here/Templates/release-note.md`: `version:` and `date:` frontmatter exactly as the template shows — **the Release Plan tab parses these**, and a malformed one silently drops the release from the board. Contents: what shipped as **links to the tickets** (they carry the detail — don't restate it), build metadata, and what deliberately did not make it.
-8. **Write the `## GitHub release body` section** into the same note — mandatory, and the only part written for people outside the team. Everything else in the note links into the vault; **the vault is git-ignored**, so a `[[wikilink]]` or a `docs/wiki/…` path pasted into GitHub is dead text or a 404. Inside a ```` fenced block (so it copies verbatim), translate every reference to an absolute GitHub URL: a ticket becomes its `discussion:` issue (`https://github.com/kaimys/obsidian-dispatch/issues/<n>`), a past release becomes `…/releases/tag/<version>`, a commit becomes `…/commit/<sha>`, a repo doc becomes `…/blob/<tag>/docs/<file>.md` — and an **ADR becomes prose**, because ADRs are not published. Write full URLs rather than bare `#5`. End with `**Full changelog:** …/compare/<previous>...<this>`. Never paste the internal note into GitHub instead.
+7. **Write the release note** `wiki/08_Delivery_and QA/Releases/<version>.md` from `wiki/00_Start-Here/Templates/release-note.md`: `version:` and `date:` frontmatter exactly as the template shows — **the Release Plan tab parses these**, and a malformed one silently drops the release from the board. Contents: what shipped as **links to the tickets** (they carry the detail — don't restate it), build metadata, and what deliberately did not make it.
+8. **Write the `## GitHub release body` section** into the same note — mandatory, and the only part written for people outside the team. Everything else in the note links into the vault; **the vault is git-ignored**, so a `[[wikilink]]` or a `wiki/…` path pasted into GitHub is dead text or a 404. Inside a ```` fenced block (so it copies verbatim), translate every reference to an absolute GitHub URL: a ticket becomes its `discussion:` issue (`https://github.com/kaimys/obsidian-dispatch/issues/<n>`), a past release becomes `…/releases/tag/<version>`, a commit becomes `…/commit/<sha>`, a repo doc becomes `…/blob/<tag>/docs/<file>.md` — and an **ADR becomes prose**, because ADRs are not published. Write full URLs rather than bare `#5`. End with `**Full changelog:** …/compare/<previous>...<this>`. Never paste the internal note into GitHub instead.
 9. Build, tag and publish per the project's process.
 
 ## Land it

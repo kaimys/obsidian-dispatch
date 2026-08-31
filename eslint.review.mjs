@@ -18,6 +18,7 @@ export default [
 			"main.js",
 			"node_modules/**",
 			"docs/**",
+			"wiki/**",
 			"test/**",
 			"*.config.*",
 			"eslint.review.mjs",

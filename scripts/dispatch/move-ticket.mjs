@@ -7,9 +7,10 @@
  *   node scripts/dispatch/move-ticket.mjs {{file}} {{from}} {{to}}
  *
  * Dispatch runs it with cwd = the repo root and `{{file}}` = the note's
- * VAULT-relative path. This vault lives at `docs/` inside this repo, so the
- * note is resolved against VAULT_DIR below — get that wrong and every run
- * silently reports "note not found".
+ * VAULT-relative path. The vault is reached through `wiki`, a git-ignored,
+ * repo-relative symlink to wherever it actually lives (ADR-0025) — the note
+ * is resolved against VAULT_DIR below, which names that link rather than a
+ * location. Get that wrong and every run silently reports "note not found".
  *
  * Mapping. GitHub issues have no columns, only state, so only the two ends of
  * the pipeline have a tracker counterpart:
@@ -62,7 +63,7 @@ import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 
 /** Vault root, relative to the repo root. */
-const VAULT_DIR = "docs";
+const VAULT_DIR = "wiki";
 
 /**
  * Frontmatter property holding the target version — the board's

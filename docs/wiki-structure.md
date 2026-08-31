@@ -139,10 +139,15 @@ The workflow logic lives in the **code repository** as agent skills; the state l
 
 ### Separate vault, symlinked into the repo
 
-The wiki is its own Obsidian vault, synced by whatever your non-technical colleagues already use (Obsidian Sync, Google Drive, Dropbox), and symlinked into the code repo so agents and Dispatch see one tree.
+The wiki is its own Obsidian vault, synced by whatever your non-technical colleagues already use (Obsidian Sync, Google Drive, Dropbox), and symlinked into the code repo — a single, git-ignored, repo-relative link (e.g. `wiki`) — so agents and Dispatch see one tree. A script or workflow command that needs the vault names the *link*, never a location: `const VAULT_DIR = "wiki"` in a repo-side script is then true by construction, and moving the wiki costs one repointed link rather than a find-and-replace across every call site.
 
 - **For**: nobody outside engineering ever sees git. Unbounded binary sources cost the repo nothing.
 - **Against**: no history, no diffs, no review on the wiki. You cannot ask "what did this spec say when we built it?" — which is exactly the question the [ticket freeze rule](page-types.md#the-freeze-rule) exists to answer, and it answers it by convention instead of by version control.
+
+Two failure modes are silent, so watch for both:
+
+- **Device-local config is keyed on the vault's absolute path.** Moving or renaming the vault orphans it — the board renders and looks healthy, and every chip fails on click.
+- **Vault-relative folder paths in the *shared* config are still folder paths.** A restructure that changes them without updating the shared settings leaves the board empty rather than erroring.
 
 ### Monorepo — wiki and code in one repository
 

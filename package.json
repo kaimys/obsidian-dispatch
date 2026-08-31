@@ -9,8 +9,8 @@
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "eslint .",
 		"lint:review": "eslint src -c eslint.review.mjs",
-		"install:docs": "node -e \"for (const f of ['main.js','manifest.json','styles.css']) require('fs').copyFileSync(f, 'docs/.obsidian/plugins/dispatch/' + f)\"",
-		"deploy:docs": "npm run build && npm run install:docs",
+		"install:wiki": "node -e \"for (const f of ['main.js','manifest.json','styles.css']) require('fs').copyFileSync(f, 'wiki/.obsidian/plugins/dispatch/' + f)\"",
+		"deploy": "npm run build && npm run install:wiki",
 		"test": "vitest run",
 		"test:watch": "vitest"
 	},
