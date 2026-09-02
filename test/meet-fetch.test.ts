@@ -1,0 +1,217 @@
+/**
+ * The pure core of the Meet fetch (US00001). Everything network-facing is a
+ * thin shell over these, which is what keeps the suite meaningful without
+ * stubbing Google — the OAuth flow and real Drive responses are the spike's job
+ * and the manual test plan's, not CI's.
+ *
+ * The cases here are the ones that actually bit during the spike: two filename
+ * spellings for the same document, presence checked by id rather than name, and
+ * a document that carries no transcript because transcription was switched off.
+ */
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+	artifactKind,
+	driveQuery,
+	hasTranscriptSection,
+	matchesMeeting,
+	parseArtifactName,
+	renderFrontmatter,
+	safeFileName,
+	scanFetched,
+} from "../scripts/dispatch/meet-fetch.mjs";
+
+const DRIVE_NAME = "Einführung in Dispatch - 2026/09/01 14:28 CEST - Notes by Gemini";
+const DISK_NAME = "Einführung in Dispatch - 2026_09_01 14_28 CEST - Notes by Gemini";
+
+describe("parseArtifactName", () => {
+	it("reads the Drive spelling, with slashes and a colon", () => {
+		expect(parseArtifactName(DRIVE_NAME)).toEqual({
+			title: "Einführung in Dispatch",
+			date: "2026-09-01",
+			time: "14:28",
+			tz: "CEST",
+			label: "Notes by Gemini",
+		});
+	});
+
+	it("reads the on-disk spelling identically", () => {
+		// A fetched file has the filesystem-illegal characters replaced, so the
+		// same document parses back to the same meeting. If these two ever
+		// diverge, every already-fetched file stops being recognisable.
+		expect(parseArtifactName(DISK_NAME)).toEqual(parseArtifactName(DRIVE_NAME));
+	});
+
+	it("tolerates a .md extension, so a fetched file round-trips", () => {
+		expect(parseArtifactName(`${DISK_NAME}.md`)).toEqual(parseArtifactName(DRIVE_NAME));
+	});
+
+	it("keeps a hyphen that belongs to the title", () => {
+		const parsed = parseArtifactName("Q3 Review - Sales - 2026/07/14 09:15 CEST - Notes by Gemini");
+		expect(parsed?.title).toBe("Q3 Review - Sales");
+		expect(parsed?.date).toBe("2026-07-14");
+	});
+
+	it("returns null for a name that is not an artifact", () => {
+		expect(parseArtifactName("2026-09-01 - Dispatch Introduction.md")).toBeNull();
+		expect(parseArtifactName("")).toBeNull();
+	});
+});
+
+describe("matchesMeeting", () => {
+	const parsed = parseArtifactName(DRIVE_NAME);
+
+	it("matches on title and date", () => {
+		expect(matchesMeeting(parsed, "Einführung in Dispatch", "2026-09-01")).toBe(true);
+	});
+
+	it("ignores case, accents and punctuation in the title", () => {
+		// The board's note title and Google's filename are typed by different
+		// people at different times; only the words are reliably the same.
+		expect(matchesMeeting(parsed, "einfuhrung, in dispatch!", "2026-09-01")).toBe(true);
+	});
+
+	it("rejects the right title on the wrong day", () => {
+		expect(matchesMeeting(parsed, "Einführung in Dispatch", "2026-09-02")).toBe(false);
+	});
+
+	it("separates two meetings held the same day when a time is given", () => {
+		const morning = parseArtifactName("Standup - 2026/09/01 09:00 CEST - Notes by Gemini");
+		const evening = parseArtifactName("Standup - 2026/09/01 17:00 CEST - Notes by Gemini");
+		expect(matchesMeeting(morning, "Standup", "2026-09-01 09:00")).toBe(true);
+		expect(matchesMeeting(evening, "Standup", "2026-09-01 09:00")).toBe(false);
+		// Without a time, either is an acceptable match for that day.
+		expect(matchesMeeting(evening, "Standup", "2026-09-01")).toBe(true);
+	});
+
+	it("is false for an unparseable name rather than throwing", () => {
+		expect(matchesMeeting(null, "Anything", "2026-09-01")).toBe(false);
+	});
+});
+
+describe("driveQuery", () => {
+	it("restricts to untrashed Google Docs matching the title", () => {
+		const q = driveQuery("Einführung in Dispatch");
+		expect(q).toContain("mimeType = 'application/vnd.google-apps.document'");
+		expect(q).toContain("trashed = false");
+		expect(q).toContain("name contains 'Einführung in Dispatch'");
+	});
+
+	it("escapes a quote in the title instead of breaking the query", () => {
+		expect(driveQuery("Kai's Meeting")).toContain("name contains 'Kai\\'s Meeting'");
+	});
+});
+
+describe("scanFetched", () => {
+	function vaultWith(files: Record<string, string>): string {
+		const dir = mkdtempSync(join(tmpdir(), "meet-fetch-"));
+		mkdirSync(dir, { recursive: true });
+		for (const [name, body] of Object.entries(files)) writeFileSync(join(dir, name), body);
+		return dir;
+	}
+
+	const fetched = (id: string) =>
+		renderFrontmatter({
+			meeting_date: "2026-09-01",
+			artifact: "notes",
+			doc_id: id,
+			fetched: "2026-09-02",
+		}) + "# Notizen\n";
+
+	it("returns the doc_id of each fetched file", () => {
+		const dir = vaultWith({ [`${DISK_NAME}.md`]: fetched("1Add4g") });
+		expect(scanFetched(dir).has("1Add4g")).toBe(true);
+	});
+
+	it("still finds a file that was renamed on disk", () => {
+		// This is the property the doc_id decision bought: presence is exact and
+		// survives both a human renaming a file and Google renaming its
+		// artifacts, which it last did in July 2026.
+		const dir = vaultWith({ "something else entirely.md": fetched("1Add4g") });
+		expect(scanFetched(dir).has("1Add4g")).toBe(true);
+	});
+
+	it("ignores a hand-downloaded file with no frontmatter", () => {
+		// Accepted cost, recorded in the plan's risks: the five files already in
+		// the folder have no frontmatter, so the first run re-downloads them.
+		const dir = vaultWith({ [`${DISK_NAME}.md`]: "# Notizen\n\nNo frontmatter here.\n" });
+		expect(scanFetched(dir).size).toBe(0);
+	});
+
+	it("returns an empty set for a folder that does not exist yet", () => {
+		expect(scanFetched(join(tmpdir(), "meet-fetch-does-not-exist")).size).toBe(0);
+	});
+});
+
+describe("hasTranscriptSection", () => {
+	const dialogue = [
+		"**Kai Mysliwiec:** Also, kurz zum Board.",
+		"**felix Schneider:** Ja, verstehe.",
+		"**Cinthia Bertsch:** Und die Chips?",
+		"**Kai Mysliwiec:** Die starten den Agenten.",
+		"**Rouwen Hirth:** Okay.",
+	].join("\n");
+
+	it("recognises a document whose transcript is appended", () => {
+		expect(hasTranscriptSection(`# Notizen\n\nZusammenfassung.\n\n${dialogue}\n`)).toBe(true);
+	});
+
+	it("reports a notes-only document rather than throwing", () => {
+		// Transcription and Gemini note-taking are separate toggles in Meet, so
+		// a document with a summary and no dialogue is an ordinary outcome.
+		expect(hasTranscriptSection("# Notizen\n\nEine Zusammenfassung des Transkripts.\n")).toBe(false);
+	});
+
+	it("is not fooled by a single bold line in the summary", () => {
+		expect(hasTranscriptSection("# Notizen\n\n**Ergebnis:** wir bauen es.\n")).toBe(false);
+	});
+});
+
+describe("safeFileName", () => {
+	it("replaces only what a filesystem rejects, keeping the name recognisable", () => {
+		expect(safeFileName(DRIVE_NAME)).toBe(DISK_NAME);
+	});
+
+	it("produces a name that parses back to the same meeting", () => {
+		expect(parseArtifactName(safeFileName(DRIVE_NAME))).toEqual(parseArtifactName(DRIVE_NAME));
+	});
+});
+
+describe("artifactKind", () => {
+	it("records what Google called it, in either language", () => {
+		expect(artifactKind("Notes by Gemini")).toBe("notes");
+		expect(artifactKind("Transcript by Gemini")).toBe("transcript");
+		expect(artifactKind("Notizen von Gemini")).toBe("notes");
+		expect(artifactKind("")).toBe("document");
+	});
+});
+
+describe("renderFrontmatter", () => {
+	it("emits the four properties the presence check and the board need", () => {
+		const block = renderFrontmatter({
+			meeting_date: "2026-09-01",
+			artifact: "notes",
+			doc_id: "1Add4g",
+			fetched: "2026-09-02",
+		});
+		expect(block).toBe(
+			"---\nmeeting_date: 2026-09-01\nartifact: notes\ndoc_id: 1Add4g\nfetched: 2026-09-02\n---\n"
+		);
+	});
+
+	it("round-trips through scanFetched", () => {
+		const dir = mkdtempSync(join(tmpdir(), "meet-fetch-rt-"));
+		writeFileSync(
+			join(dir, "x.md"),
+			renderFrontmatter({
+				meeting_date: "2026-09-01",
+				artifact: "notes",
+				doc_id: "round-trip",
+				fetched: "2026-09-02",
+			})
+		);
+		expect(scanFetched(dir).has("round-trip")).toBe(true);
+	});
+});

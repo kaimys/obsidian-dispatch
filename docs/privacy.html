@@ -14,7 +14,9 @@
 
 <h1>Privacy Policy for Dispatch</h1>
 
-<p class="effective"><strong>Effective 31 August 2026.</strong></p>
+<p class="effective"><strong>Effective 2 September 2026.</strong> Supersedes the version of
+31 August 2026, which described a single Google scope. Testing established that reading a
+meeting document needs a second one; the scope table below is the change.</p>
 
 <p>Dispatch is an open-source plugin for <a href="https://obsidian.md">Obsidian</a>, published
 under the MIT licence by Kai Mysliwiec. This policy explains what data Dispatch touches, where
@@ -49,24 +51,40 @@ Google Drive.</p>
 <tbody>
 <tr>
 <td><code>https://www.googleapis.com/auth/drive.meet.readonly</code></td>
-<td>Read-only access to the Google Drive files created by Google Meet — meeting transcripts and
-Gemini meeting notes</td>
-<td>To find the transcript for a meeting by its title and date, and to download it into your
-vault</td>
+<td>Read-only access to the Google Drive files created by Google Meet — the meeting documents
+Gemini produces, and nothing else in your Drive</td>
+<td>To find the document for a meeting by its title and date</td>
+</tr>
+<tr>
+<td><code>https://www.googleapis.com/auth/documents.readonly</code></td>
+<td>Read-only access to your Google Docs</td>
+<td>To read that document's contents. The scope above finds the file but does not permit
+reading it — Google separates the two</td>
 </tr>
 </tbody>
 </table>
 </div>
 
-<p>This is a <strong>read-only</strong> scope, and it is the narrowest scope that covers the
-task. Dispatch requests no permission to modify, create or delete anything in your Google Drive,
-and no access to Drive files that Google Meet did not create.</p>
+<p>Both are <strong>read-only</strong>. Dispatch requests no permission to modify, create or
+delete anything in your Google Drive or your documents, and it never requests
+<code>drive.readonly</code>, which would grant read access to your entire Drive.</p>
+
+<p>Being straightforward about the second scope, because it is broader than the first: Google
+grants document-reading permission per application, not per file, so
+<code>documents.readonly</code> technically covers <em>all</em> of your Google Docs, not only the
+meeting ones. Dispatch only ever requests the specific document it found via the first scope —
+searching is restricted to files Google Meet created — but the permission you grant is the wider
+one, and you should know that before granting it. It is the narrowest pair that works: without
+the second scope, Google returns "not found" for the very document the first scope just
+located.</p>
 
 <h3>What the script does with it</h3>
 
 <ol>
-<li>Lists Drive files whose names match the meeting you asked about, by title and date.</li>
-<li>Exports the matching document as Markdown.</li>
+<li>Lists the Meet-created Drive files whose names match the meeting you asked about, by title
+and date.</li>
+<li>Exports that one document as Markdown — the Gemini summary and, when the meeting was
+transcribed, the transcript that Google appends to it.</li>
 <li>Writes that Markdown into a folder inside your own Obsidian vault.</li>
 </ol>
 

@@ -23,8 +23,21 @@ Two modes over the meeting notes in `wiki/09_Meetings-and-Workshops` (`YYYY-MM-D
 
 ## Mode: report (after)
 
-4. **Locate the transcript in `wiki/09_Meetings-and-Workshops/Transcripts/`** (Google's own filename — `<Title> - <date> - Transcript by Gemini.md`, or the `… - Notes by Gemini.md` summary if no transcript exists). Never edit it; it is a raw source, and a wrong interpretation must always be redoable from it.
-   **Not there yet?** Stop and ask to download it by hand (open the Gemini notes or transcript in Google Docs → File → Download → Markdown, into that folder). Automatic fetch on click is scoped in [[Story - US00001 - Import Google Meet transcripts automatically|US00001]] and not built yet — this command does not depend on it.
+4. **Locate the meeting's document in `wiki/09_Meetings-and-Workshops/Transcripts/`** — Google's own filename, `<Title> - <YYYY_MM_DD HH_MM TZ> - Notes by Gemini.md`. **One file holds both** the Gemini summary and the transcript with speaker labels; Google stopped producing a separate `Transcript by Gemini` file. Never edit it; it is a raw source, and a wrong interpretation must always be redoable from it.
+
+   **Not there yet? Fetch it** — from the repo root:
+   ```bash
+   node scripts/dispatch/meet-fetch.mjs --title "<meeting title>" --date <YYYY-MM-DD> \
+     --dir wiki/09_Meetings-and-Workshops/Transcripts
+   ```
+   It prints one line and is safe to re-run: presence is checked by `doc_id`, so a document already fetched is never downloaded twice, and renaming a file on disk does not cause a re-download. Add ` HH:MM` to `--date` only if the same meeting ran twice that day.
+
+   Three outcomes, all reported on that one line:
+   - **Fetched, transcript present** — proceed to step 5.
+   - **Fetched, `NO TRANSCRIPT`** — transcription was off for the meeting and only the summary exists. Write the report from the summary and **say so in the note**, rather than implying dialogue was read.
+   - **No document found** — Gemini has not generated it yet (it lags the meeting), or the meeting was never recorded. Stop and report; do not invent a report from the agenda.
+
+   First run on a machine needs consent once: `node scripts/dispatch/meet-fetch.mjs --auth`. If the script says the refresh token is no longer valid, that is the same command. Setup is in `docs/installation.md`.
 5. Write the report into the meeting note: summary, **decisions** (each with who decided and the ticket ids it affects), and action items.
 6. **Action items go in `## Action items` as `- [ ]` checkbox lines**, with an owner as a bold line above a group or an inline `**Name:**` prefix. **The Todos tab parses exactly this format** — a prose paragraph of "Kai will look into X" is invisible to the board. Set `open_actions:` to the number of unchecked items.
 7. **Fold the decisions into the affected tickets — this is the step everyone skips, and the reason it matters is that a decision living only in a meeting note has to be rediscovered by whoever next opens the ticket, and won't be.** For each decision: update the ticket, recording who decided and when. **Check `frozen:` first** — on a frozen ticket append a dated entry to the record zone or open a follow-up, never edit the contract zone. Recount `open_questions:` on anything a decision answered.

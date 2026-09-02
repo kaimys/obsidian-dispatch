@@ -32,6 +32,8 @@ Notes and shared settings never contain absolute paths. They reference repositor
 
 Because the device layer lives outside the vault (Windows: `%USERPROFILE%\.dispatch\`), it works with **any** sync — Obsidian Sync, Google Drive, git — without exclusion rules, and teammates can never overwrite each other's device config. The exact path is shown in the settings tab. A `local.json` from older versions found next to the plugin is migrated there and removed from the vault automatically.
 
+The device layer has a second, narrower scope for credentials that belong to an **account rather than a vault**: `~/.dispatch/<service>.json`, currently only [`google.json`](#dispatchgooglejson--this-google-account). Those files are owned by the repo-side scripts, not by the plugin, and one of them serves every project on the machine.
+
 The sections below describe both layers as the **settings UI** presents them. If you (or an agent) write the files directly, read [The config files on disk](#the-config-files-on-disk) — the stored JSON does not have the same shape as the UI's compact input forms.
 
 ## Board settings
@@ -251,6 +253,42 @@ const filename = `${vaultName}-${hash.toString(16)}.json`;
 
 *Settings → Dispatch → This device* prints the resolved path — prefer reading it there; the derivation above is for headless setup. The runs file that lifecycle hooks append to sits beside it, under the same basename: `~/.dispatch/runs/<vault>-<hash>.jsonl`.
 
+### `~/.dispatch/google.json` — this Google account
+
+Read by `scripts/dispatch/meet-fetch.mjs`, which imports a Google Meet meeting's Gemini document into the vault. **Not** a plugin file: the plugin never reads it, and the script runs from a plain shell without Obsidian.
+
+It is keyed by **account, not by vault** — one file serves every project on the machine, because a person normally has one Google account, and because a repo-side script has no way to derive the `<vault>-<hash>` name above (that hash is over the vault's absolute path, which only the plugin knows).
+
+Save the OAuth client JSON the Google Cloud Console gives you, **unchanged** — the nested `installed` block is understood as-is. Adding `account` is optional and only pre-selects the right identity on the consent screen:
+
+```json
+{
+  "installed": {
+    "client_id": "….apps.googleusercontent.com",
+    "client_secret": "…"
+  },
+  "account": "you@example.com"
+}
+```
+
+**One-time setup in the Google Cloud Console**, signed in as the account that holds the meetings:
+
+1. **APIs & Services → Library** — enable the **Google Drive API** and the **Google Docs API**.
+2. **Google Auth Platform → Branding** — an app home page, privacy policy and terms of service, all on a domain you have verified in [Search Console](https://search.google.com/search-console). Google rejects URLs on a domain you do not own, so a GitHub or plugin-directory page will not do.
+3. **Data Access → Add or remove scopes** — add both, pasting them into *Manually add scopes* if the picker does not list them:
+   - `https://www.googleapis.com/auth/drive.meet.readonly` — finds the meeting's document
+   - `https://www.googleapis.com/auth/documents.readonly` — reads it. Discovery and content are separate grants; with only the first, Google answers "not found" for the document it just listed.
+4. **Audience → Publish app** so the status is **In production**. In *Testing*, Google expires the refresh token after **7 days** and you re-authorise every week. Do **not** submit for verification: a restricted scope makes that an annual third-party CASA assessment, and an unverified production client works for its own owner.
+5. **Credentials → Create credentials → OAuth client ID → Desktop app.** Desktop clients accept a loopback redirect with no registered URI, which is what the script uses.
+
+Then, once per machine:
+
+```bash
+node scripts/dispatch/meet-fetch.mjs --auth
+```
+
+An **"unverified app"** screen is expected — *Advanced → Go to … (unsafe)*. That is the consequence of step 4, not a fault. The refresh token is written back into `google.json` and every later run is non-interactive. Re-run `--auth` if the script ever reports the token as no longer valid; Google revokes them on a password change.
+
 ## Security model
 
 Vault content is data, not code. Because notes sync across a team, Dispatch is built so that a note can never execute an arbitrary command:
@@ -266,6 +304,7 @@ Caveat: commands run through your system shell. On Windows (`cmd.exe`), `%VAR%` 
 - **Executes local processes** — but only commands *you* configure on *your* device. Note content can never introduce a command; the confirmation dialog is on by default.
 - **Reads/writes outside the vault** — device settings at `~/.dispatch/<vault>-<hash>.json` and run records at `~/.dispatch/runs/…jsonl`, deliberately outside the vault so machine paths never sync.
 - **One network request type** — if (and only if) you configure a calendar ICS URL, the plugin fetches that feed read-only (cached 15 min) for the Meetings tab. Nothing else leaves your machine; no telemetry. Commands you configure act under your own credentials.
+- **The plugin makes no Google requests.** `scripts/dispatch/meet-fetch.mjs` does, when you run it — read-only, against your own Drive, with credentials you supply. It ships in this repository, not in the plugin bundle, and the plugin never reads `google.json`. See the [privacy policy](https://eightnine.de/dispatch/privacy.html) for what those scopes cover.
 
 ## Building from source
 
