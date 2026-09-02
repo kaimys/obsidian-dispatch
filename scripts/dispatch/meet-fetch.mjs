@@ -38,23 +38,18 @@
  *
  * Discovery
  * ---------
- * The CALENDAR FEED, and by default only that: the ICS carries each meeting's
- * document as an `ATTACH` property, and reading it costs no Google permission
- * at all. When the feed has no link — a recurring series, or a meeting aged out
- * of the window — pass `--doc <url or id>`, or opt into the Drive search with
- * `--drive`.
+ * The CALENDAR FEED, and only that: the ICS carries each meeting's document as
+ * an `ATTACH` property, and reading it costs no Google permission at all.
+ * Recurring meetings work — Google attaches the notes to the occurrence, which
+ * appears in the feed in its own right. When the feed has no link, because the
+ * meeting has aged out of its window or the series has ended, the user pastes
+ * the link with `--doc` or downloads the document by hand. Nothing searches
+ * Drive.
  *
  * Scopes
  * ------
- * ONE by default: `documents.readonly`, which is a *sensitive* scope. Nothing
- * else is asked for.
- *
- * `--drive` adds `drive.meet.readonly` for the fallback search. That one is
- * RESTRICTED, which means verifying an OAuth client on it needs an annual
- * third-party CASA assessment — the reason a user would otherwise have to
- * create their own Google Cloud project. It buys exactly one thing: finding a
- * recurring series, whose master calendar entry carries no attachment. Ask for
- * it deliberately or not at all.
+ * Exactly one: `documents.readonly`, which is *sensitive* rather than
+ * restricted. Nothing else is ever requested.
  *
  * Config: the vault's own device file, `~/.dispatch/<vault>-<hash>.json`, under
  * a `google` key — this is a Dispatch-scope script, so its settings are ordinary
@@ -76,29 +71,20 @@ import { pathToFileURL } from "node:url";
 const DISPATCH_DIR = join(homedir(), ".dispatch");
 /** Withdrawn by ADR-0027; still read once, to migrate it. */
 const LEGACY_CONFIG = join(DISPATCH_DIR, "google.json");
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.meet.readonly";
 const DOCS_SCOPE = "https://www.googleapis.com/auth/documents.readonly";
 
 /**
- * --docs-only: ask for `documents.readonly` alone and take content from the
- * Docs API instead of Drive's export.
+ * ONE scope, and it is a *sensitive* one rather than a restricted one.
  *
- * An experiment, not the shipped default. `drive.meet.readonly` is a
- * **restricted** scope, so verifying a Dispatch-owned OAuth client on it needs
- * an annual third-party CASA assessment; `documents.readonly` is merely
- * sensitive. If discovery can be dropped — the user pastes the document URL
- * once instead — the restricted scope goes with it and a shipped client becomes
- * verifiable, which is what would let other people use this without creating
- * their own Google Cloud project.
- *
- * This flag exists to prove the one assumption that argument rests on: that
- * `documents.get` really works under `documents.readonly` alone, rather than
- * only in the presence of the Drive scope it has always been paired with here.
+ * `drive.meet.readonly` was requested until 2026-09-02, for discovery. It is
+ * RESTRICTED, which means verifying an OAuth client on it needs an annual
+ * third-party CASA assessment — the single reason a user would otherwise have
+ * to create their own Google Cloud project just to import a transcript. The
+ * calendar feed identifies the document without it, so it is gone rather than
+ * demoted: a permission the code can still ask for is a permission the privacy
+ * policy has to describe.
  */
-// `--docs-only` was the experiment; it is now simply how this works, and the
-// flag is accepted silently so an older command line still runs.
-const WITH_DRIVE = process.argv.includes("--drive");
-const SCOPES = WITH_DRIVE ? [DOCS_SCOPE, DRIVE_SCOPE].join(" ") : DOCS_SCOPE;
+const SCOPES = DOCS_SCOPE;
 
 const TOKEN_KEY = "refresh_token";
 
@@ -150,25 +136,6 @@ function normaliseTitle(title) {
 }
 
 /**
- * Title + date identify a meeting, per the recorded decision — not the Meet
- * code, which never reaches the plugin (src/calendar.ts discards it).
- *
- * `when` is `YYYY-MM-DD`, optionally with ` HH:MM`. The time is what separates
- * a recurring meeting held twice in one day; omit it and any meeting that day
- * matches, which is the common case and the one the board's `meeting_date`
- * property can express.
- */
-export function matchesMeeting(parsed, title, when) {
-	if (!parsed) return false;
-	if (!titlesMatch(parsed.title, title)) return false;
-	if (!when) return true;
-	const [date, time] = String(when).trim().split(/[ T]/);
-	if (date && parsed.date !== date) return false;
-	if (time && parsed.time !== time.slice(0, 5)) return false;
-	return true;
-}
-
-/**
  * Do two titles name the same meeting? Normalised equality, or either one
  * containing the other.
  *
@@ -185,42 +152,6 @@ export function titlesMatch(a, b) {
 	const y = normaliseTitle(b);
 	if (!x || !y) return false;
 	return x === y || x.includes(y) || y.includes(x);
-}
-
-/**
- * Choose the document for a meeting from what the search returned.
- *
- * **Date first, title second.** The date is the strong key — the note is named
- * `YYYY-MM-DD - …` and carries `meeting_date:`, both machine-written — whereas
- * the title is typed by a human on one side and generated by Google on the
- * other. A day almost always holds one meeting, so the title is needed only to
- * separate two, and demanding it up front is what turned a translated title
- * into a dead end.
- *
- * Returns `{file, parsed, titleAgrees}`, or null when nothing fits or when two
- * candidates remain indistinguishable — the caller reports rather than guesses.
- */
-export function pickCandidate(files, title, when) {
-	const all = (files || [])
-		.map((file) => ({ file, parsed: parseArtifactName(file.name) }))
-		.filter((c) => c.parsed);
-
-	const [date, time] = String(when || "").trim().split(/[ T]/);
-	let pool = date ? all.filter((c) => c.parsed.date === date) : all;
-
-	// A time narrows only when it actually hits; otherwise it is ignored rather
-	// than allowed to empty the pool, since `meeting_date:` usually has no time.
-	if (time) {
-		const exact = pool.filter((c) => c.parsed.time === time.slice(0, 5));
-		if (exact.length) pool = exact;
-	}
-
-	if (pool.length === 1) {
-		return { ...pool[0], titleAgrees: titlesMatch(pool[0].parsed.title, title) };
-	}
-	const byTitle = pool.filter((c) => titlesMatch(c.parsed.title, title));
-	if (byTitle.length === 1) return { ...byTitle[0], titleAgrees: true };
-	return null;
 }
 
 /**
@@ -253,32 +184,6 @@ export function renderFrontmatter(meta) {
 		"---",
 		"",
 	].join("\n");
-}
-
-/**
- * The `files.list` q for a meeting. Pure, so it is assertable.
- *
- * **Filters on the date, not the title**, whenever a date is known. Drive's
- * `name contains` is token-AND with per-token prefix matching, order-blind and
- * not substring — measured 2026-09-02 against the real corpus:
- *
- *   contains 'Dispatch Einführung'  (wrong order)  -> 1 hit
- *   contains 'Einfüh'               (prefix)       -> 1 hit
- *   contains 'führung'              (infix)        -> 0 hits
- *   contains 'Dispatch Introduction'               -> 0 hits
- *
- * So one wrong word in the title zeroes the result server-side, and no
- * client-side leniency can recover a candidate the query never returned. The
- * date has no such failure mode: '2026/09/01', '2026-09-01' and '2026 09 01'
- * all match the same file, because the separators are tokenised away.
- */
-export function driveQuery(title, date) {
-	const quote = (s) => String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-	const clauses = ["mimeType = 'application/vnd.google-apps.document'", "trashed = false"];
-	const day = String(date || "").trim().slice(0, 10);
-	if (/^\d{4}-\d{2}-\d{2}$/.test(day)) clauses.push(`name contains '${quote(day)}'`);
-	else if (title) clauses.push(`name contains '${quote(title)}'`);
-	return clauses.join(" and ");
 }
 
 /**
@@ -397,10 +302,14 @@ export function docsToMarkdown(doc) {
  *   ATTACH;FILENAME=Notizen von Gemini;FMTTYPE=application/vnd.google-apps.document
  *    :https://docs.google.com/document/d/1Add4g…/edit?usp=meet_tnfm_calendar
  *
- * Known limit, measured 2026-09-02: a RECURRING event's master entry carries no
- * attachment, and the feed contains no per-occurrence override, so a weekly
- * series is not discoverable this way. One-off meetings are. `--doc` covers the
- * rest.
+ * A recurring meeting appears twice: the series master, which carries no
+ * attachment, and the occurrence that actually happened, which does. Filtering
+ * to events that have a document is therefore enough — measured 2026-09-02
+ * against a live weekly series, which fetched correctly.
+ *
+ * The real limit is the feed's window, not recurrence. A series that has
+ * already ENDED shows only its master, so its documents are unreachable this
+ * way; `--doc` covers those.
  */
 export function parseIcsEvents(ics) {
 	// RFC 5545 folds long lines with a leading space or tab; the ATTACH URLs are
@@ -429,7 +338,7 @@ export function parseIcsEvents(ics) {
 }
 
 /**
- * The event whose document we want. Same rule as `pickCandidate`: the date
+ * The event whose document we want. The date
  * carries the match, the title only separates two meetings on one day.
  */
 export function pickIcsEvent(events, title, when) {
@@ -594,10 +503,7 @@ async function tokenRequest(params) {
  * does not run — which is how a dead token became a dead end on 2026-09-02.
  */
 function authCommand(path) {
-	return (
-		`node scripts/dispatch/meet-fetch.mjs --config "${path}" --auth` +
-		(WITH_DRIVE ? " --drive" : "")
-	);
+	return `node scripts/dispatch/meet-fetch.mjs --config "${path}" --auth`;
 }
 
 /** An access token from the stored refresh token. The normal path. */
@@ -754,17 +660,14 @@ async function authorize(store) {
 	}
 }
 
-async function driveList(token, q) {
-	const url = new URL("https://www.googleapis.com/drive/v3/files");
-	url.searchParams.set("q", q);
-	url.searchParams.set("fields", "files(id,name,mimeType,modifiedTime)");
-	url.searchParams.set("pageSize", "50");
-	const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-	if (!res.ok) {
-		throw new Failure(`Drive search failed (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
-	}
-	return (await res.json()).files || [];
-}
+/*
+ * `driveList` used to live here, searching Drive for a meeting's document.
+ * Removed 2026-09-02 with the Drive scope itself. The calendar feed names the
+ * document, so the search bought only the recurring-series case — not worth a
+ * restricted permission that every user would have to grant, and that a privacy
+ * policy would then have to describe. That case falls back to a pasted link or
+ * a hand-downloaded file.
+ */
 
 /** Content via the Docs API, the --docs-only path. */
 async function documentsGet(token, id) {
@@ -802,35 +705,46 @@ function arg(name) {
 }
 
 /**
- * Print what the search actually returned, so a no-match is one line from being
- * diagnosed instead of needing a session of guessed titles.
+ * Print what the calendar feed actually holds, so a no-match is one line from
+ * being diagnosed instead of needing a session of guessed titles.
  *
- * If the date-filtered query came back empty, widen to every Gemini document in
- * reach: the answer is then visible even when both the title and the date were
- * wrong.
+ * Events without a document are shown too, and why: a meeting that produced no
+ * notes and a recurring series that carries none look identical from the
+ * outside, and only the second has a remedy.
  */
-async function reportCandidates(token, candidates, date) {
-	const show = (label, files) => {
-		if (!files.length) {
-			say(`  ${label}: none.`);
+async function reportCalendar(icsUrl, date) {
+	if (!icsUrl) {
+		say(`  No calendar feed configured, so there is nothing to look in.`);
+		say(`  Set the calendar URL in Dispatch's settings, or pass --doc <url or id>.`);
+		return;
+	}
+	let events;
+	try {
+		const res = await fetch(icsUrl);
+		if (!res.ok) {
+			say(`  Calendar feed returned HTTP ${res.status}.`);
 			return;
 		}
-		say(`  ${label}:`);
-		for (const f of files) {
-			const p = parseArtifactName(f.name);
-			say(p ? `    · ${p.date} ${p.time}  "${p.title}"` : `    · ${f.name}`);
-		}
-	};
+		events = parseIcsEvents(await res.text());
+	} catch (e) {
+		say(`  Calendar feed unreachable: ${e.message}`);
+		return;
+	}
 
-	show(date ? `Documents on ${date}` : "Documents considered", candidates);
-	if (candidates.length) return;
-
-	const all = await driveList(
-		token,
-		"mimeType = 'application/vnd.google-apps.document' and trashed = false and name contains 'Gemini'"
-	);
-	show("Every Gemini document this account can reach", all);
-	say(`  Re-run with --title and --date taken from one of the lines above.`);
+	const shown = date ? events.filter((e) => e.date === date) : events;
+	if (!shown.length) {
+		say(date ? `  No event on ${date} in the feed.` : `  The feed holds no events.`);
+		return;
+	}
+	say(`  ${date ? `Events on ${date}` : "Events in the feed"}:`);
+	for (const e of shown) {
+		const note = e.docId
+			? `doc ${e.docId}`
+			: e.recurring
+				? "series master, no link — look for the occurrence's own row above"
+				: "no document link yet";
+		say(`    · ${e.date}  "${e.title}"  — ${note}`);
+	}
 }
 
 /**
@@ -947,8 +861,8 @@ export async function main() {
 	const dryRun = process.argv.includes("--dry-run");
 
 	if (process.argv.includes("--list")) {
-		const token = await accessToken(store);
-		await reportCandidates(token, await driveList(token, driveQuery(title, date)), date);
+		// Needs no Google permission at all — the feed is a secret URL, not an API.
+		await reportCalendar(store.cfg.calendar_url, date);
 		return 0;
 	}
 
@@ -965,14 +879,12 @@ export async function main() {
 			`Usage: meet-fetch.mjs --title "<meeting title>" --date YYYY-MM-DD --dir <folder>\n` +
 				`       meet-fetch.mjs --doc <url or id> --dir <folder>\n` +
 				`       meet-fetch.mjs --list [--date YYYY-MM-DD]\n` +
-				`       meet-fetch.mjs --auth [--drive]`
+				`       meet-fetch.mjs --auth`
 		);
 	}
 
-	// The calendar feed is the DEFAULT discovery path, because it costs no
-	// Google scope: the ICS carries each meeting's document as an ATTACH. Drive
-	// search below is the fallback for what the feed cannot see — recurring
-	// series, and anything aged out of the window.
+	// The calendar feed is the ONLY discovery path, because it costs no Google
+	// permission: the ICS carries each meeting's document as an ATTACH.
 	if (store.cfg.calendar_url && title) {
 		const found = await discoverViaCalendar(store.cfg.calendar_url, title, date);
 		if (found) {
@@ -987,47 +899,19 @@ export async function main() {
 		}
 	}
 
-	if (!WITH_DRIVE) {
-		// The calendar feed is the only discovery this asks permission for. When
-		// it comes up empty the honest options are a document link or, for the
-		// blind spot it has, opting into the Drive search explicitly.
-		throw new Failure(
-			`The calendar feed did not yield a document for "${title}"${date ? ` on ${date}` : ""}.\n` +
-				`  Either paste the document:   --doc <url or id> --dir <folder>\n` +
-				`  or search Drive for it:      --auth --drive   (then re-run with --drive)\n\n` +
-				`  Searching Drive needs drive.meet.readonly, a RESTRICTED Google scope. It is not\n` +
-				`  requested by default because it is what a recurring series needs and nothing\n` +
-				`  else — the feed carries the link for every one-off meeting.`
-		);
-	}
-
-	const token = await accessToken(store);
-	const candidates = await driveList(token, driveQuery(title, date));
-	const match = pickCandidate(candidates, title, date);
-
-	if (!match) {
-		// Not a failure: a meeting whose document has not been generated yet is
-		// an ordinary state. But "not generated yet" and "your title is wrong"
-		// used to print the same line, which is how a translated title became a
-		// dead end on 2026-09-02 — so always show what was actually considered.
-		say(`No Gemini document matched "${title}"${date ? ` on ${date}` : ""}.`);
-		await reportCandidates(token, candidates, date);
-		return 1;
-	}
-
-	const { file, parsed, titleAgrees } = match;
-	if (!titleAgrees) {
-		// Taken on the date alone. Say so rather than silently accepting it: the
-		// alternative is a report written from the wrong meeting's transcript.
-		say(
-			`Note: matched on the date alone — the document is called "${parsed.title}", ` +
-				`you asked for "${title}". It is the only meeting on ${parsed.date}.`
-		);
-	}
-	// Drive found which document; fetching it is the same job as --doc, so it
-	// goes through the same path rather than a second copy of it.
-	say(`Found via Drive search: ${parsed.date} "${parsed.title}" -> doc ${file.id}`);
-	return await fetchByDocId(store, file.id, dir, dryRun);
+	// Nothing in the feed. Not a failure — a meeting Gemini has not processed
+	// yet is an ordinary state — so report what was actually looked at and name
+	// both ways forward. Searching Drive is deliberately not one of them.
+	say(`No document found for "${title}"${date ? ` on ${date}` : ""} in the calendar feed.`);
+	await reportCalendar(store.cfg.calendar_url, date);
+	say(
+		`\n  Two ways on:\n` +
+			`   1. Paste the document link:  --doc <url or id> --dir <folder>\n` +
+			`   2. Download it by hand from Google Docs (File -> Download -> Markdown,\n` +
+			`      both tabs) into ${dir}\n` +
+			`  If Gemini simply has not finished yet, waiting a few minutes is the third.`
+	);
+	return 1;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {

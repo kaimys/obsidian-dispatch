@@ -1,12 +1,12 @@
 /**
  * The pure core of the Meet fetch (US00001). Everything network-facing is a
  * thin shell over these, which is what keeps the suite meaningful without
- * stubbing Google — the OAuth flow and real Drive responses are the spike's job
- * and the manual test plan's, not CI's.
+ * stubbing Google — the OAuth flow and real API responses belong to the manual
+ * test plan, not to CI.
  *
- * The cases here are the ones that actually bit during the spike: two filename
- * spellings for the same document, presence checked by id rather than name, and
- * a document that carries no transcript because transcription was switched off.
+ * The cases here are the ones that actually bit: two filename spellings for the
+ * same document, presence checked by id rather than name, an ICS ATTACH folded
+ * across three lines, and a document whose transcript is in a second tab.
  */
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,15 +15,12 @@ import { describe, expect, it } from "vitest";
 import {
 	artifactKind,
 	docsToMarkdown,
-	driveQuery,
 	parseDocId,
 	parseIcsEvents,
 	pickIcsEvent,
 	resolveConfigPath,
 	hasTranscriptSection,
-	matchesMeeting,
 	parseArtifactName,
-	pickCandidate,
 	renderFrontmatter,
 	safeFileName,
 	scanFetched,
@@ -67,69 +64,6 @@ describe("parseArtifactName", () => {
 	});
 });
 
-describe("matchesMeeting", () => {
-	const parsed = parseArtifactName(DRIVE_NAME);
-
-	it("matches on title and date", () => {
-		expect(matchesMeeting(parsed, "Einführung in Dispatch", "2026-09-01")).toBe(true);
-	});
-
-	it("ignores case, accents and punctuation in the title", () => {
-		// The board's note title and Google's filename are typed by different
-		// people at different times; only the words are reliably the same.
-		expect(matchesMeeting(parsed, "einfuhrung, in dispatch!", "2026-09-01")).toBe(true);
-	});
-
-	it("rejects the right title on the wrong day", () => {
-		expect(matchesMeeting(parsed, "Einführung in Dispatch", "2026-09-02")).toBe(false);
-	});
-
-	it("separates two meetings held the same day when a time is given", () => {
-		const morning = parseArtifactName("Standup - 2026/09/01 09:00 CEST - Notes by Gemini");
-		const evening = parseArtifactName("Standup - 2026/09/01 17:00 CEST - Notes by Gemini");
-		expect(matchesMeeting(morning, "Standup", "2026-09-01 09:00")).toBe(true);
-		expect(matchesMeeting(evening, "Standup", "2026-09-01 09:00")).toBe(false);
-		// Without a time, either is an acceptable match for that day.
-		expect(matchesMeeting(evening, "Standup", "2026-09-01")).toBe(true);
-	});
-
-	it("is false for an unparseable name rather than throwing", () => {
-		expect(matchesMeeting(null, "Anything", "2026-09-01")).toBe(false);
-	});
-});
-
-describe("driveQuery", () => {
-	it("restricts to untrashed Google Docs", () => {
-		const q = driveQuery("Einführung in Dispatch", "2026-09-01");
-		expect(q).toContain("mimeType = 'application/vnd.google-apps.document'");
-		expect(q).toContain("trashed = false");
-	});
-
-	it("filters on the date, not the title, when a date is known", () => {
-		// Measured against the real corpus on 2026-09-02: Drive's `name contains`
-		// is token-AND with prefix matching, so one wrong word zeroes the result
-		// server-side and no client-side leniency can recover it. The date has no
-		// such failure mode.
-		const q = driveQuery("Dispatch Introduction", "2026-09-01");
-		expect(q).toContain("name contains '2026-09-01'");
-		expect(q).not.toContain("Dispatch Introduction");
-	});
-
-	it("falls back to the title when no date is given", () => {
-		expect(driveQuery("Einführung in Dispatch", undefined)).toContain(
-			"name contains 'Einführung in Dispatch'"
-		);
-	});
-
-	it("ignores a date it cannot use", () => {
-		expect(driveQuery("Standup", "last Tuesday")).toContain("name contains 'Standup'");
-	});
-
-	it("escapes a quote instead of breaking the query", () => {
-		expect(driveQuery("Kai's Meeting", undefined)).toContain("name contains 'Kai\\'s Meeting'");
-	});
-});
-
 describe("titlesMatch", () => {
 	it("accepts a title that contains the other", () => {
 		expect(titlesMatch("Product Weekly", "Charles Product Weekly")).toBe(true);
@@ -143,56 +77,6 @@ describe("titlesMatch", () => {
 	it("is false for an empty side rather than matching everything", () => {
 		expect(titlesMatch("", "Standup")).toBe(false);
 		expect(titlesMatch("Standup", "  ")).toBe(false);
-	});
-});
-
-describe("pickCandidate", () => {
-	const file = (name: string, id = name) => ({ id, name });
-
-	const dispatch = file(DRIVE_NAME, "1Add4g");
-	const weeklyA = file("Charles Product Weekly - 2026/07/28 09:14 CEST - Notes by Gemini", "w1");
-	const standupAm = file("Standup - 2026/09/03 09:00 CEST - Notes by Gemini", "s1");
-	const standupPm = file("Standup - 2026/09/03 17:00 CEST - Notes by Gemini", "s2");
-	const other = file("Retro - 2026/09/03 11:00 CEST - Notes by Gemini", "r1");
-
-	it("matches on the date when the titles share nothing at all", () => {
-		// The 2026-09-02 failure, exactly: the wiki note is "Dispatch
-		// Introduction", the calendar event was "Einführung in Dispatch".
-		const picked = pickCandidate([dispatch], "Dispatch Introduction", "2026-09-01");
-		expect(picked?.file.id).toBe("1Add4g");
-		expect(picked?.titleAgrees).toBe(false);
-	});
-
-	it("reports that the title agreed when it did", () => {
-		const picked = pickCandidate([dispatch], "Einführung in Dispatch", "2026-09-01");
-		expect(picked?.titleAgrees).toBe(true);
-	});
-
-	it("ignores documents from other days", () => {
-		expect(pickCandidate([dispatch, weeklyA], "anything", "2026-09-01")?.file.id).toBe("1Add4g");
-	});
-
-	it("uses the title to separate two meetings on one day", () => {
-		expect(pickCandidate([standupAm, other], "Retro", "2026-09-03")?.file.id).toBe("r1");
-	});
-
-	it("uses the time to separate the same meeting held twice", () => {
-		expect(pickCandidate([standupAm, standupPm], "Standup", "2026-09-03 17:00")?.file.id).toBe("s2");
-	});
-
-	it("returns null rather than guessing between two equal candidates", () => {
-		// Two same-titled meetings that day and no time given: reporting beats
-		// picking one and writing a report from the wrong transcript.
-		expect(pickCandidate([standupAm, standupPm], "Standup", "2026-09-03")).toBeNull();
-	});
-
-	it("returns null when nothing was recorded that day", () => {
-		expect(pickCandidate([dispatch], "Einführung in Dispatch", "2026-09-05")).toBeNull();
-	});
-
-	it("survives an empty list and unparseable names", () => {
-		expect(pickCandidate([], "Standup", "2026-09-03")).toBeNull();
-		expect(pickCandidate([file("not an artifact.md")], "Standup", "2026-09-03")).toBeNull();
 	});
 });
 
@@ -366,10 +250,11 @@ describe("parseIcsEvents", () => {
 		expect(parseIcsEvents(FEED)[1].date).toBe("2026-07-21");
 	});
 
-	it("marks a recurring master, which carries no attachment", () => {
-		// Measured 2026-09-02 against the real feed: the series master has no
-		// ATTACH and the feed holds no per-occurrence override, so a weekly
-		// meeting is not discoverable this way. Named so the gap is visible.
+	it("marks a series master, which carries no attachment of its own", () => {
+		// Google attaches the notes to the OCCURRENCE, which the feed lists
+		// separately — so a live recurring meeting is discoverable and only the
+		// master looks empty. Verified 2026-09-02 by fetching one. Filtering to
+		// events that have a document is what makes the master harmless.
 		const weekly = parseIcsEvents(FEED)[1];
 		expect(weekly.recurring).toBe(true);
 		expect(weekly.docId).toBe("");

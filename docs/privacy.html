@@ -17,8 +17,8 @@
 <p class="effective"><strong>Effective 2 September 2026.</strong> Supersedes the version of
 31 August 2026. What changed: Dispatch now finds a meeting's document through your calendar
 rather than by searching your Drive, so it asks for <strong>one</strong> permission instead of
-two, and Drive access became optional and off by default. This page also now describes the
-calendar feed, which the earlier version did not mention.</p>
+two and no longer requests any access to Google Drive whatsoever. This page also now describes
+the calendar feed, which the earlier version did not mention.</p>
 
 <p>Dispatch is an open-source plugin for <a href="https://obsidian.md">Obsidian</a>, published
 under the MIT licence by Kai Mysliwiec. This policy explains what data Dispatch touches, where
@@ -40,8 +40,8 @@ you have configured on your own machine. It does not transmit your notes anywher
 <h2>Google account data</h2>
 
 <p>One optional feature connects to Google. When you use Dispatch's meeting-transcript import, a
-script running on your computer asks Google for permission to read meeting artifacts from your
-Google Drive.</p>
+script running on your computer asks Google for permission to read the Google Doc that Gemini
+wrote for a meeting — and nothing else.</p>
 
 <h3>What we request, and why</h3>
 
@@ -54,22 +54,16 @@ Google Drive.</p>
 <tr>
 <td><code>https://www.googleapis.com/auth/documents.readonly</code></td>
 <td>Read-only access to your Google Docs</td>
-<td>To read the meeting document. This is the only scope Dispatch asks for</td>
-</tr>
-<tr>
-<td><code>https://www.googleapis.com/auth/drive.meet.readonly</code><br><em>optional, off by default</em></td>
-<td>Read-only access to the Google Drive files created by Google Meet — the meeting documents
-Gemini produces, and nothing else in your Drive</td>
-<td>Only if you opt in, to search for a recurring meeting whose calendar entry carries no
-document link. Not requested unless you ask for it</td>
+<td>To read the meeting document. This is the only permission Dispatch ever asks for</td>
 </tr>
 </tbody>
 </table>
 </div>
 
-<p>Both are <strong>read-only</strong>. Dispatch requests no permission to modify, create or
-delete anything in your Google Drive or your documents, and it never requests
-<code>drive.readonly</code>, which would grant read access to your entire Drive.</p>
+<p>It is <strong>read-only</strong>, and it is the whole list. Dispatch requests no permission to
+modify, create or delete anything, and <strong>no access to your Google Drive at all</strong> —
+not <code>drive.readonly</code>, which would expose every file you own, and not the narrower
+Meet-files scope either. It cannot list, search or browse your Drive, because it never asks to.</p>
 
 <p><strong>Which document to fetch comes from your calendar, not from searching your Drive.</strong>
 If you have given Dispatch your calendar's secret iCal address for its Meetings view, each event

@@ -283,12 +283,12 @@ Upgrading from an earlier version? A `~/.dispatch/google.json` from before this 
 
 **One-time setup in the Google Cloud Console**, signed in as the account that holds the meetings:
 
-1. **APIs & Services → Library** — enable the **Google Docs API**. (The Google Drive API is needed only for the optional `--drive` fallback in step 3.)
+1. **APIs & Services → Library** — enable the **Google Docs API**. Nothing else; the Drive API is not used.
 2. **Google Auth Platform → Branding** — an app home page, privacy policy and terms of service, all on a domain you have verified in [Search Console](https://search.google.com/search-console). Google rejects URLs on a domain you do not own, so a GitHub or plugin-directory page will not do.
 3. **Data Access → Add or remove scopes** — add **one**, pasting it into *Manually add scopes* if the picker does not list it:
    - `https://www.googleapis.com/auth/documents.readonly` — reads the meeting document. That is all the script needs: the calendar feed tells it *which* document, so nothing has to search your Drive.
 
-   Add `https://www.googleapis.com/auth/drive.meet.readonly` **only** if you need the `--drive` fallback for a recurring meeting series, whose calendar entry carries no attachment. It is a **restricted** scope, so an app verified on it needs an annual third-party security assessment — which is precisely why it is not requested by default.
+   That is the entire list. Dispatch asks for **no Google Drive access of any kind** — a Drive scope is *restricted*, meaning an app verified on one needs an annual third-party security assessment, and the calendar feed makes it unnecessary.
 4. **Audience → Publish app** so the status is **In production**. In *Testing*, Google expires the refresh token after **7 days** and you re-authorise every week. Do **not** submit for verification: a restricted scope makes that an annual third-party CASA assessment, and an unverified production client works for its own owner.
 5. **Credentials → Create credentials → OAuth client ID → Desktop app.** Desktop clients accept a loopback redirect with no registered URI, which is what the script uses.
 
