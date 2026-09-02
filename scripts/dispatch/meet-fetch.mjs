@@ -307,15 +307,20 @@ export function parseDocId(input) {
  *    in Markdown — it renders literally. The markers have to hug the text.
  */
 export function docsToMarkdown(doc) {
+	// Each tab contributes its title as a heading, which is what Drive's own
+	// export does — for a Gemini meeting document those are "📝 Notizen" and
+	// "📖 Transkript", i.e. the labels that tell a reader where the summary
+	// stops and the dialogue starts.
 	const bodies = [];
 	const walk = (tabs) => {
 		for (const tab of tabs || []) {
-			if (tab.documentTab?.body) bodies.push(tab.documentTab.body);
+			const title = tab.tabProperties?.title;
+			if (tab.documentTab?.body) bodies.push({ title, body: tab.documentTab.body });
 			walk(tab.childTabs);
 		}
 	};
 	walk(doc?.tabs);
-	if (!bodies.length && doc?.body) bodies.push(doc.body);
+	if (!bodies.length && doc?.body) bodies.push({ body: doc.body });
 
 	const emphasise = (text, marker) => {
 		const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text);
@@ -323,7 +328,15 @@ export function docsToMarkdown(doc) {
 	};
 
 	const out = [];
-	for (const el of bodies.flatMap((b) => b.content || [])) {
+	const elements = bodies.flatMap(({ title, body }) => [
+		...(title ? [{ tabTitle: title }] : []),
+		...(body.content || []),
+	]);
+	for (const el of elements) {
+		if (el.tabTitle) {
+			out.push(`# ${el.tabTitle}`);
+			continue;
+		}
 		const p = el.paragraph;
 		if (!p) continue;
 		const heading = /^HEADING_(\d)$/.exec(p.paragraphStyle?.namedStyleType || "");

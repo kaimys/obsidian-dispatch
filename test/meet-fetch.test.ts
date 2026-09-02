@@ -279,7 +279,24 @@ describe("parseDocId", () => {
 describe("docsToMarkdown", () => {
 	const run = (content: string, textStyle = {}) => ({ textRun: { content, textStyle } });
 	const para = (elements: unknown[], extra = {}) => ({ paragraph: { elements, ...extra } });
-	const tab = (content: unknown[]) => ({ documentTab: { body: { content } } });
+	const tab = (content: unknown[], title?: string) => ({
+		...(title ? { tabProperties: { title } } : {}),
+		documentTab: { body: { content } },
+	});
+
+	it("emits each tab's title as a heading, as Drive's export does", () => {
+		// "📝 Notizen" / "📖 Transkript" are what tell a reader where the summary
+		// stops and the dialogue starts. Dropping them was the last gap against
+		// the export — 74 headings instead of 76.
+		const md = docsToMarkdown({
+			tabs: [
+				tab([para([run("summary")])], "📝 Notizen"),
+				tab([para([run("dialogue")])], "📖 Transkript"),
+			],
+		});
+		expect(md).toContain("# 📝 Notizen");
+		expect(md).toContain("# 📖 Transkript");
+	});
 
 	it("walks every tab, not just the first", () => {
 		// The Gemini meeting document has two: notes, then transcript. Without
