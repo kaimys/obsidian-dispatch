@@ -14,7 +14,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
 	artifactKind,
+	docsToMarkdown,
 	driveQuery,
+	parseDocId,
 	hasTranscriptSection,
 	matchesMeeting,
 	parseArtifactName,
@@ -253,6 +255,113 @@ describe("hasTranscriptSection", () => {
 
 	it("is not fooled by a single bold line in the summary", () => {
 		expect(hasTranscriptSection("# Notizen\n\n**Ergebnis:** wir bauen es.\n")).toBe(false);
+	});
+});
+
+describe("parseDocId", () => {
+	const ID = "1Add4g__42SvoPqt38tL3yYx_SBINXalKcfBlAM13kYM";
+
+	it("takes the id out of whatever the user pasted", () => {
+		expect(parseDocId(`https://docs.google.com/document/d/${ID}/edit?tab=t.0`)).toBe(ID);
+		expect(parseDocId(`https://docs.google.com/document/d/${ID}`)).toBe(ID);
+		expect(parseDocId(ID)).toBe(ID);
+		expect(parseDocId(`  ${ID}  `)).toBe(ID);
+	});
+
+	it("returns null rather than guessing at something unusable", () => {
+		expect(parseDocId("https://example.com/nothing")).toBeNull();
+		expect(parseDocId("Dispatch Introduction")).toBeNull();
+		expect(parseDocId("")).toBeNull();
+		expect(parseDocId(undefined)).toBeNull();
+	});
+});
+
+describe("docsToMarkdown", () => {
+	const run = (content: string, textStyle = {}) => ({ textRun: { content, textStyle } });
+	const para = (elements: unknown[], extra = {}) => ({ paragraph: { elements, ...extra } });
+	const tab = (content: unknown[]) => ({ documentTab: { body: { content } } });
+
+	it("walks every tab, not just the first", () => {
+		// The Gemini meeting document has two: notes, then transcript. Without
+		// includeTabsContent the API returns only the first — 200 OK, and the
+		// dialogue silently absent.
+		const md = docsToMarkdown({
+			tabs: [tab([para([run("notes half")])]), tab([para([run("transcript half")])])],
+		});
+		expect(md).toContain("notes half");
+		expect(md).toContain("transcript half");
+	});
+
+	it("falls back to body when the response has no tabs", () => {
+		expect(docsToMarkdown({ body: { content: [para([run("plain")])] } })).toContain("plain");
+	});
+
+	it("keeps emphasis markers hugging the text", () => {
+		// Google's bold range usually swallows the trailing space, and
+		// `**Name: **` is not emphasis in Markdown — it renders literally.
+		const md = docsToMarkdown({
+			body: { content: [para([run("Kai Mysliwiec: ", { bold: true }), run("Also, kurz zum Board.")])] },
+		});
+		expect(md).toContain("**Kai Mysliwiec:** Also, kurz zum Board.");
+		expect(md).not.toContain("**Kai Mysliwiec: **");
+	});
+
+	it("renders headings at their level", () => {
+		const md = docsToMarkdown({
+			body: {
+				content: [
+					para([run("Zusammenfassung")], { paragraphStyle: { namedStyleType: "HEADING_3" } }),
+					para([run("Titel")], { paragraphStyle: { namedStyleType: "HEADING_1" } }),
+				],
+			},
+		});
+		expect(md).toContain("### Zusammenfassung");
+		expect(md).toContain("# Titel");
+	});
+
+	it("renders links, bullets and italics", () => {
+		const md = docsToMarkdown({
+			body: {
+				content: [
+					para([run("Transkript", { link: { url: "https://docs.google.com/x" } })]),
+					para([run("a point")], { bullet: {} }),
+					para([run("betont ", { italic: true })]),
+				],
+			},
+		});
+		expect(md).toContain("[Transkript](https://docs.google.com/x)");
+		expect(md).toContain("- a point");
+		expect(md).toContain("*betont*");
+	});
+
+	it("renders smart chips, which are not textRuns", () => {
+		// The two links missing from the first measurement were these: a person
+		// chip after "Eingeladen" and a linked calendar event after "Anhänge".
+		const md = docsToMarkdown({
+			body: {
+				content: [
+					para([
+						run("Eingeladen "),
+						{ person: { personProperties: { name: "Felix Schneider" } } },
+					]),
+					para([
+						run("Anhänge "),
+						{
+							richLink: {
+								richLinkProperties: { title: "Einführung in Dispatch", uri: "https://cal/x" },
+							},
+						},
+					]),
+				],
+			},
+		});
+		expect(md).toContain("Eingeladen Felix Schneider");
+		expect(md).toContain("[Einführung in Dispatch](https://cal/x)");
+	});
+
+	it("survives an empty or malformed document", () => {
+		expect(docsToMarkdown({})).toBe("\n");
+		expect(docsToMarkdown({ tabs: [] , body: { content: [] } })).toBe("\n");
 	});
 });
 

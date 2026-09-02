@@ -59,10 +59,31 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const CONFIG = join(homedir(), ".dispatch", "google.json");
-const SCOPES = [
-	"https://www.googleapis.com/auth/drive.meet.readonly",
-	"https://www.googleapis.com/auth/documents.readonly",
-].join(" ");
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.meet.readonly";
+const DOCS_SCOPE = "https://www.googleapis.com/auth/documents.readonly";
+
+/**
+ * --docs-only: ask for `documents.readonly` alone and take content from the
+ * Docs API instead of Drive's export.
+ *
+ * An experiment, not the shipped default. `drive.meet.readonly` is a
+ * **restricted** scope, so verifying a Dispatch-owned OAuth client on it needs
+ * an annual third-party CASA assessment; `documents.readonly` is merely
+ * sensitive. If discovery can be dropped — the user pastes the document URL
+ * once instead — the restricted scope goes with it and a shipped client becomes
+ * verifiable, which is what would let other people use this without creating
+ * their own Google Cloud project.
+ *
+ * This flag exists to prove the one assumption that argument rests on: that
+ * `documents.get` really works under `documents.readonly` alone, rather than
+ * only in the presence of the Drive scope it has always been paired with here.
+ */
+const DOCS_ONLY = process.argv.includes("--docs-only");
+const SCOPES = DOCS_ONLY ? DOCS_SCOPE : [DRIVE_SCOPE, DOCS_SCOPE].join(" ");
+
+// Two tokens live side by side, so running the experiment cannot revoke the
+// working setup out from under the normal path.
+const TOKEN_KEY = DOCS_ONLY ? "refresh_token_docs_only" : "refresh_token";
 
 // `console` is off-limits repo-wide (the Obsidian plugin ruleset lints scripts/
 // too); the other scripts here write through process.stdout for the same reason.
@@ -255,6 +276,86 @@ export function hasTranscriptSection(body) {
 	return (labels?.length ?? 0) >= 5;
 }
 
+/**
+ * A Google Docs id from whatever the user pasted — a full URL, a sharing link,
+ * or the bare id. Returns null rather than guessing at something unusable.
+ */
+export function parseDocId(input) {
+	const s = String(input || "").trim();
+	if (!s) return null;
+	const fromUrl = /\/document\/d\/([A-Za-z0-9_-]{20,})/.exec(s);
+	if (fromUrl) return fromUrl[1];
+	const fromQuery = /[?&]id=([A-Za-z0-9_-]{20,})/.exec(s);
+	if (fromQuery) return fromQuery[1];
+	return /^[A-Za-z0-9_-]{20,}$/.test(s) ? s : null;
+}
+
+/**
+ * Render a `documents.get` response as Markdown.
+ *
+ * Needed because the Docs API returns a structure where Drive's export returns
+ * finished Markdown — the price of dropping the Drive scope. Measured against
+ * that export on the 2026-09-01 meeting: 448 of 448 speaker labels, 103,404 of
+ * 105,288 bytes.
+ *
+ * Two things are easy to get wrong and both were:
+ *  - **Tabs.** A Gemini meeting document has two, notes and transcript, and
+ *    `documents.get` returns only the first unless `includeTabsContent=true` is
+ *    set. It answers 200 either way, so the transcript goes missing silently.
+ *  - **Whitespace inside a styled run.** Google's bold range usually includes
+ *    the trailing space ("Kai Mysliwiec: "), and `**Name: **` is not emphasis
+ *    in Markdown — it renders literally. The markers have to hug the text.
+ */
+export function docsToMarkdown(doc) {
+	const bodies = [];
+	const walk = (tabs) => {
+		for (const tab of tabs || []) {
+			if (tab.documentTab?.body) bodies.push(tab.documentTab.body);
+			walk(tab.childTabs);
+		}
+	};
+	walk(doc?.tabs);
+	if (!bodies.length && doc?.body) bodies.push(doc.body);
+
+	const emphasise = (text, marker) => {
+		const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text);
+		return core ? `${lead}${marker}${core}${marker}${trail}` : text;
+	};
+
+	const out = [];
+	for (const el of bodies.flatMap((b) => b.content || [])) {
+		const p = el.paragraph;
+		if (!p) continue;
+		const heading = /^HEADING_(\d)$/.exec(p.paragraphStyle?.namedStyleType || "");
+		let line = "";
+		for (const run of p.elements || []) {
+			// Smart chips are their own element types, not textRuns — a person
+			// chip and a linked calendar event both render as nothing if only
+			// textRun is handled, which is where the two missing links went.
+			if (run.person) {
+				line += run.person.personProperties?.name || run.person.personProperties?.email || "";
+				continue;
+			}
+			if (run.richLink) {
+				const props = run.richLink.richLinkProperties || {};
+				if (props.title) line += props.uri ? `[${props.title}](${props.uri})` : props.title;
+				continue;
+			}
+			const t = run.textRun;
+			if (!t?.content) continue;
+			let text = t.content.replace(/\n$/, "");
+			if (t.textStyle?.bold) text = emphasise(text, "**");
+			if (t.textStyle?.italic) text = emphasise(text, "*");
+			const url = t.textStyle?.link?.url;
+			if (url && text.trim()) text = `[${text.trim()}](${url})`;
+			line += text;
+		}
+		if (heading) out.push(`${"#".repeat(Math.min(6, Number(heading[1])))} ${line}`.trimEnd());
+		else out.push(p.bullet ? `- ${line}`.trimEnd() : line.trimEnd());
+	}
+	return out.join("\n").replace(/\n{3,}/g, "\n\n") + "\n";
+}
+
 /** Drive names carry characters no filesystem accepts. */
 export function safeFileName(name) {
 	return String(name)
@@ -303,18 +404,20 @@ async function tokenRequest(params) {
 
 /** An access token from the stored refresh token. The normal path. */
 async function accessToken(cfg) {
-	if (!cfg.refresh_token) {
+	if (!cfg[TOKEN_KEY]) {
 		throw new Failure(
-			`No refresh token in ${CONFIG}.\n` + `  Run: node scripts/dispatch/meet-fetch.mjs --auth`
+			`No ${TOKEN_KEY} in ${CONFIG}.\n` +
+				`  Run: node scripts/dispatch/meet-fetch.mjs --auth${DOCS_ONLY ? " --docs-only" : ""}`
 		);
 	}
 	try {
 		const tok = await tokenRequest({
 			client_id: cfg.client_id,
 			client_secret: cfg.client_secret,
-			refresh_token: cfg.refresh_token,
+			refresh_token: cfg[TOKEN_KEY],
 			grant_type: "refresh_token",
 		});
+		if (tok.scope) say(`Scopes on this token: ${tok.scope}`);
 		return tok.access_token;
 	} catch (e) {
 		// A revoked or expired token surfaces here, typically long after setup
@@ -399,8 +502,9 @@ async function authorize(store) {
 		}
 		// Write back against the original shape, so the console's nested block is
 		// preserved rather than replaced by a flattened copy.
-		writeFileSync(path, JSON.stringify({ ...raw, refresh_token: tok.refresh_token }, null, 2) + "\n");
-		say(`Refresh token stored in ${path}. Later runs need no browser.`);
+		writeFileSync(path, JSON.stringify({ ...raw, [TOKEN_KEY]: tok.refresh_token }, null, 2) + "\n");
+		say(`Granted: ${tok.scope || "(not reported)"}`);
+		say(`Stored as "${TOKEN_KEY}" in ${path}. Later runs need no browser.`);
 	} finally {
 		// The single shutdown point, awaited so the handle is fully closed before
 		// anything calls process.exit(). `closeAllConnections` drops the browser's
@@ -420,6 +524,24 @@ async function driveList(token, q) {
 		throw new Failure(`Drive search failed (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
 	}
 	return (await res.json()).files || [];
+}
+
+/** Content via the Docs API, the --docs-only path. */
+async function documentsGet(token, id) {
+	// includeTabsContent is not optional: without it the response is 200 with
+	// only the first tab, i.e. the notes and no transcript.
+	const url = new URL(`https://docs.googleapis.com/v1/documents/${id}`);
+	url.searchParams.set("includeTabsContent", "true");
+	const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+	if (res.status === 403 || res.status === 404) {
+		throw new Failure(
+			`The Docs API refused document ${id} (HTTP ${res.status}).\n` +
+				`  Either the id is wrong, or this token does not carry ${DOCS_SCOPE}.\n` +
+				`  Re-run with --auth (add --docs-only to consent to the Docs scope alone).`
+		);
+	}
+	if (!res.ok) throw new Failure(`Docs API failed (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
+	return await res.json();
 }
 
 async function exportMarkdown(token, id) {
@@ -489,6 +611,65 @@ async function reportCandidates(token, candidates, date) {
 	say(`  Re-run with --title and --date taken from one of the lines above.`);
 }
 
+/**
+ * Fetch one document the caller already identified — no search, no matching.
+ *
+ * Content comes from the Docs API under --docs-only and from Drive's export
+ * otherwise, so the two can be compared against the same document.
+ */
+async function fetchByDocId(store, docArg, dir, dryRun) {
+	const id = parseDocId(docArg);
+	if (!id) throw new Failure(`Not a Google Docs URL or id: ${docArg}`);
+	if (!dir) throw new Failure(`--doc also needs --dir <folder>.`);
+
+	const token = await accessToken(store.cfg);
+	if (scanFetched(dir).has(id)) {
+		say(`Already fetched: doc_id ${id} — nothing to do.`);
+		return 0;
+	}
+
+	let name;
+	let body;
+	if (DOCS_ONLY) {
+		const doc = await documentsGet(token, id);
+		name = doc.title || id;
+		body = docsToMarkdown(doc);
+		say(`Docs API: "${name}" — ${(doc.tabs || []).length} tab(s), ${body.length} bytes rendered.`);
+	} else {
+		const url = new URL(`https://www.googleapis.com/drive/v3/files/${id}`);
+		url.searchParams.set("fields", "id,name");
+		const meta = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+		if (!meta.ok) throw new Failure(`Drive could not read ${id} (HTTP ${meta.status}).`);
+		name = (await meta.json()).name || id;
+		body = await exportMarkdown(token, id);
+	}
+
+	if (dryRun) {
+		say(`[dry-run] would write "${name}" (${body.length} bytes) into ${dir}`);
+		return 0;
+	}
+
+	const parsed = parseArtifactName(name);
+	const target = join(dir, `${safeFileName(name)}.md`);
+	mkdirSync(dir, { recursive: true });
+	writeFileSync(
+		target,
+		renderFrontmatter({
+			meeting_date: parsed?.date || "",
+			artifact: artifactKind(parsed?.label),
+			doc_id: id,
+			fetched: new Date().toISOString().slice(0, 10),
+		}) + body
+	);
+	say(
+		`Fetched "${name}" -> ${target} (${body.length} bytes). ` +
+			(hasTranscriptSection(body)
+				? `Transcript present.`
+				: `NO TRANSCRIPT in this document — transcription was off for the meeting.`)
+	);
+	return 0;
+}
+
 export async function main() {
 	const store = loadConfig();
 
@@ -508,11 +689,25 @@ export async function main() {
 		return 0;
 	}
 
+	// --doc skips discovery entirely: the user supplies the document, so nothing
+	// has to be searched for or matched. This is the shape the --docs-only
+	// experiment is testing, since discovery is the only part needing Drive.
+	const docArg = arg("doc");
+	if (docArg) return await fetchByDocId(store, docArg, dir, dryRun);
+
+	if (DOCS_ONLY) {
+		throw new Failure(
+			`--docs-only carries no Drive scope, so it cannot search for a meeting.\n` +
+				`  Pass the document itself: --doc <url or id> --dir <folder>`
+		);
+	}
+
 	if (!title || !dir) {
 		throw new Failure(
 			`Usage: meet-fetch.mjs --title "<meeting title>" --date YYYY-MM-DD --dir <folder>\n` +
+				`       meet-fetch.mjs --doc <url or id> --dir <folder>\n` +
 				`       meet-fetch.mjs --list [--date YYYY-MM-DD]\n` +
-				`       meet-fetch.mjs --auth`
+				`       meet-fetch.mjs --auth [--docs-only]`
 		);
 	}
 
