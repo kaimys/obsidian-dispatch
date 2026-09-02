@@ -211,6 +211,30 @@ export interface LocalSettings {
 	enableHooks: boolean;
 	/** Show a confirmation dialog (with the exact command) before running a chip. */
 	confirmBeforeRun: boolean;
+	/**
+	 * Google OAuth for `scripts/dispatch/meet-fetch.mjs` (ADR-0027).
+	 *
+	 * A Dispatch-scope script — one Dispatch ships, identical for every user — so
+	 * its settings are ordinary device settings and live here rather than in a
+	 * file of their own. The **script** writes `refresh_token` after consent; the
+	 * plugin round-trips the whole block untouched, which is the one rule that
+	 * matters: overwriting it would cost the user their authorisation.
+	 *
+	 * Snake case, unlike everything else here, because these keys come verbatim
+	 * from the OAuth client JSON Google's console hands you.
+	 */
+	google: GoogleConfig;
+}
+
+/** Credentials for a Dispatch-scope Google integration. All optional: a vault that never uses it has none. */
+export interface GoogleConfig {
+	/** From the console's downloaded client JSON — a Desktop client. */
+	client_id?: string;
+	client_secret?: string;
+	/** Minted by `meet-fetch.mjs --auth`. Never written by the plugin. */
+	refresh_token?: string;
+	/** Pre-selects the right identity on the consent screen. */
+	account?: string;
 }
 
 export const DEFAULT_SHARED: SharedSettings = {
@@ -275,4 +299,5 @@ export const DEFAULT_LOCAL: LocalSettings = {
 	calendarUrl: "",
 	enableHooks: false,
 	confirmBeforeRun: true,
+	google: {},
 };

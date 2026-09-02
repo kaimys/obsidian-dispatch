@@ -19,6 +19,7 @@ import {
 	parseDocId,
 	parseIcsEvents,
 	pickIcsEvent,
+	resolveConfigPath,
 	hasTranscriptSection,
 	matchesMeeting,
 	parseArtifactName,
@@ -257,6 +258,48 @@ describe("hasTranscriptSection", () => {
 
 	it("is not fooled by a single bold line in the summary", () => {
 		expect(hasTranscriptSection("# Notizen\n\n**Ergebnis:** wir bauen es.\n")).toBe(false);
+	});
+});
+
+describe("resolveConfigPath", () => {
+	const VAULTS = ["Dispatch-Wiki-7ea0c874.json", "Constanze-Obsidian-96d7f2ee.json"];
+
+	it("prefers an explicit --config over everything", () => {
+		const r = resolveConfigPath("/explicit.json", "/from-env.json", VAULTS);
+		expect(r.path).toBe("/explicit.json");
+		expect(r.how).toBe("--config");
+	});
+
+	it("uses the injected path when there is no explicit one", () => {
+		// The channel Dispatch uses when it launches the script, the same way
+		// run-state.mjs receives DISPATCH_RUNS_FILE.
+		expect(resolveConfigPath(undefined, "/from-env.json", VAULTS).path).toBe("/from-env.json");
+	});
+
+	it("falls back to the single vault on the machine", () => {
+		const r = resolveConfigPath(undefined, undefined, ["Dispatch-Wiki-7ea0c874.json"]);
+		expect(r.path).toContain("Dispatch-Wiki-7ea0c874.json");
+	});
+
+	it("refuses to guess between two vaults", () => {
+		// ADR-0027's narrow rule, matching findAdoptionCandidate: stopping and
+		// asking beats fetching a transcript into the wrong vault.
+		const r = resolveConfigPath(undefined, undefined, VAULTS);
+		expect(r.path).toBeNull();
+		expect(r.how).toContain("2 vaults");
+	});
+
+	it("ignores files that are not vault settings", () => {
+		// google.json used to live here (ADR-0024, withdrawn). It must not be
+		// mistaken for a vault, or the count goes wrong.
+		const r = resolveConfigPath(undefined, undefined, ["google.json", "Dispatch-Wiki-7ea0c874.json"]);
+		expect(r.path).toContain("Dispatch-Wiki-7ea0c874.json");
+	});
+
+	it("reports having found nothing at all", () => {
+		const r = resolveConfigPath(undefined, undefined, []);
+		expect(r.path).toBeNull();
+		expect(r.how).toContain("no vault");
 	});
 });
 

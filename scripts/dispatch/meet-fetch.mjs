@@ -6,7 +6,7 @@
  * -----
  *   node scripts/dispatch/meet-fetch.mjs --auth
  *       One-time consent. Opens a loopback OAuth flow and stores the refresh
- *       token in ~/.dispatch/google.json. Every later run is non-interactive.
+ *       token in the vault's device file. Every later run is non-interactive.
  *
  *   node scripts/dispatch/meet-fetch.mjs --title "<meeting title>" \
  *        --date YYYY-MM-DD --dir <folder>
@@ -36,29 +36,40 @@
  * without transcription yields the same document minus the dialogue, which is
  * why the transcript check is on content, not on a filename.
  *
+ * Discovery
+ * ---------
+ * The CALENDAR FEED first: the ICS carries each meeting's document as an
+ * `ATTACH` property, and reading it costs no Google permission at all. Drive
+ * search is the fallback for what the feed cannot see — a recurring series
+ * carries no attachment on its master entry.
+ *
  * Scopes
  * ------
- *   drive.meet.readonly   discovery — files.list over Meet-created files
+ *   drive.meet.readonly   discovery fallback — files.list over Meet files
  *   documents.readonly    content — without it files.export returns 404 while
  *                         files.list and files.get both still return 200
  * `drive.readonly` is deliberately NOT requested: it would grant read of the
  * entire Drive to fetch one document.
  *
- * Config: ~/.dispatch/google.json — account-scoped rather than per-vault, so
- * one Google account serves every project (ADR-0024). Google's own downloaded
- * client JSON works unmodified. Nothing is ever written into the vault except
- * the finished document.
+ * Config: the vault's own device file, `~/.dispatch/<vault>-<hash>.json`, under
+ * a `google` key — this is a Dispatch-scope script, so its settings are ordinary
+ * device settings (ADR-0027). Google's own downloaded client JSON works
+ * unmodified. A pre-ADR-0027 `~/.dispatch/google.json` is migrated in and
+ * removed on first run. Nothing is ever written into the vault except the
+ * finished document.
  *
  * Zero dependencies. Node 18+.
  */
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const CONFIG = join(homedir(), ".dispatch", "google.json");
+const DISPATCH_DIR = join(homedir(), ".dispatch");
+/** Withdrawn by ADR-0027; still read once, to migrate it. */
+const LEGACY_CONFIG = join(DISPATCH_DIR, "google.json");
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.meet.readonly";
 const DOCS_SCOPE = "https://www.googleapis.com/auth/documents.readonly";
 
@@ -437,23 +448,97 @@ export function safeFileName(name) {
 
 class Failure extends Error {}
 
-export function loadConfig(path = CONFIG) {
-	if (!existsSync(path)) {
+/**
+ * Which device file to read (ADR-0027).
+ *
+ * This is a **Dispatch-scope** script — Dispatch ships it and it is the same for
+ * every user — so its settings are ordinary device settings and live in the
+ * per-vault file the plugin already writes. It must still run from a plain
+ * shell (ADR-0023), so the vault is found in three steps and an injected path
+ * is a convenience rather than the only channel:
+ *
+ *   1. `--config <path>`, explicit and always wins.
+ *   2. `DISPATCH_LOCAL_SETTINGS`, injected when Dispatch launches the script —
+ *      the same mechanism `run-state.mjs` gets `DISPATCH_RUNS_FILE` through.
+ *   3. the single `~/.dispatch/<vault>-<hash>.json` on the machine.
+ *
+ * Step 3 requires **exactly one** match. Two vaults and the script stops and
+ * asks, rather than guessing which one you meant — the same narrow rule
+ * `findAdoptionCandidate` uses in the plugin.
+ */
+export function resolveConfigPath(explicit, env, files) {
+	if (explicit) return { path: explicit, how: "--config" };
+	if (env) return { path: env, how: "DISPATCH_LOCAL_SETTINGS" };
+	const vaults = (files || []).filter((f) => /^.+-[0-9a-f]+\.json$/.test(f));
+	if (vaults.length === 1) return { path: join(DISPATCH_DIR, vaults[0]), how: "the only vault on this machine" };
+	return { path: null, how: vaults.length ? `${vaults.length} vaults` : "no vault" };
+}
+
+export function loadConfig(explicitPath) {
+	const files = existsSync(DISPATCH_DIR) ? readdirSync(DISPATCH_DIR) : [];
+	const { path, how } = resolveConfigPath(
+		explicitPath ?? arg("config"),
+		process.env.DISPATCH_LOCAL_SETTINGS,
+		files
+	);
+	if (!path) {
 		throw new Failure(
-			`No ${path}.\n` +
-				`  Create the OAuth client in the Google Cloud Console (Desktop app), download\n` +
-				`  its JSON unchanged to that path, then run: node scripts/dispatch/meet-fetch.mjs --auth`
+			`Could not tell which vault's settings to use — found ${how} under ${DISPATCH_DIR}.\n` +
+				`  Pass --config <path to ~/.dispatch/<vault>-<hash>.json>. Dispatch shows the\n` +
+				`  exact path in Settings -> Dispatch -> This device.`
 		);
 	}
+	if (!existsSync(path)) {
+		throw new Failure(`No ${path} (chosen via ${how}). Open the vault in Obsidian once to create it.`);
+	}
+
 	const raw = JSON.parse(readFileSync(path, "utf8"));
+	const google = raw.google ?? {};
 	// The console's own download nests credentials under "installed" (desktop)
 	// or "web". Accept it as-is: it is what everyone has on disk, and a
 	// hand-flattened copy is one more thing to get wrong.
-	const cfg = { ...(raw.installed ?? raw.web ?? {}), ...raw };
+	const cfg = {
+		...(google.installed ?? google.web ?? {}),
+		...google,
+		calendar_url: raw.calendarUrl || "",
+	};
 	if (!cfg.client_id || !cfg.client_secret) {
-		throw new Failure(`${path} has no client_id/client_secret, at the top level or under "installed".`);
+		throw new Failure(
+			`No Google OAuth client in ${path}.\n` +
+				`  Create a Desktop client in the Google Cloud Console, then paste its client_id\n` +
+				`  and client_secret into that file under "google", and run --auth. Setup is in\n` +
+				`  docs/installation.md.`
+		);
 	}
-	return { cfg, raw, path };
+	return { cfg, raw, path, how };
+}
+
+/**
+ * One-time move of `~/.dispatch/google.json` into the vault's device file.
+ *
+ * ADR-0024 put the credentials in an account-scoped file of their own; ADR-0027
+ * withdrew that. Migrating rather than asking the user to re-authenticate costs
+ * a few lines and saves a browser round-trip per vault. The old file is removed
+ * afterwards, so it cannot be picked up again or left holding a live token.
+ */
+function migrateLegacyConfig(targetPath) {
+	if (!existsSync(LEGACY_CONFIG) || !existsSync(targetPath)) return false;
+	try {
+		const legacy = JSON.parse(readFileSync(LEGACY_CONFIG, "utf8"));
+		const target = JSON.parse(readFileSync(targetPath, "utf8"));
+		if (target.google?.client_id || target.google?.installed) return false;
+
+		const { calendar_url: legacyCalendar, ...google } = legacy;
+		target.google = google;
+		if (legacyCalendar && !target.calendarUrl) target.calendarUrl = legacyCalendar;
+		writeFileSync(targetPath, JSON.stringify(target, null, 2) + "\n");
+		unlinkSync(LEGACY_CONFIG);
+		say(`Migrated ${LEGACY_CONFIG} into ${targetPath} (ADR-0027) and removed the old file.`);
+		return true;
+	} catch (e) {
+		say(`Could not migrate ${LEGACY_CONFIG}: ${e.message}. Move its contents under "google" by hand.`);
+		return false;
+	}
 }
 
 async function tokenRequest(params) {
@@ -472,10 +557,11 @@ async function tokenRequest(params) {
 }
 
 /** An access token from the stored refresh token. The normal path. */
-async function accessToken(cfg) {
+async function accessToken(store) {
+	const { cfg, path } = store;
 	if (!cfg[TOKEN_KEY]) {
 		throw new Failure(
-			`No ${TOKEN_KEY} in ${CONFIG}.\n` +
+			`No google.${TOKEN_KEY} in ${path}.\n` +
 				`  Run: node scripts/dispatch/meet-fetch.mjs --auth${DOCS_ONLY ? " --docs-only" : ""}`
 		);
 	}
@@ -571,9 +657,13 @@ async function authorize(store) {
 		}
 		// Write back against the original shape, so the console's nested block is
 		// preserved rather than replaced by a flattened copy.
-		writeFileSync(path, JSON.stringify({ ...raw, [TOKEN_KEY]: tok.refresh_token }, null, 2) + "\n");
+		// Write back into the `google` block only, preserving every other device
+		// setting in the file — repo aliases, tool commands, the calendar URL.
+		// This file is the plugin's; the script owns exactly one key in it.
+		const next = { ...raw, google: { ...(raw.google ?? {}), [TOKEN_KEY]: tok.refresh_token } };
+		writeFileSync(path, JSON.stringify(next, null, 2) + "\n");
 		say(`Granted: ${tok.scope || "(not reported)"}`);
-		say(`Stored as "${TOKEN_KEY}" in ${path}. Later runs need no browser.`);
+		say(`Stored as google.${TOKEN_KEY} in ${path}. Later runs need no browser.`);
 	} finally {
 		// The single shutdown point, awaited so the handle is fully closed before
 		// anything calls process.exit(). `closeAllConnections` drops the browser's
@@ -727,7 +817,7 @@ async function fetchByDocId(store, docArg, dir, dryRun) {
 	if (!id) throw new Failure(`Not a Google Docs URL or id: ${docArg}`);
 	if (!dir) throw new Failure(`--doc also needs --dir <folder>.`);
 
-	const token = await accessToken(store.cfg);
+	const token = await accessToken(store);
 	if (scanFetched(dir).has(id)) {
 		say(`Already fetched: doc_id ${id} — nothing to do.`);
 		return 0;
@@ -776,6 +866,19 @@ async function fetchByDocId(store, docArg, dir, dryRun) {
 }
 
 export async function main() {
+	// Before reading anything: fold a pre-ADR-0027 ~/.dispatch/google.json into
+	// the vault's device file, so an existing setup keeps working without
+	// re-authenticating.
+	{
+		const files = existsSync(DISPATCH_DIR) ? readdirSync(DISPATCH_DIR) : [];
+		const { path } = resolveConfigPath(
+			arg("config"),
+			process.env.DISPATCH_LOCAL_SETTINGS,
+			files
+		);
+		if (path) migrateLegacyConfig(path);
+	}
+
 	const store = loadConfig();
 
 	if (process.argv.includes("--auth")) {
@@ -789,7 +892,7 @@ export async function main() {
 	const dryRun = process.argv.includes("--dry-run");
 
 	if (process.argv.includes("--list")) {
-		const token = await accessToken(store.cfg);
+		const token = await accessToken(store);
 		await reportCandidates(token, await driveList(token, driveQuery(title, date)), date);
 		return 0;
 	}
@@ -833,7 +936,7 @@ export async function main() {
 		);
 	}
 
-	const token = await accessToken(store.cfg);
+	const token = await accessToken(store);
 	const candidates = await driveList(token, driveQuery(title, date));
 	const match = pickCandidate(candidates, title, date);
 
