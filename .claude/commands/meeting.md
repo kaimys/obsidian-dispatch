@@ -42,7 +42,12 @@ Two modes over the meeting notes in `wiki/09_Meetings-and-Workshops` (`YYYY-MM-D
 
    `node scripts/dispatch/meet-fetch.mjs --list` shows the same inventory at any time.
 
-   First run on a machine needs consent once: `node scripts/dispatch/meet-fetch.mjs --auth`. If the script says the refresh token is no longer valid, that is the same command. Setup is in `docs/installation.md`.
+   **Two recoverable errors. Run the fix yourself — never hand the user a command to paste.** You have a shell; asking someone to copy a line back into the terminal you are already holding is work you are supposed to be doing.
+
+   - **`Could not tell which vault's settings to use`** — more than one vault on the machine. The error lists the device files; pick the one whose name matches this vault (`Dispatch-Wiki-<hash>.json` here) and re-run with `--config "<that path>"`. Do not ask which one.
+   - **`The stored refresh token is no longer valid`** — first run on this machine, or the grant was revoked. **Run the exact `--auth` command the error prints**, including its `--config`. It prints a Google URL and then blocks on a local callback: show the user that URL, tell them to complete the consent in the browser (an "unverified app" screen is expected — *Advanced → Go to Dispatch*), and let the command finish on its own. Give it a long timeout, because it waits for a human. When it reports the token stored, re-run the fetch and carry on with step 5.
+
+   Only stop and ask the user when something needs a decision or a credential you cannot supply — a Cloud Console setup that has never been done, or a document that genuinely does not exist. Setup is in `docs/installation.md`.
 5. Write the report into the meeting note: summary, **decisions** (each with who decided and the ticket ids it affects), and action items.
 6. **Action items go in `## Action items` as `- [ ]` checkbox lines**, with an owner as a bold line above a group or an inline `**Name:**` prefix. **The Todos tab parses exactly this format** — a prose paragraph of "Kai will look into X" is invisible to the board. Set `open_actions:` to the number of unchecked items.
 7. **Fold the decisions into the affected tickets — this is the step everyone skips, and the reason it matters is that a decision living only in a meeting note has to be rediscovered by whoever next opens the ticket, and won't be.** For each decision: update the ticket, recording who decided and when. **Check `frozen:` first** — on a frozen ticket append a dated entry to the record zone or open a follow-up, never edit the contract zone. Recount `open_questions:` on anything a decision answered.
