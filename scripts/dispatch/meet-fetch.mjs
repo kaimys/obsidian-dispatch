@@ -62,6 +62,7 @@
  */
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -620,6 +621,39 @@ async function accessToken(store) {
 	}
 }
 
+/**
+ * Open the consent page in the user's browser.
+ *
+ * Not a convenience. `--auth` blocks on a loopback server while the user
+ * clicks through, and an agent running it cannot both wait for that and hand
+ * the URL to the user — relaying it means ending the turn, which kills the
+ * server before the redirect arrives. Opening the browser here removes the
+ * relay: the caller just waits, and the flow completes inside one call.
+ *
+ * Best-effort. The URL is printed either way, so a headless or SSH session
+ * still works by copying it.
+ */
+function openInBrowser(url) {
+	// One argv entry, no shell — a consent URL is full of & and ? and would be
+	// mangled by `cmd /c start`. rundll32 is the escaping-free route on Windows.
+	const [cmd, args] =
+		process.platform === "win32"
+			? ["rundll32", ["url.dll,FileProtocolHandler", url]]
+			: process.platform === "darwin"
+				? ["open", [url]]
+				: ["xdg-open", [url]];
+	try {
+		const child = spawn(cmd, args, { detached: true, stdio: "ignore" });
+		child.on("error", () => {
+			/* no browser here; the printed URL is the fallback */
+		});
+		child.unref();
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 /** One-time consent over a loopback redirect, storing the refresh token. */
 async function authorize(store) {
 	const { cfg, raw, path } = store;
@@ -669,11 +703,18 @@ async function authorize(store) {
 	auth.searchParams.set("state", state);
 	if (cfg.account) auth.searchParams.set("login_hint", cfg.account);
 
-	say(`\nOpen this URL and sign in${cfg.account ? ` as ${cfg.account}` : ""}:\n`);
+	const opened = openInBrowser(auth.toString());
+	say(
+		opened
+			? `\nOpening the consent page in your browser${cfg.account ? ` — sign in as ${cfg.account}` : ""}.` +
+					`\nIf nothing appears, open this URL by hand:\n`
+			: `\nOpen this URL and sign in${cfg.account ? ` as ${cfg.account}` : ""}:\n`
+	);
 	say(auth.toString());
 	say(
 		`\n  An "unverified app" screen is expected — Advanced -> Go to <app> (unsafe).\n` +
-			`  The client is published but deliberately unverified; see docs/privacy.html.\n`
+			`  The client is published but deliberately unverified; see docs/privacy.html.\n` +
+			`  Waiting for the redirect — this run finishes on its own once you approve.\n`
 	);
 
 	try {
