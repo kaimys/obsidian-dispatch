@@ -50,16 +50,16 @@ Google Drive.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>https://www.googleapis.com/auth/drive.meet.readonly</code></td>
-<td>Read-only access to the Google Drive files created by Google Meet — the meeting documents
-Gemini produces, and nothing else in your Drive</td>
-<td>To find the document for a meeting by its title and date</td>
-</tr>
-<tr>
 <td><code>https://www.googleapis.com/auth/documents.readonly</code></td>
 <td>Read-only access to your Google Docs</td>
-<td>To read that document's contents. The scope above finds the file but does not permit
-reading it — Google separates the two</td>
+<td>To read the meeting document. This is the only scope Dispatch asks for</td>
+</tr>
+<tr>
+<td><code>https://www.googleapis.com/auth/drive.meet.readonly</code><br><em>optional, off by default</em></td>
+<td>Read-only access to the Google Drive files created by Google Meet — the meeting documents
+Gemini produces, and nothing else in your Drive</td>
+<td>Only if you opt in, to search for a recurring meeting whose calendar entry carries no
+document link. Not requested unless you ask for it</td>
 </tr>
 </tbody>
 </table>
@@ -69,14 +69,16 @@ reading it — Google separates the two</td>
 delete anything in your Google Drive or your documents, and it never requests
 <code>drive.readonly</code>, which would grant read access to your entire Drive.</p>
 
-<p>Being straightforward about the second scope, because it is broader than the first: Google
-grants document-reading permission per application, not per file, so
+<p><strong>Which document to fetch comes from your calendar, not from searching your Drive.</strong>
+If you have given Dispatch your calendar's secret iCal address for its Meetings view, each event
+in that feed already carries a link to its own Gemini document. So the normal path asks Google
+for one permission only — reading a document whose address it was handed.</p>
+
+<p>Being straightforward about what that one scope covers, because it is broader than it sounds:
+Google grants document-reading permission per application, not per file, so
 <code>documents.readonly</code> technically covers <em>all</em> of your Google Docs, not only the
-meeting ones. Dispatch only ever requests the specific document it found via the first scope —
-searching is restricted to files Google Meet created — but the permission you grant is the wider
-one, and you should know that before granting it. It is the narrowest pair that works: without
-the second scope, Google returns "not found" for the very document the first scope just
-located.</p>
+meeting ones. Dispatch only ever requests the specific document your calendar pointed at, but the
+permission you grant is the wider one, and you should know that before granting it.</p>
 
 <h3>What the script does with it</h3>
 

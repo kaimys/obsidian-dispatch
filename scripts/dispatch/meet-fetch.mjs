@@ -38,18 +38,23 @@
  *
  * Discovery
  * ---------
- * The CALENDAR FEED first: the ICS carries each meeting's document as an
- * `ATTACH` property, and reading it costs no Google permission at all. Drive
- * search is the fallback for what the feed cannot see — a recurring series
- * carries no attachment on its master entry.
+ * The CALENDAR FEED, and by default only that: the ICS carries each meeting's
+ * document as an `ATTACH` property, and reading it costs no Google permission
+ * at all. When the feed has no link — a recurring series, or a meeting aged out
+ * of the window — pass `--doc <url or id>`, or opt into the Drive search with
+ * `--drive`.
  *
  * Scopes
  * ------
- *   drive.meet.readonly   discovery fallback — files.list over Meet files
- *   documents.readonly    content — without it files.export returns 404 while
- *                         files.list and files.get both still return 200
- * `drive.readonly` is deliberately NOT requested: it would grant read of the
- * entire Drive to fetch one document.
+ * ONE by default: `documents.readonly`, which is a *sensitive* scope. Nothing
+ * else is asked for.
+ *
+ * `--drive` adds `drive.meet.readonly` for the fallback search. That one is
+ * RESTRICTED, which means verifying an OAuth client on it needs an annual
+ * third-party CASA assessment — the reason a user would otherwise have to
+ * create their own Google Cloud project. It buys exactly one thing: finding a
+ * recurring series, whose master calendar entry carries no attachment. Ask for
+ * it deliberately or not at all.
  *
  * Config: the vault's own device file, `~/.dispatch/<vault>-<hash>.json`, under
  * a `google` key — this is a Dispatch-scope script, so its settings are ordinary
@@ -90,12 +95,12 @@ const DOCS_SCOPE = "https://www.googleapis.com/auth/documents.readonly";
  * `documents.get` really works under `documents.readonly` alone, rather than
  * only in the presence of the Drive scope it has always been paired with here.
  */
-const DOCS_ONLY = process.argv.includes("--docs-only");
-const SCOPES = DOCS_ONLY ? DOCS_SCOPE : [DRIVE_SCOPE, DOCS_SCOPE].join(" ");
+// `--docs-only` was the experiment; it is now simply how this works, and the
+// flag is accepted silently so an older command line still runs.
+const WITH_DRIVE = process.argv.includes("--drive");
+const SCOPES = WITH_DRIVE ? [DOCS_SCOPE, DRIVE_SCOPE].join(" ") : DOCS_SCOPE;
 
-// Two tokens live side by side, so running the experiment cannot revoke the
-// working setup out from under the normal path.
-const TOKEN_KEY = DOCS_ONLY ? "refresh_token_docs_only" : "refresh_token";
+const TOKEN_KEY = "refresh_token";
 
 // `console` is off-limits repo-wide (the Obsidian plugin ruleset lints scripts/
 // too); the other scripts here write through process.stdout for the same reason.
@@ -591,7 +596,7 @@ async function tokenRequest(params) {
 function authCommand(path) {
 	return (
 		`node scripts/dispatch/meet-fetch.mjs --config "${path}" --auth` +
-		(DOCS_ONLY ? " --docs-only" : "")
+		(WITH_DRIVE ? " --drive" : "")
 	);
 }
 
@@ -779,33 +784,15 @@ async function documentsGet(token, id) {
 	return await res.json();
 }
 
-async function exportMarkdown(token, id) {
-	const url = new URL(`https://www.googleapis.com/drive/v3/files/${id}/export`);
-	url.searchParams.set("mimeType", "text/markdown");
-	const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-	if (res.status === 403) {
-		const text = await res.text();
-		if (/exportSizeLimitExceeded/i.test(text)) {
-			throw new Failure(
-				`The document is over Drive's 10 MB export limit and cannot be exported as Markdown.\n` +
-					`  Download it by hand from Google Docs (File -> Download -> Markdown).`
-			);
-		}
-		throw new Failure(`Export refused (HTTP 403): ${text.slice(0, 200)}`);
-	}
-	if (res.status === 404) {
-		// The scope split that cost the spike two iterations: files.list and
-		// files.get succeed on drive.meet.readonly alone, and only the export
-		// reveals that content access was never granted.
-		throw new Failure(
-			`Export returned 404 for a document that was found by search.\n` +
-				`  This is what a missing documents.readonly scope looks like — Drive answers\n` +
-				`  "not found" rather than "not permitted". Re-run --auth to consent to both scopes.`
-		);
-	}
-	if (!res.ok) throw new Failure(`Export failed (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
-	return await res.text();
-}
+/*
+ * `files.export` used to live here — Drive's own Markdown of the same document.
+ * Removed 2026-09-02 along with the Drive content scope: `documents.get` needs
+ * only `documents.readonly` and renders at parity (448 of 448 speaker labels,
+ * 76 of 76 headings, 4 of 4 links). Keeping both would have meant maintaining a
+ * second content path whose only distinction was needing a broader permission.
+ *
+ * Its 10 MB export cap went with it; the Docs API has no such limit.
+ */
 
 // ───────────────────────────────────────────────────────────────────── the CLI
 
@@ -899,21 +886,13 @@ async function fetchByDocId(store, docArg, dir, dryRun) {
 		return 0;
 	}
 
-	let name;
-	let body;
-	if (DOCS_ONLY) {
-		const doc = await documentsGet(token, id);
-		name = doc.title || id;
-		body = docsToMarkdown(doc);
-		say(`Docs API: "${name}" — ${(doc.tabs || []).length} tab(s), ${body.length} bytes rendered.`);
-	} else {
-		const url = new URL(`https://www.googleapis.com/drive/v3/files/${id}`);
-		url.searchParams.set("fields", "id,name");
-		const meta = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-		if (!meta.ok) throw new Failure(`Drive could not read ${id} (HTTP ${meta.status}).`);
-		name = (await meta.json()).name || id;
-		body = await exportMarkdown(token, id);
-	}
+	// One content path, always the Docs API. It needs only documents.readonly,
+	// and renders at parity with Drive's own export — 448 of 448 speaker labels
+	// and 76 of 76 headings on the 2026-09-01 meeting.
+	const doc = await documentsGet(token, id);
+	const name = doc.title || id;
+	const body = docsToMarkdown(doc);
+	say(`Docs API: "${name}" — ${(doc.tabs || []).length} tab(s), ${body.length} bytes rendered.`);
 
 	if (dryRun) {
 		say(`[dry-run] would write "${name}" (${body.length} bytes) into ${dir}`);
@@ -978,6 +957,18 @@ export async function main() {
 	const docArg = arg("doc");
 	if (docArg) return await fetchByDocId(store, docArg, dir, dryRun);
 
+	// Before any lookup: a missing --title is a usage error, not a meeting that
+	// could not be found. Reporting it as the latter produced `no document for
+	// "undefined"`, which sends the reader looking for a calendar problem.
+	if (!title || !dir) {
+		throw new Failure(
+			`Usage: meet-fetch.mjs --title "<meeting title>" --date YYYY-MM-DD --dir <folder>\n` +
+				`       meet-fetch.mjs --doc <url or id> --dir <folder>\n` +
+				`       meet-fetch.mjs --list [--date YYYY-MM-DD]\n` +
+				`       meet-fetch.mjs --auth [--drive]`
+		);
+	}
+
 	// The calendar feed is the DEFAULT discovery path, because it costs no
 	// Google scope: the ICS carries each meeting's document as an ATTACH. Drive
 	// search below is the fallback for what the feed cannot see — recurring
@@ -996,19 +987,17 @@ export async function main() {
 		}
 	}
 
-	if (DOCS_ONLY) {
+	if (!WITH_DRIVE) {
+		// The calendar feed is the only discovery this asks permission for. When
+		// it comes up empty the honest options are a document link or, for the
+		// blind spot it has, opting into the Drive search explicitly.
 		throw new Failure(
-			`--docs-only carries no Drive scope, so it cannot search for a meeting.\n` +
-				`  Pass the document itself: --doc <url or id> --dir <folder>`
-		);
-	}
-
-	if (!title || !dir) {
-		throw new Failure(
-			`Usage: meet-fetch.mjs --title "<meeting title>" --date YYYY-MM-DD --dir <folder>\n` +
-				`       meet-fetch.mjs --doc <url or id> --dir <folder>\n` +
-				`       meet-fetch.mjs --list [--date YYYY-MM-DD]\n` +
-				`       meet-fetch.mjs --auth [--docs-only]`
+			`The calendar feed did not yield a document for "${title}"${date ? ` on ${date}` : ""}.\n` +
+				`  Either paste the document:   --doc <url or id> --dir <folder>\n` +
+				`  or search Drive for it:      --auth --drive   (then re-run with --drive)\n\n` +
+				`  Searching Drive needs drive.meet.readonly, a RESTRICTED Google scope. It is not\n` +
+				`  requested by default because it is what a recurring series needs and nothing\n` +
+				`  else — the feed carries the link for every one-off meeting.`
 		);
 	}
 
@@ -1035,37 +1024,10 @@ export async function main() {
 				`you asked for "${title}". It is the only meeting on ${parsed.date}.`
 		);
 	}
-	if (scanFetched(dir).has(file.id)) {
-		say(`Already fetched: "${file.name}" (doc_id ${file.id}) — nothing to do.`);
-		return 0;
-	}
-	if (dryRun) {
-		say(`[dry-run] would fetch "${file.name}" (doc_id ${file.id}) into ${dir}`);
-		return 0;
-	}
-
-	const body = await exportMarkdown(token, file.id);
-	const target = join(dir, `${safeFileName(file.name)}.md`);
-	mkdirSync(dir, { recursive: true });
-	writeFileSync(
-		target,
-		renderFrontmatter({
-			meeting_date: parsed.date,
-			artifact: artifactKind(parsed.label),
-			doc_id: file.id,
-			fetched: new Date().toISOString().slice(0, 10),
-		}) + body
-	);
-
-	const transcript = hasTranscriptSection(body);
-	say(
-		`Fetched "${file.name}" -> ${target} (${body.length} bytes). ` +
-			(transcript
-				? `Transcript present.`
-				: `NO TRANSCRIPT in this document — transcription was off for the meeting; ` +
-					`only the Gemini summary is available.`)
-	);
-	return 0;
+	// Drive found which document; fetching it is the same job as --doc, so it
+	// goes through the same path rather than a second copy of it.
+	say(`Found via Drive search: ${parsed.date} "${parsed.title}" -> doc ${file.id}`);
+	return await fetchByDocId(store, file.id, dir, dryRun);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
