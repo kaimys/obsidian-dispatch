@@ -15,6 +15,7 @@ import { findAdoptionCandidate } from "./adoption";
 import { BoardView, VIEW_TYPE_BOARD } from "./board";
 import { CalendarEvent, fetchCalendar } from "./calendar";
 import { CHIP_ICON, launchChip, registerChipProcessor } from "./chips";
+import { mergeCalendarUrl } from "./google-config";
 import { RunTracker } from "./runs";
 import { DispatchSettingTab } from "./settings-tab";
 import {
@@ -344,7 +345,48 @@ export default class DispatchPlugin extends Plugin {
 		const path = this.localSettingsPath();
 		mkdirSync(dirname(path), { recursive: true });
 		writeFileSync(path, JSON.stringify(this.local, null, 2), "utf8");
+		this.mirrorCalendarUrl();
 		return Promise.resolve();
+	}
+
+	/** `~/.dispatch/google.json` — keyed by ACCOUNT, not by vault (ADR-0024). */
+	googleConfigPath(): string {
+		return join(homedir(), ".dispatch", "google.json");
+	}
+
+	/**
+	 * Copy the calendar URL into the account-scoped Google config.
+	 *
+	 * `scripts/dispatch/meet-fetch.mjs` needs the ICS feed to find a meeting's
+	 * Gemini document — the feed's `ATTACH` property carries the document link,
+	 * which is how discovery avoids a Drive scope entirely. It cannot read the
+	 * per-vault device file to get it: that filename is a hash of the vault's
+	 * absolute path, which only the plugin knows.
+	 *
+	 * The URL is a credential, so it stays outside the vault, exactly as it
+	 * already does in the per-vault file. Nothing new is exposed; it is the same
+	 * secret in a second machine-local file, one that serves every vault on this
+	 * machine rather than one.
+	 *
+	 * Note the boundary this crosses: ADR-0024 describes `~/.dispatch/<service>.json`
+	 * as script-owned. The plugin writing one key into it is a deliberate
+	 * exception — the user types the URL into Dispatch's settings, and making
+	 * them hand-copy it into a second file would be friction with no benefit —
+	 * but it is an exception, and the ADR needs amending to say so.
+	 *
+	 * Never throws: a settings save must not fail because of this.
+	 */
+	private mirrorCalendarUrl(): void {
+		const path = this.googleConfigPath();
+		try {
+			const existing = existsSync(path) ? readFileSync(path, "utf8") : null;
+			const next = mergeCalendarUrl(existing, this.local.calendarUrl);
+			if (next === null) return;
+			mkdirSync(dirname(path), { recursive: true });
+			writeFileSync(path, next, "utf8");
+		} catch {
+			/* the calendar URL is a convenience here; never break saving settings */
+		}
 	}
 
 	refreshBoards(): void {

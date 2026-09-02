@@ -17,6 +17,8 @@ import {
 	docsToMarkdown,
 	driveQuery,
 	parseDocId,
+	parseIcsEvents,
+	pickIcsEvent,
 	hasTranscriptSection,
 	matchesMeeting,
 	parseArtifactName,
@@ -255,6 +257,97 @@ describe("hasTranscriptSection", () => {
 
 	it("is not fooled by a single bold line in the summary", () => {
 		expect(hasTranscriptSection("# Notizen\n\n**Ergebnis:** wir bauen es.\n")).toBe(false);
+	});
+});
+
+describe("parseIcsEvents", () => {
+	// Folded exactly as Google folds it — RFC 5545 wraps at 75 octets with a
+	// leading space, and the ATTACH URLs are always long enough to wrap.
+	const FEED = [
+		"BEGIN:VCALENDAR",
+		"BEGIN:VEVENT",
+		"DTSTART:20260901T123000Z",
+		"SUMMARY:Einführung in Dispatch",
+		"UID:3lvie9bi4hf0ua5ogcj0v57nnu@google.com",
+		"ATTACH;FILENAME=Notizen von Gemini;FMTTYPE=application/vnd.google-apps.docu",
+		" ment:https://docs.google.com/document/d/1Add4g__42SvoPqt38tL3yYx_SBINXalKcf",
+		" BlAM13kYM/edit?usp=meet_tnfm_calendar",
+		"END:VEVENT",
+		"BEGIN:VEVENT",
+		"DTSTART;TZID=Europe/Berlin:20260721T091500",
+		"SUMMARY:Charles Product Weekly",
+		"UID:6dvsas511jska3u6rudc3hb8o3@google.com",
+		"RRULE:FREQ=WEEKLY;UNTIL=20260727T215959Z;BYDAY=TU",
+		"END:VEVENT",
+		"END:VCALENDAR",
+	].join("\r\n");
+
+	it("unfolds continuation lines to recover the document link", () => {
+		// The id spans three physical lines. Matching without unfolding first
+		// yields a truncated id that looks plausible and 404s.
+		const events = parseIcsEvents(FEED);
+		expect(events[0].docId).toBe("1Add4g__42SvoPqt38tL3yYx_SBINXalKcfBlAM13kYM");
+	});
+
+	it("reads title, date and uid", () => {
+		const [first] = parseIcsEvents(FEED);
+		expect(first.title).toBe("Einführung in Dispatch");
+		expect(first.date).toBe("2026-09-01");
+		expect(first.uid).toBe("3lvie9bi4hf0ua5ogcj0v57nnu@google.com");
+	});
+
+	it("handles DTSTART with a TZID parameter", () => {
+		expect(parseIcsEvents(FEED)[1].date).toBe("2026-07-21");
+	});
+
+	it("marks a recurring master, which carries no attachment", () => {
+		// Measured 2026-09-02 against the real feed: the series master has no
+		// ATTACH and the feed holds no per-occurrence override, so a weekly
+		// meeting is not discoverable this way. Named so the gap is visible.
+		const weekly = parseIcsEvents(FEED)[1];
+		expect(weekly.recurring).toBe(true);
+		expect(weekly.docId).toBe("");
+	});
+
+	it("survives an empty or junk feed", () => {
+		expect(parseIcsEvents("")).toEqual([]);
+		expect(parseIcsEvents("not a calendar")).toEqual([]);
+		expect(parseIcsEvents(undefined)).toEqual([]);
+	});
+});
+
+describe("pickIcsEvent", () => {
+	const ev = (title: string, date: string, docId = "doc-" + date, recurring = false) => ({
+		title,
+		date,
+		uid: `${date}@google.com`,
+		docId,
+		recurring,
+	});
+
+	it("matches on the date when the titles differ entirely", () => {
+		const picked = pickIcsEvent([ev("Einführung in Dispatch", "2026-09-01")], "Dispatch Introduction", "2026-09-01");
+		expect(picked?.docId).toBe("doc-2026-09-01");
+		expect(picked?.titleAgrees).toBe(false);
+	});
+
+	it("ignores events with no attached document", () => {
+		expect(pickIcsEvent([ev("Weekly", "2026-09-01", "")], "Weekly", "2026-09-01")).toBeNull();
+	});
+
+	it("uses the title to separate two meetings on one day", () => {
+		const events = [ev("Standup", "2026-09-03", "a"), ev("Retro", "2026-09-03", "b")];
+		expect(pickIcsEvent(events, "Retro", "2026-09-03")?.docId).toBe("b");
+	});
+
+	it("returns null rather than guessing between two equal candidates", () => {
+		const events = [ev("Standup", "2026-09-03", "a"), ev("Standup", "2026-09-03", "b")];
+		expect(pickIcsEvent(events, "Standup", "2026-09-03")).toBeNull();
+	});
+
+	it("survives an empty feed", () => {
+		expect(pickIcsEvent([], "Anything", "2026-09-01")).toBeNull();
+		expect(pickIcsEvent(undefined, "Anything", "2026-09-01")).toBeNull();
 	});
 });
 

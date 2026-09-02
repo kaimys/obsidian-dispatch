@@ -369,6 +369,62 @@ export function docsToMarkdown(doc) {
 	return out.join("\n").replace(/\n{3,}/g, "\n\n") + "\n";
 }
 
+/**
+ * Google Calendar's ICS feed, parsed down to what discovery needs.
+ *
+ * The feed is the primary source for a meeting's document, because it costs no
+ * Google OAuth scope at all — it is a secret URL the user already configured
+ * for the Meetings tab, mirrored into `google.json` by the plugin. Each event
+ * carries the Gemini document as an `ATTACH` property:
+ *
+ *   ATTACH;FILENAME=Notizen von Gemini;FMTTYPE=application/vnd.google-apps.document
+ *    :https://docs.google.com/document/d/1Add4g…/edit?usp=meet_tnfm_calendar
+ *
+ * Known limit, measured 2026-09-02: a RECURRING event's master entry carries no
+ * attachment, and the feed contains no per-occurrence override, so a weekly
+ * series is not discoverable this way. One-off meetings are. `--doc` covers the
+ * rest.
+ */
+export function parseIcsEvents(ics) {
+	// RFC 5545 folds long lines with a leading space or tab; the ATTACH URLs are
+	// always folded, so unfolding has to happen before anything is matched.
+	const unfolded = String(ics || "").replace(/\r?\n[ \t]/g, "");
+	const events = [];
+	for (const block of unfolded.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/g) || []) {
+		const prop = (name) => {
+			const m = new RegExp(`^${name}[^:\\r\\n]*:(.*)$`, "m").exec(block);
+			return m ? m[1].trim() : "";
+		};
+		const start = prop("DTSTART");
+		const date = /^(\d{4})(\d{2})(\d{2})/.exec(start);
+		const attach = /ATTACH[^:\r\n]*:(https:\/\/docs\.google\.com\/document\/d\/([A-Za-z0-9_-]+)[^\r\n]*)/.exec(
+			block
+		);
+		events.push({
+			title: prop("SUMMARY"),
+			date: date ? `${date[1]}-${date[2]}-${date[3]}` : "",
+			uid: prop("UID"),
+			docId: attach ? attach[2] : "",
+			recurring: /^RRULE[:;]/m.test(block),
+		});
+	}
+	return events;
+}
+
+/**
+ * The event whose document we want. Same rule as `pickCandidate`: the date
+ * carries the match, the title only separates two meetings on one day.
+ */
+export function pickIcsEvent(events, title, when) {
+	const withDoc = (events || []).filter((e) => e.docId);
+	const [date, time] = String(when || "").trim().split(/[ T]/);
+	void time;
+	const pool = date ? withDoc.filter((e) => e.date === date) : withDoc;
+	if (pool.length === 1) return { ...pool[0], titleAgrees: titlesMatch(pool[0].title, title) };
+	const byTitle = pool.filter((e) => titlesMatch(e.title, title));
+	return byTitle.length === 1 ? { ...byTitle[0], titleAgrees: true } : null;
+}
+
 /** Drive names carry characters no filesystem accepts. */
 export function safeFileName(name) {
 	return String(name)
@@ -625,6 +681,42 @@ async function reportCandidates(token, candidates, date) {
 }
 
 /**
+ * Look the meeting up in the calendar feed. Costs no Google scope: the ICS URL
+ * is a secret address the user configured for the Meetings tab, which the
+ * plugin mirrors into `google.json` (it cannot be read from the per-vault
+ * device file, whose name is a hash of the vault path only the plugin knows).
+ *
+ * Never throws — a feed that is unreachable or has aged the meeting out is an
+ * ordinary miss, and Drive search is still there to try.
+ */
+async function discoverViaCalendar(icsUrl, title, date) {
+	try {
+		const res = await fetch(icsUrl);
+		if (!res.ok) {
+			say(`Calendar feed returned HTTP ${res.status}; falling back to Drive search.`);
+			return null;
+		}
+		const events = parseIcsEvents(await res.text());
+		const found = pickIcsEvent(events, title, date);
+		if (found) return found;
+
+		const onDate = events.filter((e) => !date || e.date === date);
+		if (onDate.length && onDate.every((e) => !e.docId)) {
+			// Worth naming rather than silently falling through: a recurring
+			// master carries no attachment, which is the feed's known blind spot.
+			const why = onDate.some((e) => e.recurring)
+				? `the calendar entry is a recurring series, and Google attaches the notes to the occurrence rather than the series`
+				: `no notes are attached to it yet`;
+			say(`The calendar feed has this meeting but no document link — ${why}.`);
+		}
+		return null;
+	} catch (e) {
+		say(`Calendar feed unreachable (${e.message}); falling back to Drive search.`);
+		return null;
+	}
+}
+
+/**
  * Fetch one document the caller already identified — no search, no matching.
  *
  * Content comes from the Docs API under --docs-only and from Drive's export
@@ -703,10 +795,27 @@ export async function main() {
 	}
 
 	// --doc skips discovery entirely: the user supplies the document, so nothing
-	// has to be searched for or matched. This is the shape the --docs-only
-	// experiment is testing, since discovery is the only part needing Drive.
+	// has to be searched for or matched.
 	const docArg = arg("doc");
 	if (docArg) return await fetchByDocId(store, docArg, dir, dryRun);
+
+	// The calendar feed is the DEFAULT discovery path, because it costs no
+	// Google scope: the ICS carries each meeting's document as an ATTACH. Drive
+	// search below is the fallback for what the feed cannot see — recurring
+	// series, and anything aged out of the window.
+	if (store.cfg.calendar_url && title) {
+		const found = await discoverViaCalendar(store.cfg.calendar_url, title, date);
+		if (found) {
+			if (!found.titleAgrees) {
+				say(
+					`Note: matched on the date alone — the calendar event is "${found.title}", ` +
+						`you asked for "${title}".`
+				);
+			}
+			say(`Found via the calendar feed: ${found.date} "${found.title}" -> doc ${found.docId}`);
+			return await fetchByDocId(store, found.docId, dir, dryRun);
+		}
+	}
 
 	if (DOCS_ONLY) {
 		throw new Failure(
