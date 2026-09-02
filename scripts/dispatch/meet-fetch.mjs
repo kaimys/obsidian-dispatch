@@ -467,8 +467,22 @@ class Failure extends Error {}
  * `findAdoptionCandidate` uses in the plugin.
  */
 export function resolveConfigPath(explicit, env, files) {
-	if (explicit) return { path: explicit, how: "--config" };
-	if (env) return { path: env, how: "DISPATCH_LOCAL_SETTINGS" };
+	// `~` is not expanded by Node, and PowerShell passes it through untouched to
+	// a native command — so `--config ~/.dispatch/x.json` looked for a directory
+	// literally named "~". Humans and agents both write paths that way, and the
+	// documentation prints them that way, so expanding it here is the fix rather
+	// than telling people not to.
+	const expand = (p) => {
+		const s = String(p ?? "");
+		if (s === "~") return homedir();
+		if (!/^~[/\\]/.test(s)) return s;
+		// Split on both separators and re-join, so the result uses the platform's
+		// own and the path we echo back in an error is copy-pasteable.
+		return join(homedir(), ...s.slice(2).split(/[/\\]/));
+	};
+
+	if (explicit) return { path: expand(explicit), how: "--config" };
+	if (env) return { path: expand(env), how: "DISPATCH_LOCAL_SETTINGS" };
 	const vaults = (files || []).filter((f) => /^.+-[0-9a-f]+\.json$/.test(f));
 	if (vaults.length === 1) return { path: join(DISPATCH_DIR, vaults[0]), how: "the only vault on this machine" };
 	return { path: null, how: vaults.length ? `${vaults.length} vaults` : "no vault" };
@@ -489,7 +503,17 @@ export function loadConfig(explicitPath) {
 		);
 	}
 	if (!existsSync(path)) {
-		throw new Failure(`No ${path} (chosen via ${how}). Open the vault in Obsidian once to create it.`);
+		// Say what was actually looked for and what is actually there — the two
+		// disagreeing is the whole of this failure, and guessing which vault the
+		// user meant is exactly what the rule above refuses to do.
+		const vaults = files.filter((f) => /^.+-[0-9a-f]+\.json$/.test(f));
+		throw new Failure(
+			`No ${path} (chosen via ${how}).\n` +
+				(vaults.length
+					? `  Device files present in ${DISPATCH_DIR}:\n` +
+						vaults.map((f) => `    ${join(DISPATCH_DIR, f)}`).join("\n")
+					: `  ${DISPATCH_DIR} holds no vault settings — open the vault in Obsidian once to create one.`)
+		);
 	}
 
 	const raw = JSON.parse(readFileSync(path, "utf8"));
@@ -556,14 +580,25 @@ async function tokenRequest(params) {
 	return json;
 }
 
+/**
+ * The re-authorisation command, spelled out for THIS machine.
+ *
+ * It has to carry `--config`: with more than one vault the bare `--auth` stops
+ * on the ambiguity rule, so a message that omits it hands the user a cure that
+ * does not run — which is how a dead token became a dead end on 2026-09-02.
+ */
+function authCommand(path) {
+	return (
+		`node scripts/dispatch/meet-fetch.mjs --config "${path}" --auth` +
+		(DOCS_ONLY ? " --docs-only" : "")
+	);
+}
+
 /** An access token from the stored refresh token. The normal path. */
 async function accessToken(store) {
 	const { cfg, path } = store;
 	if (!cfg[TOKEN_KEY]) {
-		throw new Failure(
-			`No google.${TOKEN_KEY} in ${path}.\n` +
-				`  Run: node scripts/dispatch/meet-fetch.mjs --auth${DOCS_ONLY ? " --docs-only" : ""}`
-		);
+		throw new Failure(`No google.${TOKEN_KEY} in ${path}.\n  Run: ${authCommand(path)}`);
 	}
 	try {
 		const tok = await tokenRequest({
@@ -580,7 +615,7 @@ async function accessToken(store) {
 		throw new Failure(
 			`${e.message}\n` +
 				`  The stored refresh token is no longer valid (revoked, or the password changed).\n` +
-				`  Run: node scripts/dispatch/meet-fetch.mjs --auth`
+				`  Run: ${authCommand(path)}`
 		);
 	}
 }

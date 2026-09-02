@@ -270,6 +270,29 @@ describe("resolveConfigPath", () => {
 		expect(r.how).toBe("--config");
 	});
 
+	it("expands a leading ~, which nothing else does", () => {
+		// Node never expands it, and PowerShell leaves a QUOTED ~ alone when
+		// passing it to a native command — so `--config "~/.dispatch/x.json"`
+		// looked for a directory literally named "~". Docs and agents both write
+		// paths this way, so the script has to cope rather than object.
+		const r = resolveConfigPath("~/.dispatch/Dispatch-Wiki-7ea0c874.json", undefined, []);
+		expect(r.path).not.toContain("~");
+		expect(r.path).toContain("Dispatch-Wiki-7ea0c874.json");
+		expect(r.path).toMatch(/[/\\]\.dispatch[/\\]/);
+	});
+
+	it("expands ~ in the injected path too", () => {
+		expect(resolveConfigPath(undefined, "~/.dispatch/x.json", []).path).not.toContain("~");
+	});
+
+	it("leaves an ordinary absolute path exactly as given", () => {
+		// Only a LEADING ~ is special; a path that merely contains one is a real
+		// path and must survive untouched.
+		expect(resolveConfigPath("/srv/vaults/~backup/x.json", undefined, []).path).toBe(
+			"/srv/vaults/~backup/x.json"
+		);
+	});
+
 	it("uses the injected path when there is no explicit one", () => {
 		// The channel Dispatch uses when it launches the script, the same way
 		// run-state.mjs receives DISPATCH_RUNS_FILE.
