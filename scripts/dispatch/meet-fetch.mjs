@@ -342,13 +342,24 @@ async function authorize(store) {
 			const url = new URL(req.url, redirect);
 			const c = url.searchParams.get("code");
 			const err = url.searchParams.get("error");
-			res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+			// `Connection: close` so the browser does not hold a keep-alive socket
+			// open: a lingering connection is what keeps the server handle alive
+			// past the point we want to exit.
+			res.writeHead(200, {
+				"Content-Type": "text/html; charset=utf-8",
+				Connection: "close",
+			});
 			res.end(
 				`<!doctype html><meta charset="utf-8"><body style="font:16px system-ui;padding:3rem">` +
 					(c ? "Authorised — close this tab and return to the terminal." : `Failed: ${err}`) +
 					`</body>`
 			);
-			server.close();
+			// Deliberately NOT closing the server here. Closing it mid-response
+			// leaves a half-torn-down handle, and process.exit() landing on top of
+			// that aborts Node on Windows with
+			//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), async.c:76
+			// — after the token was already written, so the run looked successful
+			// and still exited non-zero. The shutdown belongs in one place, below.
 			if (url.searchParams.get("state") !== state) reject(new Failure("state mismatch"));
 			else if (c) resolve(c);
 			else reject(new Failure(err || "no code returned"));
@@ -372,23 +383,31 @@ async function authorize(store) {
 			`  The client is published but deliberately unverified; see docs/privacy.html.\n`
 	);
 
-	const tok = await tokenRequest({
-		code: await code,
-		client_id: cfg.client_id,
-		client_secret: cfg.client_secret,
-		redirect_uri: redirect,
-		grant_type: "authorization_code",
-	});
-	if (!tok.refresh_token) {
-		throw new Failure(
-			`Google returned no refresh token. The OAuth client is probably still in\n` +
-				`  "Testing" — publish it to production, or tokens expire after 7 days.`
-		);
+	try {
+		const tok = await tokenRequest({
+			code: await code,
+			client_id: cfg.client_id,
+			client_secret: cfg.client_secret,
+			redirect_uri: redirect,
+			grant_type: "authorization_code",
+		});
+		if (!tok.refresh_token) {
+			throw new Failure(
+				`Google returned no refresh token. The OAuth client is probably still in\n` +
+					`  "Testing" — publish it to production, or tokens expire after 7 days.`
+			);
+		}
+		// Write back against the original shape, so the console's nested block is
+		// preserved rather than replaced by a flattened copy.
+		writeFileSync(path, JSON.stringify({ ...raw, refresh_token: tok.refresh_token }, null, 2) + "\n");
+		say(`Refresh token stored in ${path}. Later runs need no browser.`);
+	} finally {
+		// The single shutdown point, awaited so the handle is fully closed before
+		// anything calls process.exit(). `closeAllConnections` drops the browser's
+		// socket, without which `close()` waits for a connection nobody will end.
+		server.closeAllConnections?.();
+		await new Promise((resolve) => server.close(resolve));
 	}
-	// Write back against the original shape, so the console's nested block is
-	// preserved rather than replaced by a flattened copy.
-	writeFileSync(path, JSON.stringify({ ...raw, refresh_token: tok.refresh_token }, null, 2) + "\n");
-	say(`Refresh token stored in ${path}. Later runs need no browser.`);
 }
 
 async function driveList(token, q) {
@@ -554,10 +573,21 @@ export async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+	// Set the code and let the loop drain; never process.exit().
+	//
+	// process.exit() tears the event loop down immediately, and if fetch's
+	// connection pool then signals the main thread the run aborts with
+	//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), async.c:76
+	// (Windows exit code 0xC0000409). Every path here does a token exchange
+	// just before returning, so the race was reachable from all of them — it
+	// hit --auth *after* the refresh token had been written, making a
+	// successful run report failure to whatever checked the exit code.
 	main()
-		.then((code) => process.exit(code))
+		.then((code) => {
+			process.exitCode = code;
+		})
 		.catch((e) => {
 			process.stderr.write(`${e instanceof Failure ? e.message : String(e?.stack || e)}\n`);
-			process.exit(1);
+			process.exitCode = 1;
 		});
 }
