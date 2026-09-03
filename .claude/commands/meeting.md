@@ -25,11 +25,19 @@ Two modes over the meeting notes in `wiki/09_Meetings-and-Workshops` (`YYYY-MM-D
 
 4. **Locate the meeting's document in `wiki/09_Meetings-and-Workshops/Transcripts/`** — Google's own filename, `<Title> - <YYYY_MM_DD HH_MM TZ> - Notes by Gemini.md`. **One file holds both** the Gemini summary and the transcript with speaker labels; Google stopped producing a separate `Transcript by Gemini` file. Never edit it; it is a raw source, and a wrong interpretation must always be redoable from it.
 
-   **Not there yet? Fetch it** — from the repo root:
+   **Not there yet?** There are two ways it gets there, and the ordinary one needs no setup.
+
+   **The default: ask for it.** Say which meeting you need and what to do — *open the Gemini document in Google Docs and use File → Download → Markdown for **both tabs** (Notizen and Transkript), then drop the files in `wiki/09_Meetings-and-Workshops/Transcripts/`* — then stop and wait. When the files appear, step 4 finds them and nothing else changes. This is not a fallback or a degraded path; it is how most people will always do it, and a report written from a hand-downloaded file is identical to one written from a fetched file.
+
+   **The optional automated import.** If the `google` block is configured in this vault's device file (`~/.dispatch/<vault>-<hash>.json`), the download is skipped and you fetch it yourself — from the repo root:
    ```bash
    node scripts/dispatch/meet-fetch.mjs --title "<meeting title>" --date <YYYY-MM-DD> \
      --dir wiki/09_Meetings-and-Workshops/Transcripts
    ```
+   **Check whether it is configured before reaching for it**, and if it is not, take the default above rather than walking someone through a Google Cloud project mid-report. Setting it up is a deliberate act — a Cloud project, an OAuth consent screen on a verified domain — worth it for a team or a recurring series, not for one meeting. `docs/installation.md` has it; offer it, never impose it.
+
+   The rest of this step describes the import, and only applies when it is configured.
+
    It prints one line and is safe to re-run: presence is checked by `doc_id`, so a document already fetched is never downloaded twice, and renaming a file on disk does not cause a re-download. Add ` HH:MM` to `--date` only if the same meeting ran twice that day — the time separates two candidates and is ignored when it matches none, so a guessed hour cannot hide the meeting.
 
    **`--date` is the key, `--title` only disambiguates.** Google names the document after the *calendar event*, which need not match the note — on 2026-09-01 the note was "Dispatch Introduction" and the document "Einführung in Dispatch". So pass the date from the note's `meeting_date` (or its filename) and do not worry if the title is a translation or a rename; the script matches on the date and tells you when the titles disagree.
@@ -48,7 +56,7 @@ Two modes over the meeting notes in `wiki/09_Meetings-and-Workshops` (`YYYY-MM-D
 
    - **`does not look like a Gemini meeting document`** — the calendar event carries more than one document (an agenda, a deck) and the wrong one was taken. Nothing was written. Run `--list`, read the row for that meeting — it names the attachment it chose — and re-run with `--doc <the notes document's url or id>`.
    - **`Could not tell which vault's settings to use`** — more than one vault on the machine, and the run was not started from a chip (a chip launch sets `DISPATCH_LOCAL_SETTINGS`, which answers this). The error lists the device files; pick the one whose name matches this vault (`Dispatch-Wiki-<hash>.json` here) and re-run with `--config "<that path>"`. Do not ask which one.
-   - **`The stored refresh token is no longer valid`** — first run on this machine, or the grant was revoked. **Ask first, then run it.** This opens a browser and asks for access to the user's Google Docs, so say so plainly and give them the choice — something like:
+   - **`The stored refresh token is no longer valid`** — the import is configured but not yet authorised on this machine, or the grant was revoked. (No `google` block at all is not this error, and not a problem: take the default and ask for the download.) **Ask first, then run it.** This opens a browser and asks for access to the user's Google Docs, so say so plainly and give them the choice — something like:
 
      > *"To fetch the transcript I need your permission once, to read the Gemini document for this meeting. It opens a Google consent page in your browser and asks for read-only access to your Google Docs — nothing in your Drive. Shall I go ahead? If you'd rather not, you can download the document yourself instead: open it in Google Docs, and for **both tabs** (Notizen and Transkript) use File → Download → Markdown, then drop the files in `wiki/09_Meetings-and-Workshops/Transcripts/`. I'll work from those."*
 

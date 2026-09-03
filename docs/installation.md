@@ -253,9 +253,15 @@ const filename = `${vaultName}-${hash.toString(16)}.json`;
 
 *Settings → Dispatch → This device* prints the resolved path — prefer reading it there; the derivation above is for headless setup. The runs file that lifecycle hooks append to sits beside it, under the same basename: `~/.dispatch/runs/<vault>-<hash>.jsonl`.
 
-### The `google` block — Meet transcript import
+### The `google` block — optional Meet transcript import
+
+> **You almost certainly do not need this.** The normal way to get a meeting transcript into your vault is to open the Gemini document in Google Docs and use **File → Download → Markdown** for both tabs, saving into your transcripts folder. `/meeting report` reads whatever is in that folder; it does not care how the file arrived, and nothing below is required for it to work.
+>
+> What this section adds is skipping that download. It costs a Google Cloud project of your own, an OAuth consent screen on **a domain you have verified in Search Console**, and a published app — perhaps twenty minutes if you have done it before, and an afternoon if you have not. That is worth it if you run recurring meetings, or are setting Dispatch up for a team who should not each be exporting documents by hand. For one meeting a fortnight, download the file.
 
 `scripts/dispatch/meet-fetch.mjs` imports a Google Meet meeting's Gemini document into the vault. It is a **Dispatch-scope** script — Dispatch ships it and it does the same thing for everyone — so its settings are ordinary device settings and live in the same per-vault file as everything else above, under a `google` key. (A script the *project* chooses, like a tracker sync, is configured by the project instead; that split is the whole of ADR-0027.)
+
+It also **ships in this repository rather than in the plugin bundle**, so the import is available to people working from a clone. Installing Dispatch from the community directory does not put the script on your machine.
 
 Paste the OAuth client JSON the Google Cloud Console gives you **unchanged** under `google` — the nested `installed` block is understood as-is. `account` is optional and only pre-selects the right identity on the consent screen; `refresh_token` is written by the script after consent, never by hand:
 
@@ -287,7 +293,7 @@ The script reads `calendarUrl` from the same file: the calendar feed carries eac
    - `https://www.googleapis.com/auth/documents.readonly` — reads the meeting document. That is all the script needs: the calendar feed tells it *which* document, so nothing has to search your Drive.
 
    That is the entire list. Dispatch asks for **no Google Drive access of any kind** — a Drive scope is *restricted*, meaning an app verified on one needs an annual third-party security assessment, and the calendar feed makes it unnecessary.
-4. **Audience → Publish app** so the status is **In production**. In *Testing*, Google expires the refresh token after **7 days** and you re-authorise every week. Do **not** submit for verification: a restricted scope makes that an annual third-party CASA assessment, and an unverified production client works for its own owner.
+4. **Audience → Publish app** so the status is **In production**. In *Testing*, Google expires the refresh token after **7 days** and you re-authorise every week. You do not need to submit for verification: an unverified production client works for its owner and for up to 100 consenting accounts, which is far more than a team. (Verification would be a consent-screen review rather than the annual third-party CASA assessment a Drive scope would need — Dispatch asks for no Drive scope.)
 5. **Credentials → Create credentials → OAuth client ID → Desktop app.** Desktop clients accept a loopback redirect with no registered URI, which is what the script uses.
 
 Then, once per machine:
@@ -299,6 +305,8 @@ node scripts/dispatch/meet-fetch.mjs --auth
 An **"unverified app"** screen is expected — *Advanced → Go to … (unsafe)*. That is the consequence of step 4, not a fault. The refresh token is written back into the same device file, under `google`, and every later run is non-interactive. Re-run `--auth` if the script ever reports the token as no longer valid; Google revokes them on a password change.
 
 Editing that file by hand while Obsidian is open is safe in both directions: the plugin re-reads the `google` block before saving its own settings, so it never writes over a token or a client you just put there.
+
+**Setting this up for a team.** One person does the Console setup once; everyone else runs `--auth` against the same client and consents with their own Google account. Each teammate's refresh token stays on their own machine, in their own device file, and grants access only to documents *they* can already open. What is shared is the OAuth client, not the access. Anyone who would rather not is unaffected — they download the document and `/meeting report` reads it either way.
 
 ## Security model
 
