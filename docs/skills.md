@@ -26,6 +26,7 @@ The core loop. Each one is wired to a chip on the ticket card, so the board is t
 | `/implementation-plan <id>` | the refined spec, engineering docs, existing ADRs | the plan into the ticket, **new ADRs** for durable decisions | — |
 | `/develop <id>` | the plan, the code | code + tests, status moves, `log.md` | — |
 | `/test-plan <id>` | the ticket, the automated suites | the manual plan (only what automation doesn't cover), `open_tests` | — |
+| `/code-review <id>` | the ticket's contract zone, the branch diff, its tests, reviews already on the PR | a dated `## Code review` entry in the ticket — findings with file, line and fix — and the card back to development when a criterion fails. Reviewer ≠ author is its precondition, which a chip launch satisfies by construction | — |
 | `/fix-bug <report>` | a bug report, a thread, or a description | a bug ticket in both systems, then the fix through the same loop | chat MCP, tracker MCP |
 
 <img src="assets/Tickets.png" alt="Tickets" width="33%" style="float: right; margin:10px" />
@@ -92,6 +93,7 @@ Update ticket       | claude | my-project | /update-ticket {{id}}
 Implementation plan | claude | my-project | /implementation-plan {{id}}
 Start development   | claude | my-project | /develop {{id}}
 Write test plan     | claude | my-project | /test-plan {{id}}
+Code review         | claude | my-project | /code-review {{id}}
 ```
 
 Column headers get batch versions (`{{ids}}`, `{{status}}`, `{{count}}`) for "update all tickets in refinement"; meeting rows and calendar events get their own sets. The mechanics — variables, tool commands, the busy-gate, run tracking — are in [installation.md](installation.md#chips).
