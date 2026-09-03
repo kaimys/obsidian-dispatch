@@ -279,8 +279,6 @@ The script reads `calendarUrl` from the same file: the calendar feed carries eac
 
 > ⚠️ **This file now holds a client secret and a refresh token.** It always lived outside the vault and never syncs, but it used to contain only paths and command templates. Treat it as you would an SSH key, and note that anything copying it — including Dispatch's own "adopt settings" prompt when a vault moves — is copying credentials.
 
-Upgrading from an earlier version? A `~/.dispatch/google.json` from before this change is folded into the vault's device file automatically on the next run, and the old file is deleted.
-
 **One-time setup in the Google Cloud Console**, signed in as the account that holds the meetings:
 
 1. **APIs & Services → Library** — enable the **Google Docs API**. Nothing else; the Drive API is not used.
@@ -298,7 +296,9 @@ Then, once per machine:
 node scripts/dispatch/meet-fetch.mjs --auth
 ```
 
-An **"unverified app"** screen is expected — *Advanced → Go to … (unsafe)*. That is the consequence of step 4, not a fault. The refresh token is written back into `google.json` and every later run is non-interactive. Re-run `--auth` if the script ever reports the token as no longer valid; Google revokes them on a password change.
+An **"unverified app"** screen is expected — *Advanced → Go to … (unsafe)*. That is the consequence of step 4, not a fault. The refresh token is written back into the same device file, under `google`, and every later run is non-interactive. Re-run `--auth` if the script ever reports the token as no longer valid; Google revokes them on a password change.
+
+Editing that file by hand while Obsidian is open is safe in both directions: the plugin re-reads the `google` block before saving its own settings, so it never writes over a token or a client you just put there.
 
 ## Security model
 

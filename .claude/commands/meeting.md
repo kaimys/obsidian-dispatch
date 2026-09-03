@@ -30,21 +30,24 @@ Two modes over the meeting notes in `wiki/09_Meetings-and-Workshops` (`YYYY-MM-D
    node scripts/dispatch/meet-fetch.mjs --title "<meeting title>" --date <YYYY-MM-DD> \
      --dir wiki/09_Meetings-and-Workshops/Transcripts
    ```
-   It prints one line and is safe to re-run: presence is checked by `doc_id`, so a document already fetched is never downloaded twice, and renaming a file on disk does not cause a re-download. Add ` HH:MM` to `--date` only if the same meeting ran twice that day.
+   It prints one line and is safe to re-run: presence is checked by `doc_id`, so a document already fetched is never downloaded twice, and renaming a file on disk does not cause a re-download. Add ` HH:MM` to `--date` only if the same meeting ran twice that day — the time separates two candidates and is ignored when it matches none, so a guessed hour cannot hide the meeting.
 
    **`--date` is the key, `--title` only disambiguates.** Google names the document after the *calendar event*, which need not match the note — on 2026-09-01 the note was "Dispatch Introduction" and the document "Einführung in Dispatch". So pass the date from the note's `meeting_date` (or its filename) and do not worry if the title is a translation or a rename; the script matches on the date and tells you when the titles disagree.
 
-   Four outcomes, all reported on that one line:
+   Six outcomes, all reported as the run happens:
    - **Fetched, transcript present** — proceed to step 5.
    - **Fetched, `NO TRANSCRIPT`** — transcription was off for the meeting and only the summary exists. Write the report from the summary and **say so in the note**, rather than implying dialogue was read.
    - **`Note: matched on the date alone`** — the document's title differs from what you asked for and it was the only meeting that day. Check the named title is plausibly the same meeting, then proceed.
+   - **`WARNING: this document is from <other date>`** — **stop and check before writing anything.** Google attaches a meeting's notes to a recurring event's *next* occurrence as well, so an upcoming event can carry the previous run's document; measured on this vault's own series on 2026-09-03. Run `--list`, find the row whose document belongs to the meeting you are reporting on, and fetch it with `--doc`. Never write a report from a document whose date you could not account for.
+   - **`WARNING: this event has N Gemini documents`** — several conferences ran against one calendar entry (a call that dropped and was rejoined, or a series started more than once), and the first was taken. **Check before writing.** Read the fetched document's title: it carries the conference's own start time. If it is not the meeting you are reporting on, re-run with one of the `--doc` lines the warning prints. They are all the same day, so nothing else will flag this for you.
    - **No document matched** — the script prints every document it considered, and if that list is empty, every Gemini document in reach with its parsed title and date. **Read that list before concluding anything**; the answer is usually one line in it. If the meeting genuinely is not there, Gemini has not generated it yet (it lags the meeting) or the meeting was never recorded — stop and report, and never invent a report from the agenda.
 
    `node scripts/dispatch/meet-fetch.mjs --list` shows the same inventory at any time.
 
-   **Two recoverable errors. Run the fix yourself — never hand the user a command to paste.** You have a shell; asking someone to copy a line back into the terminal you are already holding is work you are supposed to be doing.
+   **Three recoverable errors. Run the fix yourself — never hand the user a command to paste.** You have a shell; asking someone to copy a line back into the terminal you are already holding is work you are supposed to be doing.
 
-   - **`Could not tell which vault's settings to use`** — more than one vault on the machine. The error lists the device files; pick the one whose name matches this vault (`Dispatch-Wiki-<hash>.json` here) and re-run with `--config "<that path>"`. Do not ask which one.
+   - **`does not look like a Gemini meeting document`** — the calendar event carries more than one document (an agenda, a deck) and the wrong one was taken. Nothing was written. Run `--list`, read the row for that meeting — it names the attachment it chose — and re-run with `--doc <the notes document's url or id>`.
+   - **`Could not tell which vault's settings to use`** — more than one vault on the machine, and the run was not started from a chip (a chip launch sets `DISPATCH_LOCAL_SETTINGS`, which answers this). The error lists the device files; pick the one whose name matches this vault (`Dispatch-Wiki-<hash>.json` here) and re-run with `--config "<that path>"`. Do not ask which one.
    - **`The stored refresh token is no longer valid`** — first run on this machine, or the grant was revoked. **Ask first, then run it.** This opens a browser and asks for access to the user's Google Docs, so say so plainly and give them the choice — something like:
 
      > *"To fetch the transcript I need your permission once, to read the Gemini document for this meeting. It opens a Google consent page in your browser and asks for read-only access to your Google Docs — nothing in your Drive. Shall I go ahead? If you'd rather not, you can download the document yourself instead: open it in Google Docs, and for **both tabs** (Notizen and Transkript) use File → Download → Markdown, then drop the files in `wiki/09_Meetings-and-Workshops/Transcripts/`. I'll work from those."*
