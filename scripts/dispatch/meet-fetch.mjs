@@ -10,12 +10,15 @@
  *
  *   node scripts/dispatch/meet-fetch.mjs --title "<meeting title>" \
  *        --date YYYY-MM-DD --dir <folder>
- *       Finds the meeting's document by title + date, exports it as Markdown
- *       and writes it into <folder>. Prints one line per outcome.
+ *       Finds the meeting's document by date + title, renders it as Markdown
+ *       and writes it into <folder>. Prints one line per outcome. `--date` may
+ *       carry a time (`YYYY-MM-DD HH:MM`) to separate two runs of the same
+ *       meeting on one day.
  *
  *   node scripts/dispatch/meet-fetch.mjs --list [--date YYYY-MM-DD]
- *       Show the meeting documents in reach, with the title and date each one
- *       parses to. Use it when a fetch reports no match.
+ *       Show what the calendar feed holds — each event's date, start time,
+ *       title, and the document attached to it. Use it when a fetch reports no
+ *       match. Needs no Google credentials.
  *
  *   --dry-run   report what would be fetched, write nothing
  *
@@ -54,23 +57,20 @@
  * Config: the vault's own device file, `~/.dispatch/<vault>-<hash>.json`, under
  * a `google` key — this is a Dispatch-scope script, so its settings are ordinary
  * device settings (ADR-0027). Google's own downloaded client JSON works
- * unmodified. A pre-ADR-0027 `~/.dispatch/google.json` is migrated in and
- * removed on first run. Nothing is ever written into the vault except the
- * finished document.
+ * unmodified. Nothing is ever written into the vault except the finished
+ * document.
  *
  * Zero dependencies. Node 18+.
  */
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DISPATCH_DIR = join(homedir(), ".dispatch");
-/** Withdrawn by ADR-0027; still read once, to migrate it. */
-const LEGACY_CONFIG = join(DISPATCH_DIR, "google.json");
 const DOCS_SCOPE = "https://www.googleapis.com/auth/documents.readonly";
 
 /**
@@ -227,6 +227,11 @@ export function parseDocId(input) {
  *  - **Whitespace inside a styled run.** Google's bold range usually includes
  *    the trailing space ("Kai Mysliwiec: "), and `**Name: **` is not emphasis
  *    in Markdown — it renders literally. The markers have to hug the text.
+ *
+ * Known and accepted: nested bullets flatten to one level and `table` elements
+ * are dropped. That is the remaining 1,884 bytes of the parity measurement, it
+ * costs nothing a transcript carries, and it is written here so the next person
+ * does not measure it again.
  */
 export function docsToMarkdown(doc) {
 	// Each tab contributes its title as a heading, which is what Drive's own
@@ -291,13 +296,92 @@ export function docsToMarkdown(doc) {
 	return out.join("\n").replace(/\n{3,}/g, "\n\n") + "\n";
 }
 
+/** `--date` may carry a disambiguating time; most callers want only the day. */
+export function splitWhen(when) {
+	const [date = "", time = ""] = String(when || "")
+		.trim()
+		.split(/[ T]/);
+	return { date, time: /^\d{1,2}:\d{2}$/.test(time) ? time.padStart(5, "0") : "" };
+}
+
+const pad = (n) => String(n).padStart(2, "0");
+
+/**
+ * An ICS `DTSTART` value → the meeting's LOCAL date and time.
+ *
+ * The date is what `--date` is matched against, and it has to be the date the
+ * person saw in their calendar. Google writes UTC for some events
+ * (`20260901T123000Z`) and the event's own zone for others
+ * (`DTSTART;TZID=Europe/Berlin:20260901T143000`), so taking the first eight
+ * digits is right for the second form and wrong for the first: a 00:30
+ * Europe/Berlin meeting is `T2230Z` on the previous day, and a `--date` taken
+ * from the note would then miss it.
+ */
+export function icsStart(value) {
+	// The seconds are optional in the value and irrelevant to us, but they must
+	// be consumed: without them the trailing `Z` never matched, and a UTC
+	// DTSTART was read as if it were local.
+	const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(?:\d{2})?)?(Z)?/.exec(
+		String(value || "").trim()
+	);
+	if (!m) return { date: "", time: "" };
+	const [, y, mo, d, hh, mi, zulu] = m;
+	if (zulu && hh) {
+		const local = new Date(Date.UTC(+y, +mo - 1, +d, +hh, +mi));
+		return {
+			date: `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}`,
+			time: `${pad(local.getHours())}:${pad(local.getMinutes())}`,
+		};
+	}
+	return { date: `${y}-${mo}-${d}`, time: hh ? `${hh}:${mi}` : "" };
+}
+
+/**
+ * Which of an event's attachments is the meeting's Gemini document.
+ *
+ * A calendar entry routinely carries more than one — an agenda doc, a deck —
+ * and taking the first `docs.google.com/document` link fetched whichever Google
+ * happened to list first, then wrote it into the vault as the meeting's
+ * transcript. The feed already says which is which: Gemini's attachment is
+ * named "Notes by Gemini" / "Notizen von Gemini", and Meet stamps its URL with
+ * `usp=meet_tnfm_calendar`. Falling back to the first document keeps a feed
+ * that carries neither marker working as it did.
+ */
+function pickAttachment(attachments) {
+	return (
+		attachments.find((a) => /gemini/i.test(a.filename)) ||
+		attachments.find((a) => /usp=meet_tnfm_calendar/.test(a.url)) ||
+		attachments[0] ||
+		null
+	);
+}
+
+/**
+ * Every Gemini document on the event, not just the chosen one.
+ *
+ * ONE OCCURRENCE CAN CARRY SEVERAL. Measured 2026-09-03 on this vault's own
+ * calendar: three conferences started against one *Test Meeting* occurrence left
+ * three `ATTACH` properties, all named "Notizen von Gemini". The cause there was
+ * repeated test starts, but a call that drops and is rejoined produces the same
+ * shape, and the picker takes whichever Google listed first — so which half of a
+ * meeting you get is an ordering accident. The date guard cannot see it either:
+ * all the candidates share a date. Counting them is what lets the run say so.
+ */
+function geminiAttachments(attachments) {
+	const gemini = attachments.filter(
+		(a) => /gemini/i.test(a.filename) || /usp=meet_tnfm_calendar/.test(a.url)
+	);
+	return gemini.length ? gemini : attachments;
+}
+
 /**
  * Google Calendar's ICS feed, parsed down to what discovery needs.
  *
  * The feed is the primary source for a meeting's document, because it costs no
  * Google OAuth scope at all — it is a secret URL the user already configured
- * for the Meetings tab, mirrored into `google.json` by the plugin. Each event
- * carries the Gemini document as an `ATTACH` property:
+ * for the Meetings tab, which the script reads from `calendarUrl` in the same
+ * device file its own settings live in (ADR-0027). Each event carries the
+ * Gemini document as an `ATTACH` property:
  *
  *   ATTACH;FILENAME=Notizen von Gemini;FMTTYPE=application/vnd.google-apps.document
  *    :https://docs.google.com/document/d/1Add4g…/edit?usp=meet_tnfm_calendar
@@ -321,16 +405,26 @@ export function parseIcsEvents(ics) {
 			const m = new RegExp(`^${name}[^:\\r\\n]*:(.*)$`, "m").exec(block);
 			return m ? m[1].trim() : "";
 		};
-		const start = prop("DTSTART");
-		const date = /^(\d{4})(\d{2})(\d{2})/.exec(start);
-		const attach = /ATTACH[^:\r\n]*:(https:\/\/docs\.google\.com\/document\/d\/([A-Za-z0-9_-]+)[^\r\n]*)/.exec(
-			block
-		);
+		const { date, time } = icsStart(prop("DTSTART"));
+		const attachments = [
+			...block.matchAll(
+				/^ATTACH([^:\r\n]*):(https:\/\/docs\.google\.com\/document\/d\/([A-Za-z0-9_-]+)[^\r\n]*)/gm
+			),
+		].map(([, params, url, id]) => ({
+			url,
+			id,
+			filename: (/FILENAME=([^;:]*)/i.exec(params)?.[1] ?? "").trim(),
+		}));
+		const attach = pickAttachment(attachments);
 		events.push({
 			title: prop("SUMMARY"),
-			date: date ? `${date[1]}-${date[2]}-${date[3]}` : "",
+			date,
+			time,
 			uid: prop("UID"),
-			docId: attach ? attach[2] : "",
+			docId: attach ? attach.id : "",
+			docName: attach ? attach.filename : "",
+			/** Every Gemini candidate, so a run can report that it had to choose. */
+			docIds: attach ? geminiAttachments(attachments).map((a) => a.id) : [],
 			recurring: /^RRULE[:;]/m.test(block),
 		});
 	}
@@ -338,14 +432,22 @@ export function parseIcsEvents(ics) {
 }
 
 /**
- * The event whose document we want. The date
- * carries the match, the title only separates two meetings on one day.
+ * The event whose document we want. The date carries the match; a time on
+ * `--date` and then the title separate two meetings on one day.
+ *
+ * The time is a disambiguator and only ever narrows a field of several — an
+ * hour that matches nothing is ignored rather than allowed to hide the day's
+ * only meeting, because it is typed by a human against a note while the date
+ * is machine-written on both sides.
  */
 export function pickIcsEvent(events, title, when) {
 	const withDoc = (events || []).filter((e) => e.docId);
-	const [date, time] = String(when || "").trim().split(/[ T]/);
-	void time;
-	const pool = date ? withDoc.filter((e) => e.date === date) : withDoc;
+	const { date, time } = splitWhen(when);
+	let pool = date ? withDoc.filter((e) => e.date === date) : withDoc;
+	if (time && pool.length > 1) {
+		const atTime = pool.filter((e) => e.time === time);
+		if (atTime.length) pool = atTime;
+	}
 	if (pool.length === 1) return { ...pool[0], titleAgrees: titlesMatch(pool[0].title, title) };
 	const byTitle = pool.filter((e) => titlesMatch(e.title, title));
 	return byTitle.length === 1 ? { ...byTitle[0], titleAgrees: true } : null;
@@ -403,13 +505,14 @@ export function resolveConfigPath(explicit, env, files) {
 	return { path: null, how: vaults.length ? `${vaults.length} vaults` : "no vault" };
 }
 
-export function loadConfig(explicitPath) {
-	const files = existsSync(DISPATCH_DIR) ? readdirSync(DISPATCH_DIR) : [];
-	const { path, how } = resolveConfigPath(
-		explicitPath ?? arg("config"),
-		process.env.DISPATCH_LOCAL_SETTINGS,
-		files
-	);
+/**
+ * Read the device file `main()` resolved.
+ *
+ * `requireClient` is false for `--list`, which only reads the calendar feed: a
+ * user who has not set up an OAuth client yet still gets the inventory that
+ * tells them whether their meeting is even in the feed.
+ */
+export function loadConfig({ path, how }, files, { requireClient = true } = {}) {
 	if (!path) {
 		throw new Failure(
 			`Could not tell which vault's settings to use — found ${how} under ${DISPATCH_DIR}.\n` +
@@ -421,7 +524,7 @@ export function loadConfig(explicitPath) {
 		// Say what was actually looked for and what is actually there — the two
 		// disagreeing is the whole of this failure, and guessing which vault the
 		// user meant is exactly what the rule above refuses to do.
-		const vaults = files.filter((f) => /^.+-[0-9a-f]+\.json$/.test(f));
+		const vaults = (files || []).filter((f) => /^.+-[0-9a-f]+\.json$/.test(f));
 		throw new Failure(
 			`No ${path} (chosen via ${how}).\n` +
 				(vaults.length
@@ -441,7 +544,7 @@ export function loadConfig(explicitPath) {
 		...google,
 		calendar_url: raw.calendarUrl || "",
 	};
-	if (!cfg.client_id || !cfg.client_secret) {
+	if (requireClient && (!cfg.client_id || !cfg.client_secret)) {
 		throw new Failure(
 			`No Google OAuth client in ${path}.\n` +
 				`  Create a Desktop client in the Google Cloud Console, then paste its client_id\n` +
@@ -450,34 +553,6 @@ export function loadConfig(explicitPath) {
 		);
 	}
 	return { cfg, raw, path, how };
-}
-
-/**
- * One-time move of `~/.dispatch/google.json` into the vault's device file.
- *
- * ADR-0024 put the credentials in an account-scoped file of their own; ADR-0027
- * withdrew that. Migrating rather than asking the user to re-authenticate costs
- * a few lines and saves a browser round-trip per vault. The old file is removed
- * afterwards, so it cannot be picked up again or left holding a live token.
- */
-function migrateLegacyConfig(targetPath) {
-	if (!existsSync(LEGACY_CONFIG) || !existsSync(targetPath)) return false;
-	try {
-		const legacy = JSON.parse(readFileSync(LEGACY_CONFIG, "utf8"));
-		const target = JSON.parse(readFileSync(targetPath, "utf8"));
-		if (target.google?.client_id || target.google?.installed) return false;
-
-		const { calendar_url: legacyCalendar, ...google } = legacy;
-		target.google = google;
-		if (legacyCalendar && !target.calendarUrl) target.calendarUrl = legacyCalendar;
-		writeFileSync(targetPath, JSON.stringify(target, null, 2) + "\n");
-		unlinkSync(LEGACY_CONFIG);
-		say(`Migrated ${LEGACY_CONFIG} into ${targetPath} (ADR-0027) and removed the old file.`);
-		return true;
-	} catch (e) {
-		say(`Could not migrate ${LEGACY_CONFIG}: ${e.message}. Move its contents under "google" by hand.`);
-		return false;
-	}
 }
 
 async function tokenRequest(params) {
@@ -580,6 +655,15 @@ async function authorize(store) {
 			const url = new URL(req.url, redirect);
 			const c = url.searchParams.get("code");
 			const err = url.searchParams.get("error");
+			// Decided before the page is written, so the tab says what actually
+			// happened: a state mismatch used to render "Authorised" and reject
+			// in the terminal a line later.
+			const mismatch = url.searchParams.get("state") !== state;
+			const outcome = mismatch
+				? "Failed: this redirect did not come from the consent page this run opened."
+				: c
+					? "Authorised — close this tab and return to the terminal."
+					: `Failed: ${err}`;
 			// `Connection: close` so the browser does not hold a keep-alive socket
 			// open: a lingering connection is what keeps the server handle alive
 			// past the point we want to exit.
@@ -589,7 +673,7 @@ async function authorize(store) {
 			});
 			res.end(
 				`<!doctype html><meta charset="utf-8"><body style="font:16px system-ui;padding:3rem">` +
-					(c ? "Authorised — close this tab and return to the terminal." : `Failed: ${err}`) +
+					outcome +
 					`</body>`
 			);
 			// Deliberately NOT closing the server here. Closing it mid-response
@@ -598,7 +682,7 @@ async function authorize(store) {
 			//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), async.c:76
 			// — after the token was already written, so the run looked successful
 			// and still exited non-zero. The shutdown belongs in one place, below.
-			if (url.searchParams.get("state") !== state) reject(new Failure("state mismatch"));
+			if (mismatch) reject(new Failure("state mismatch"));
 			else if (c) resolve(c);
 			else reject(new Failure(err || "no code returned"));
 		});
@@ -642,11 +726,11 @@ async function authorize(store) {
 					`  "Testing" — publish it to production, or tokens expire after 7 days.`
 			);
 		}
-		// Write back against the original shape, so the console's nested block is
-		// preserved rather than replaced by a flattened copy.
 		// Write back into the `google` block only, preserving every other device
-		// setting in the file — repo aliases, tool commands, the calendar URL.
-		// This file is the plugin's; the script owns exactly one key in it.
+		// setting in the file — repo aliases, tool commands, the calendar URL —
+		// and the console's own nested `installed` block inside it, rather than
+		// replacing it with a flattened copy. This file is the plugin's; the
+		// script owns exactly one key in it.
 		const next = { ...raw, google: { ...(raw.google ?? {}), [TOKEN_KEY]: tok.refresh_token } };
 		writeFileSync(path, JSON.stringify(next, null, 2) + "\n");
 		say(`Granted: ${tok.scope || "(not reported)"}`);
@@ -669,7 +753,7 @@ async function authorize(store) {
  * a hand-downloaded file.
  */
 
-/** Content via the Docs API, the --docs-only path. */
+/** Content, via the Docs API. The only content path there is. */
 async function documentsGet(token, id) {
 	// includeTabsContent is not optional: without it the response is 200 with
 	// only the first tab, i.e. the notes and no transcript.
@@ -680,7 +764,7 @@ async function documentsGet(token, id) {
 		throw new Failure(
 			`The Docs API refused document ${id} (HTTP ${res.status}).\n` +
 				`  Either the id is wrong, or this token does not carry ${DOCS_SCOPE}.\n` +
-				`  Re-run with --auth (add --docs-only to consent to the Docs scope alone).`
+				`  Consent again with --auth.`
 		);
 	}
 	if (!res.ok) throw new Failure(`Docs API failed (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
@@ -738,33 +822,39 @@ async function reportCalendar(icsUrl, date) {
 	}
 	say(`  ${date ? `Events on ${date}` : "Events in the feed"}:`);
 	for (const e of shown) {
+		const extra = (e.docIds?.length ?? 0) - 1;
 		const note = e.docId
-			? `doc ${e.docId}`
+			? `doc ${e.docId}${e.docName ? ` ("${e.docName}")` : ""}` +
+				(extra > 0 ? `  [+${extra} more on this event: ${e.docIds.slice(1).join(", ")}]` : "")
 			: e.recurring
 				? "series master, no link — look for the occurrence's own row above"
 				: "no document link yet";
-		say(`    · ${e.date}  "${e.title}"  — ${note}`);
+		// The time is printed because it is also the disambiguator: two rows on
+		// one date are separated by adding it to --date.
+		say(`    · ${e.date}${e.time ? ` ${e.time}` : ""}  "${e.title}"  — ${note}`);
 	}
 }
 
 /**
  * Look the meeting up in the calendar feed. Costs no Google scope: the ICS URL
  * is a secret address the user configured for the Meetings tab, which the
- * plugin mirrors into `google.json` (it cannot be read from the per-vault
- * device file, whose name is a hash of the vault path only the plugin knows).
+ * script reads from `calendarUrl` in the vault's device file (ADR-0027).
  *
  * Never throws — a feed that is unreachable or has aged the meeting out is an
- * ordinary miss, and Drive search is still there to try.
+ * ordinary miss, and the caller reports the ways on (`--doc`, a hand download).
+ * There is no second discovery path to fall back to; that was the price of
+ * dropping the Drive scope, and it is paid in a message rather than in silence.
  */
-async function discoverViaCalendar(icsUrl, title, date) {
+async function discoverViaCalendar(icsUrl, title, when) {
+	const { date } = splitWhen(when);
 	try {
 		const res = await fetch(icsUrl);
 		if (!res.ok) {
-			say(`Calendar feed returned HTTP ${res.status}; falling back to Drive search.`);
+			say(`Calendar feed returned HTTP ${res.status}, so the meeting could not be looked up.`);
 			return null;
 		}
 		const events = parseIcsEvents(await res.text());
-		const found = pickIcsEvent(events, title, date);
+		const found = pickIcsEvent(events, title, when);
 		if (found) return found;
 
 		const onDate = events.filter((e) => !date || e.date === date);
@@ -778,7 +868,7 @@ async function discoverViaCalendar(icsUrl, title, date) {
 		}
 		return null;
 	} catch (e) {
-		say(`Calendar feed unreachable (${e.message}); falling back to Drive search.`);
+		say(`Calendar feed unreachable (${e.message}), so the meeting could not be looked up.`);
 		return null;
 	}
 }
@@ -786,19 +876,23 @@ async function discoverViaCalendar(icsUrl, title, date) {
 /**
  * Fetch one document the caller already identified — no search, no matching.
  *
- * Content comes from the Docs API under --docs-only and from Drive's export
- * otherwise, so the two can be compared against the same document.
+ * Content is the Docs API, which is the only content path: `documents.get`
+ * needs `documents.readonly` alone, and Drive's own export needed a scope this
+ * script deliberately no longer asks for.
  */
-async function fetchByDocId(store, docArg, dir, dryRun) {
+async function fetchByDocId(store, docArg, dir, dryRun, expectedDate = "") {
 	const id = parseDocId(docArg);
 	if (!id) throw new Failure(`Not a Google Docs URL or id: ${docArg}`);
 	if (!dir) throw new Failure(`--doc also needs --dir <folder>.`);
 
-	const token = await accessToken(store);
+	// Presence before the token exchange: "already fetched, nothing to do" is
+	// the path /meeting calls safe to re-run, and a refresh token that died
+	// months ago must not turn a no-op into a failure.
 	if (scanFetched(dir).has(id)) {
 		say(`Already fetched: doc_id ${id} — nothing to do.`);
 		return 0;
 	}
+	const token = await accessToken(store);
 
 	// One content path, always the Docs API. It needs only documents.readonly,
 	// and renders at parity with Drive's own export — 448 of 448 speaker labels
@@ -808,19 +902,50 @@ async function fetchByDocId(store, docArg, dir, dryRun) {
 	const body = docsToMarkdown(doc);
 	say(`Docs API: "${name}" — ${(doc.tabs || []).length} tab(s), ${body.length} bytes rendered.`);
 
+	// A document whose title carries no meeting date is not a Gemini artifact,
+	// and writing it anyway produced a file with an empty `meeting_date` that
+	// the board cannot place and the next run cannot explain. The likely cause
+	// is an agenda doc or a deck attached to the same calendar event.
+	const parsed = parseArtifactName(name);
+	if (!parsed) {
+		throw new Failure(
+			`"${name}" (doc ${id}) does not look like a Gemini meeting document.\n` +
+				`  Google names them "<Title> - YYYY/MM/DD HH:MM TZ - Notes by Gemini", and the\n` +
+				`  meeting date comes from that name. Nothing was written.\n` +
+				`  If the calendar event carries several documents, pass the notes one directly:\n` +
+				`    --doc <url or id> --dir <folder>`
+		);
+	}
+
+	// The feed can hand over a document from a DIFFERENT DAY, and the fetch then
+	// looks entirely successful. Measured 2026-09-03 on the real account: a
+	// recurring "Test Meeting" whose 09-03 occurrence had not happened yet
+	// already carried the notes of the *second* conference held on 09-02, which
+	// Google had attached to the next occurrence rather than the one it belonged
+	// to. Discovery is by date, so nothing downstream would ever notice — the
+	// report would be written from the wrong meeting's dialogue.
+	if (expectedDate && parsed.date !== expectedDate) {
+		say(
+			`WARNING: this document is from ${parsed.date}, and you asked for ${expectedDate}.\n` +
+				`  Google attaches a meeting's notes to a recurring event's next occurrence as\n` +
+				`  well, so a date in the feed is not proof of the conference's date. Check the\n` +
+				`  document is the right meeting before writing a report from it; --list shows\n` +
+				`  every event and its document, and --doc <url or id> fetches one by name.`
+		);
+	}
+
 	if (dryRun) {
 		say(`[dry-run] would write "${name}" (${body.length} bytes) into ${dir}`);
 		return 0;
 	}
 
-	const parsed = parseArtifactName(name);
 	const target = join(dir, `${safeFileName(name)}.md`);
 	mkdirSync(dir, { recursive: true });
 	writeFileSync(
 		target,
 		renderFrontmatter({
-			meeting_date: parsed?.date || "",
-			artifact: artifactKind(parsed?.label),
+			meeting_date: parsed.date,
+			artifact: artifactKind(parsed.label),
 			doc_id: id,
 			fetched: new Date().toISOString().slice(0, 10),
 		}) + body
@@ -835,20 +960,11 @@ async function fetchByDocId(store, docArg, dir, dryRun) {
 }
 
 export async function main() {
-	// Before reading anything: fold a pre-ADR-0027 ~/.dispatch/google.json into
-	// the vault's device file, so an existing setup keeps working without
-	// re-authenticating.
-	{
-		const files = existsSync(DISPATCH_DIR) ? readdirSync(DISPATCH_DIR) : [];
-		const { path } = resolveConfigPath(
-			arg("config"),
-			process.env.DISPATCH_LOCAL_SETTINGS,
-			files
-		);
-		if (path) migrateLegacyConfig(path);
-	}
+	const files = existsSync(DISPATCH_DIR) ? readdirSync(DISPATCH_DIR) : [];
+	const chosen = resolveConfigPath(arg("config"), process.env.DISPATCH_LOCAL_SETTINGS, files);
 
-	const store = loadConfig();
+	const listing = process.argv.includes("--list");
+	const store = loadConfig(chosen, files, { requireClient: !listing });
 
 	if (process.argv.includes("--auth")) {
 		await authorize(store);
@@ -860,16 +976,16 @@ export async function main() {
 	const dir = arg("dir");
 	const dryRun = process.argv.includes("--dry-run");
 
-	if (process.argv.includes("--list")) {
+	if (listing) {
 		// Needs no Google permission at all — the feed is a secret URL, not an API.
-		await reportCalendar(store.cfg.calendar_url, date);
+		await reportCalendar(store.cfg.calendar_url, splitWhen(date).date);
 		return 0;
 	}
 
 	// --doc skips discovery entirely: the user supplies the document, so nothing
 	// has to be searched for or matched.
 	const docArg = arg("doc");
-	if (docArg) return await fetchByDocId(store, docArg, dir, dryRun);
+	if (docArg) return await fetchByDocId(store, docArg, dir, dryRun, splitWhen(date).date);
 
 	// Before any lookup: a missing --title is a usage error, not a meeting that
 	// could not be found. Reporting it as the latter produced `no document for
@@ -894,8 +1010,24 @@ export async function main() {
 						`you asked for "${title}".`
 				);
 			}
-			say(`Found via the calendar feed: ${found.date} "${found.title}" -> doc ${found.docId}`);
-			return await fetchByDocId(store, found.docId, dir, dryRun);
+			say(
+				`Found via the calendar feed: ${found.date}${found.time ? ` ${found.time}` : ""} ` +
+					`"${found.title}" -> doc ${found.docId}`
+			);
+			// Several conferences can hang off one occurrence — a rejoined call, or
+			// a series someone started more than once. Taking the first is a guess,
+			// and the run has to say it made one: every candidate shares the date,
+			// so the date guard below stays silent on exactly this case.
+			const others = (found.docIds || []).filter((id) => id !== found.docId);
+			if (others.length) {
+				say(
+					`WARNING: this event has ${others.length + 1} Gemini documents and the first was\n` +
+						`  taken. The others are for conferences held against the same calendar entry:\n` +
+						others.map((id) => `    --doc ${id}`).join("\n") +
+						`\n  If the fetched document is not the meeting you meant, fetch one of those.`
+				);
+			}
+			return await fetchByDocId(store, found.docId, dir, dryRun, splitWhen(date).date);
 		}
 	}
 
@@ -903,7 +1035,10 @@ export async function main() {
 	// yet is an ordinary state — so report what was actually looked at and name
 	// both ways forward. Searching Drive is deliberately not one of them.
 	say(`No document found for "${title}"${date ? ` on ${date}` : ""} in the calendar feed.`);
-	await reportCalendar(store.cfg.calendar_url, date);
+	// The date part only: `--date "2026-09-01 14:00"` is a day the feed has, and
+	// reporting "no event on 2026-09-01 14:00" for it sends the reader looking
+	// for a calendar problem that is not there.
+	await reportCalendar(store.cfg.calendar_url, splitWhen(date).date);
 	say(
 		`\n  Two ways on:\n` +
 			`   1. Paste the document link:  --doc <url or id> --dir <folder>\n` +

@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import {
 	artifactKind,
 	docsToMarkdown,
+	icsStart,
 	parseDocId,
 	parseIcsEvents,
 	pickIcsEvent,
@@ -24,6 +25,7 @@ import {
 	renderFrontmatter,
 	safeFileName,
 	scanFetched,
+	splitWhen,
 	titlesMatch,
 } from "../scripts/dispatch/meet-fetch.mjs";
 
@@ -197,9 +199,10 @@ describe("resolveConfigPath", () => {
 	});
 
 	it("ignores files that are not vault settings", () => {
-		// google.json used to live here (ADR-0024, withdrawn). It must not be
-		// mistaken for a vault, or the count goes wrong.
-		const r = resolveConfigPath(undefined, undefined, ["google.json", "Dispatch-Wiki-7ea0c874.json"]);
+		// `~/.dispatch/` is not ours alone — anything without the -<hash> suffix
+		// must not be counted as a vault, or the "exactly one" rule miscounts and
+		// starts refusing to run.
+		const r = resolveConfigPath(undefined, undefined, ["notes.json", "Dispatch-Wiki-7ea0c874.json"]);
 		expect(r.path).toContain("Dispatch-Wiki-7ea0c874.json");
 	});
 
@@ -265,12 +268,144 @@ describe("parseIcsEvents", () => {
 		expect(parseIcsEvents("not a calendar")).toEqual([]);
 		expect(parseIcsEvents(undefined)).toEqual([]);
 	});
+
+	// A calendar event routinely carries an agenda doc or a deck as well, and
+	// the first `docs.google.com/document` link in the block used to win —
+	// whichever Google happened to list first was fetched and written into the
+	// vault as the meeting's transcript.
+	const withAgenda = (order: "agenda first" | "notes first") => {
+		const agenda = [
+			"ATTACH;FILENAME=Agenda Q3;FMTTYPE=application/vnd.google-apps.document:https://docs.google.com/document/d/AGENDAdocIdAAAAAAAAAAAAAAAAAAA/edit?usp=drive_link",
+		];
+		const notes = [
+			"ATTACH;FILENAME=Notizen von Gemini;FMTTYPE=application/vnd.google-apps.document:https://docs.google.com/document/d/GEMINIdocIdBBBBBBBBBBBBBBBBBBB/edit?usp=meet_tnfm_calendar",
+		];
+		return [
+			"BEGIN:VCALENDAR",
+			"BEGIN:VEVENT",
+			"DTSTART;TZID=Europe/Berlin:20260901T142800",
+			"SUMMARY:Einführung in Dispatch",
+			...(order === "agenda first" ? [...agenda, ...notes] : [...notes, ...agenda]),
+			"END:VEVENT",
+			"END:VCALENDAR",
+		].join("\r\n");
+	};
+
+	it("takes the Gemini document when the event carries other attachments", () => {
+		for (const order of ["agenda first", "notes first"] as const) {
+			const [event] = parseIcsEvents(withAgenda(order));
+			expect(event.docId, order).toBe("GEMINIdocIdBBBBBBBBBBBBBBBBBBB");
+			expect(event.docName, order).toBe("Notizen von Gemini");
+		}
+	});
+
+	it("falls back to Meet's own URL marker when the filename says nothing", () => {
+		// `usp=meet_tnfm_calendar` is stamped on the link Meet attaches; a feed
+		// that names the attachment something else is still identifiable.
+		const feed = withAgenda("agenda first").replace("FILENAME=Notizen von Gemini;", "");
+		expect(parseIcsEvents(feed)[0].docId).toBe("GEMINIdocIdBBBBBBBBBBBBBBBBBBB");
+	});
+
+	it("falls back to the first document when nothing marks either", () => {
+		const feed = withAgenda("agenda first")
+			.replace("FILENAME=Notizen von Gemini;", "")
+			.replace("usp=meet_tnfm_calendar", "usp=drive_link");
+		expect(parseIcsEvents(feed)[0].docId).toBe("AGENDAdocIdAAAAAAAAAAAAAAAAAAA");
+	});
+
+	it("reads the event's start time, which is what separates two runs of one meeting", () => {
+		expect(parseIcsEvents(withAgenda("notes first"))[0].time).toBe("14:28");
+	});
+
+	it("keeps every Gemini document when one occurrence carries several", () => {
+		// Measured 2026-09-03 on the real calendar: three conferences started
+		// against one "Test Meeting" occurrence left three ATTACH lines, all
+		// "Notizen von Gemini". The picker takes the first, so the run has to be
+		// able to say it chose — the date guard cannot, since they share a date.
+		const feed = [
+			"BEGIN:VCALENDAR",
+			"BEGIN:VEVENT",
+			"DTSTART;TZID=Europe/Berlin:20260902T174500",
+			"SUMMARY:Test Meeting",
+			"ATTACH;FILENAME=Notizen von Gemini:https://docs.google.com/document/d/FIRSTdocIdAAAAAAAAAAAAAAAAAAAA/edit?usp=meet_tnfm_calendar",
+			"ATTACH;FILENAME=Notizen von Gemini:https://docs.google.com/document/d/SECONDdocIdBBBBBBBBBBBBBBBBBB/edit?usp=meet_tnfm_calendar",
+			"ATTACH;FILENAME=Notizen von Gemini:https://docs.google.com/document/d/THIRDdocIdCCCCCCCCCCCCCCCCCC/edit?usp=meet_tnfm_calendar",
+			"END:VEVENT",
+			"END:VCALENDAR",
+		].join("\r\n");
+		const [event] = parseIcsEvents(feed);
+		expect(event.docId).toBe("FIRSTdocIdAAAAAAAAAAAAAAAAAAAA");
+		expect(event.docIds).toEqual([
+			"FIRSTdocIdAAAAAAAAAAAAAAAAAAAA",
+			"SECONDdocIdBBBBBBBBBBBBBBBBBB",
+			"THIRDdocIdCCCCCCCCCCCCCCCCCC",
+		]);
+	});
+
+	it("does not count a non-Gemini attachment as a candidate", () => {
+		// The agenda doc must not make a single-document event look ambiguous.
+		const [event] = parseIcsEvents(withAgenda("agenda first"));
+		expect(event.docIds).toEqual(["GEMINIdocIdBBBBBBBBBBBBBBBBBBB"]);
+	});
+});
+
+describe("icsStart", () => {
+	it("reads a zone-qualified DTSTART as written", () => {
+		// TZID names the event's own zone, which for a personal calendar is the
+		// one the person read the time in.
+		expect(icsStart("20260901T142800")).toEqual({ date: "2026-09-01", time: "14:28" });
+	});
+
+	it("converts a UTC DTSTART to local before taking the date", () => {
+		// The first eight digits are the UTC date, and a late-evening meeting in
+		// a positive offset is the previous day in UTC — so `--date` taken from
+		// the note missed it, and the no-match report listed it under yesterday.
+		const utc = new Date(Date.UTC(2026, 8, 1, 22, 30));
+		const pad = (n: number) => String(n).padStart(2, "0");
+		expect(icsStart("20260901T223000Z")).toEqual({
+			date: `${utc.getFullYear()}-${pad(utc.getMonth() + 1)}-${pad(utc.getDate())}`,
+			time: `${pad(utc.getHours())}:${pad(utc.getMinutes())}`,
+		});
+	});
+
+	it("reads an all-day DTSTART, which carries no time", () => {
+		expect(icsStart("20260901")).toEqual({ date: "2026-09-01", time: "" });
+	});
+
+	it("survives a missing or malformed value", () => {
+		expect(icsStart("")).toEqual({ date: "", time: "" });
+		expect(icsStart(undefined)).toEqual({ date: "", time: "" });
+	});
+});
+
+describe("splitWhen", () => {
+	it("splits a date from the time that disambiguates it", () => {
+		expect(splitWhen("2026-09-01 14:00")).toEqual({ date: "2026-09-01", time: "14:00" });
+		expect(splitWhen("2026-09-01T14:00")).toEqual({ date: "2026-09-01", time: "14:00" });
+		expect(splitWhen("2026-09-01")).toEqual({ date: "2026-09-01", time: "" });
+	});
+
+	it("pads a single-digit hour, so 9:05 and 09:05 mean the same thing", () => {
+		expect(splitWhen("2026-09-01 9:05").time).toBe("09:05");
+	});
+
+	it("ignores a trailing word that is not a time", () => {
+		expect(splitWhen("2026-09-01 morning")).toEqual({ date: "2026-09-01", time: "" });
+		expect(splitWhen(undefined)).toEqual({ date: "", time: "" });
+	});
 });
 
 describe("pickIcsEvent", () => {
-	const ev = (title: string, date: string, docId = "doc-" + date, recurring = false) => ({
+	const ev = (
+		title: string,
+		date: string,
+		docId = "doc-" + date,
+		recurring = false,
+		time = ""
+	) => ({
 		title,
 		date,
+		time,
 		uid: `${date}@google.com`,
 		docId,
 		recurring,
@@ -299,6 +434,26 @@ describe("pickIcsEvent", () => {
 	it("survives an empty feed", () => {
 		expect(pickIcsEvent([], "Anything", "2026-09-01")).toBeNull();
 		expect(pickIcsEvent(undefined, "Anything", "2026-09-01")).toBeNull();
+	});
+
+	it("separates two runs of the same meeting by the time on --date", () => {
+		// `/meeting` promises this: "Add HH:MM to --date only if the same meeting
+		// ran twice that day." Without it both candidates match the title and the
+		// run returns null — the promise was documented and ignored.
+		const events = [
+			ev("Standup", "2026-09-03", "morning", false, "09:00"),
+			ev("Standup", "2026-09-03", "evening", false, "17:00"),
+		];
+		expect(pickIcsEvent(events, "Standup", "2026-09-03 17:00")?.docId).toBe("evening");
+		expect(pickIcsEvent(events, "Standup", "2026-09-03")).toBeNull();
+	});
+
+	it("ignores a time that matches nothing, rather than hiding the day's meeting", () => {
+		// The date is machine-written on both sides; the time is typed by a human
+		// against a note. A wrong hour must not turn a findable meeting into a
+		// "not generated yet" report.
+		const events = [ev("Einführung in Dispatch", "2026-09-01", "only", false, "14:28")];
+		expect(pickIcsEvent(events, "Dispatch Introduction", "2026-09-01 09:00")?.docId).toBe("only");
 	});
 });
 
