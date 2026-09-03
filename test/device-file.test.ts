@@ -65,6 +65,16 @@ describe("mergeDeviceFile", () => {
 		expect(merged.google.client_id).toBe("123.apps.googleusercontent.com");
 	});
 
+	it("refuses a google block that is not an object", () => {
+		// installation.md tells the user to paste Google's client JSON in by hand,
+		// so this key can be whatever a mistake produces. Taking it on trust
+		// writes the mistake back out, and the next reader fails on it instead.
+		for (const bad of ['"oops"', "[1,2]", "42", "true"]) {
+			const merged = mergeDeviceFile(inMemory(), `{"google": ${bad}}`);
+			expect(merged.google, bad).toEqual(inMemory().google);
+		}
+	});
+
 	it("saves anyway when the file is missing or unreadable", () => {
 		// Refusing to write would lose the change the user just made, and there
 		// is nothing on disk to preserve.

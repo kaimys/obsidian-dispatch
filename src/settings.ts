@@ -266,8 +266,16 @@ export interface GoogleConfig {
 export function mergeDeviceFile(local: LocalSettings, onDisk: string | null): LocalSettings {
 	if (!onDisk) return local;
 	try {
-		const parsed = JSON.parse(onDisk) as Partial<LocalSettings>;
-		return parsed.google ? { ...local, google: parsed.google } : local;
+		const parsed = JSON.parse(onDisk) as { google?: unknown };
+		// Type-guarded rather than trusted: the user is told to paste Google's
+		// client JSON into this file by hand, so `google` can be anything a
+		// mistake produces. Taking it on trust would write a string or an array
+		// back out as the block, and the next reader — plugin or script — would
+		// be the one to fail on it.
+		const google = parsed.google;
+		return google && typeof google === "object" && !Array.isArray(google)
+			? { ...local, google }
+			: local;
 	} catch {
 		return local;
 	}

@@ -357,7 +357,7 @@ function pickAttachment(attachments) {
 }
 
 /**
- * Every Gemini document on the event, not just the chosen one.
+ * The attachments the feed actually marks as Gemini output.
  *
  * ONE OCCURRENCE CAN CARRY SEVERAL. Measured 2026-09-03 on this vault's own
  * calendar: three conferences started against one *Test Meeting* occurrence left
@@ -366,12 +366,16 @@ function pickAttachment(attachments) {
  * shape, and the picker takes whichever Google listed first — so which half of a
  * meeting you get is an ordering accident. The date guard cannot see it either:
  * all the candidates share a date. Counting them is what lets the run say so.
+ *
+ * Returns only the MARKED ones, so the caller can tell "several documents Google
+ * says are Gemini notes" from "several documents, none of which it does" — those
+ * are different warnings, and calling an agenda doc a Gemini document because it
+ * happened to be attached would be the picker lying about its own confidence.
  */
 function geminiAttachments(attachments) {
-	const gemini = attachments.filter(
+	return attachments.filter(
 		(a) => /gemini/i.test(a.filename) || /usp=meet_tnfm_calendar/.test(a.url)
 	);
-	return gemini.length ? gemini : attachments;
 }
 
 /**
@@ -416,6 +420,7 @@ export function parseIcsEvents(ics) {
 			filename: (/FILENAME=([^;:]*)/i.exec(params)?.[1] ?? "").trim(),
 		}));
 		const attach = pickAttachment(attachments);
+		const marked = geminiAttachments(attachments);
 		events.push({
 			title: prop("SUMMARY"),
 			date,
@@ -423,8 +428,10 @@ export function parseIcsEvents(ics) {
 			uid: prop("UID"),
 			docId: attach ? attach.id : "",
 			docName: attach ? attach.filename : "",
-			/** Every Gemini candidate, so a run can report that it had to choose. */
-			docIds: attach ? geminiAttachments(attachments).map((a) => a.id) : [],
+			/** Every candidate the pick chose among, so a run can report that it chose. */
+			docIds: attach ? (marked.length ? marked : attachments).map((a) => a.id) : [],
+			/** Whether those candidates are ones the feed calls Gemini output. */
+			docIdsMarked: marked.length > 0,
 			recurring: /^RRULE[:;]/m.test(block),
 		});
 	}
@@ -534,7 +541,21 @@ export function loadConfig({ path, how }, files, { requireClient = true } = {}) 
 		);
 	}
 
-	const raw = JSON.parse(readFileSync(path, "utf8"));
+	// Guarded, because docs/installation.md tells the user to paste the console's
+	// client JSON into this file by hand — a trailing comma is the likeliest way
+	// it ever breaks, and every other failure here names its cause and its cure.
+	// Unguarded, the top-level catch prints a stack trace and the reader goes
+	// looking for a bug in the script.
+	let raw;
+	try {
+		raw = JSON.parse(readFileSync(path, "utf8"));
+	} catch (e) {
+		throw new Failure(
+			`${path} is not valid JSON: ${e.message}\n` +
+				`  Open it and fix the syntax — a trailing comma or an unescaped backslash in a\n` +
+				`  Windows path are the usual causes. Nothing was read, and nothing was changed.`
+		);
+	}
 	const google = raw.google ?? {};
 	// The console's own download nests credentials under "installed" (desktop)
 	// or "web". Accept it as-is: it is what everyone has on disk, and a
@@ -1020,11 +1041,19 @@ export async function main() {
 			// so the date guard below stays silent on exactly this case.
 			const others = (found.docIds || []).filter((id) => id !== found.docId);
 			if (others.length) {
+				const alternatives = others.map((id) => `    --doc ${id}`).join("\n");
 				say(
-					`WARNING: this event has ${others.length + 1} Gemini documents and the first was\n` +
-						`  taken. The others are for conferences held against the same calendar entry:\n` +
-						others.map((id) => `    --doc ${id}`).join("\n") +
-						`\n  If the fetched document is not the meeting you meant, fetch one of those.`
+					found.docIdsMarked
+						? `WARNING: this event has ${others.length + 1} Gemini documents and the first was\n` +
+								`  taken. The others are for conferences held against the same calendar entry:\n` +
+								alternatives +
+								`\n  If the fetched document is not the meeting you meant, fetch one of those.`
+						: // Nothing in the feed says which of these is Gemini output, so the
+							// pick was order alone — a weaker claim, and it has to read as one.
+							`WARNING: this event has ${others.length + 1} attached documents and NONE of them\n` +
+								`  is marked as Gemini notes, so the first was taken on order alone:\n` +
+								alternatives +
+								`\n  Check the fetched document is this meeting's notes before writing a report.`
 				);
 			}
 			return await fetchByDocId(store, found.docId, dir, dryRun, splitWhen(date).date);

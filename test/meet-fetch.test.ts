@@ -346,6 +346,22 @@ describe("parseIcsEvents", () => {
 		// The agenda doc must not make a single-document event look ambiguous.
 		const [event] = parseIcsEvents(withAgenda("agenda first"));
 		expect(event.docIds).toEqual(["GEMINIdocIdBBBBBBBBBBBBBBBBBBB"]);
+		expect(event.docIdsMarked).toBe(true);
+	});
+
+	it("says when none of the candidates is marked as Gemini output", () => {
+		// With no marker anywhere the pick is order alone, and the warning has to
+		// read as the weaker claim it is — calling an agenda doc a Gemini document
+		// would be the picker lying about its own confidence.
+		const feed = withAgenda("agenda first")
+			.replace("FILENAME=Notizen von Gemini;", "FILENAME=Slides;")
+			.replace("usp=meet_tnfm_calendar", "usp=drive_link");
+		const [event] = parseIcsEvents(feed);
+		expect(event.docIdsMarked).toBe(false);
+		expect(event.docIds).toEqual([
+			"AGENDAdocIdAAAAAAAAAAAAAAAAAAA",
+			"GEMINIdocIdBBBBBBBBBBBBBBBBBBB",
+		]);
 	});
 });
 
