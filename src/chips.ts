@@ -220,6 +220,13 @@ function executeChip(
 		const env: Record<string, string> = {
 			DISPATCH_RUN_ID: runId,
 			DISPATCH_RUNS_FILE: plugin.runs.path(),
+			// The device file this vault's settings live in. A Dispatch-scope
+			// script reads its own configuration out of it (ADR-0027), and it
+			// cannot derive the name — a hash of the vault's absolute path — for
+			// itself. Without this, a machine with more than one vault leaves the
+			// script guessing, which it refuses to do, so every chip-launched
+			// `/meeting report` stopped and asked for --config.
+			DISPATCH_LOCAL_SETTINGS: plugin.localSettingsPath(),
 			DISPATCH_NOTE: noteAbs,
 			DISPATCH_LABEL: spec.label,
 			DISPATCH_STARTED: startedIso,
