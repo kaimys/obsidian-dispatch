@@ -211,6 +211,74 @@ export interface LocalSettings {
 	enableHooks: boolean;
 	/** Show a confirmation dialog (with the exact command) before running a chip. */
 	confirmBeforeRun: boolean;
+	/**
+	 * Google OAuth for `scripts/dispatch/meet-fetch.mjs` (ADR-0027).
+	 *
+	 * A Dispatch-scope script — one Dispatch ships, identical for every user — so
+	 * its settings are ordinary device settings and live here rather than in a
+	 * file of their own. The **script** writes `refresh_token` after consent, and
+	 * the user pastes the client in by hand, both while Obsidian may be running —
+	 * so the plugin takes this block from disk on every save (`mergeDeviceFile`)
+	 * rather than round-tripping the copy it read at load. It has no UI of its
+	 * own here, and overwriting it costs the user their authorisation.
+	 *
+	 * Snake case, unlike everything else here, because these keys come verbatim
+	 * from the OAuth client JSON Google's console hands you.
+	 */
+	google: GoogleConfig;
+}
+
+/** Credentials for a Dispatch-scope Google integration. All optional: a vault that never uses it has none. */
+export interface GoogleConfig {
+	/** From the console's downloaded client JSON — a Desktop client. */
+	client_id?: string;
+	client_secret?: string;
+	/**
+	 * The console hands that JSON with the credentials nested under `installed`
+	 * (desktop client) or `web`, and `docs/installation.md` tells the user to
+	 * paste the block as it comes rather than flatten it by hand. The script
+	 * accepts either shape; the plugin reads neither, so this is here to
+	 * describe a file that exists rather than one that would be tidier.
+	 */
+	installed?: { client_id?: string; client_secret?: string };
+	web?: { client_id?: string; client_secret?: string };
+	/** Minted by `meet-fetch.mjs --auth`. Never written by the plugin. */
+	refresh_token?: string;
+	/** Pre-selects the right identity on the consent screen. */
+	account?: string;
+}
+
+/**
+ * The device file to write: this session's settings, with the `google` block
+ * taken from whatever is on disk.
+ *
+ * The plugin reads the device file once, at load. `meet-fetch.mjs --auth`
+ * writes `google.refresh_token` into that same file while Obsidian is running,
+ * and so does a user pasting a client id in by hand — after which touching any
+ * setting in the settings tab serialised the plugin's stale copy back over it.
+ * The token vanished silently, and the next fetch asked for consent again.
+ *
+ * The plugin owns every other key and never edits this one, so "whatever is on
+ * disk wins" is the whole rule. An unreadable file leaves the in-memory copy
+ * alone: refusing to save would lose the change the user just made, and there
+ * is nothing there to preserve.
+ */
+export function mergeDeviceFile(local: LocalSettings, onDisk: string | null): LocalSettings {
+	if (!onDisk) return local;
+	try {
+		const parsed = JSON.parse(onDisk) as { google?: unknown };
+		// Type-guarded rather than trusted: the user is told to paste Google's
+		// client JSON into this file by hand, so `google` can be anything a
+		// mistake produces. Taking it on trust would write a string or an array
+		// back out as the block, and the next reader — plugin or script — would
+		// be the one to fail on it.
+		const google = parsed.google;
+		return google && typeof google === "object" && !Array.isArray(google)
+			? { ...local, google }
+			: local;
+	} catch {
+		return local;
+	}
 }
 
 export const DEFAULT_SHARED: SharedSettings = {
@@ -275,4 +343,5 @@ export const DEFAULT_LOCAL: LocalSettings = {
 	calendarUrl: "",
 	enableHooks: false,
 	confirmBeforeRun: true,
+	google: {},
 };

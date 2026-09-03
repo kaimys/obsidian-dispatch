@@ -14,7 +14,11 @@
 
 <h1>Privacy Policy for Dispatch</h1>
 
-<p class="effective"><strong>Effective 31 August 2026.</strong></p>
+<p class="effective"><strong>Effective 2 September 2026.</strong> Supersedes the version of
+31 August 2026. What changed: Dispatch now finds a meeting's document through your calendar
+rather than by searching your Drive, so it asks for <strong>one</strong> permission instead of
+two and no longer requests any access to Google Drive whatsoever. This page also now describes
+the calendar feed, which the earlier version did not mention.</p>
 
 <p>Dispatch is an open-source plugin for <a href="https://obsidian.md">Obsidian</a>, published
 under the MIT licence by Kai Mysliwiec. This policy explains what data Dispatch touches, where
@@ -36,8 +40,8 @@ you have configured on your own machine. It does not transmit your notes anywher
 <h2>Google account data</h2>
 
 <p>One optional feature connects to Google. When you use Dispatch's meeting-transcript import, a
-script running on your computer asks Google for permission to read meeting artifacts from your
-Google Drive.</p>
+script running on your computer asks Google for permission to read the Google Doc that Gemini
+wrote for a meeting — and nothing else.</p>
 
 <h3>What we request, and why</h3>
 
@@ -48,40 +52,67 @@ Google Drive.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>https://www.googleapis.com/auth/drive.meet.readonly</code></td>
-<td>Read-only access to the Google Drive files created by Google Meet — meeting transcripts and
-Gemini meeting notes</td>
-<td>To find the transcript for a meeting by its title and date, and to download it into your
-vault</td>
+<td><code>https://www.googleapis.com/auth/documents.readonly</code></td>
+<td>Read-only access to your Google Docs</td>
+<td>To read the meeting document. This is the only permission Dispatch ever asks for</td>
 </tr>
 </tbody>
 </table>
 </div>
 
-<p>This is a <strong>read-only</strong> scope, and it is the narrowest scope that covers the
-task. Dispatch requests no permission to modify, create or delete anything in your Google Drive,
-and no access to Drive files that Google Meet did not create.</p>
+<p>It is <strong>read-only</strong>, and it is the whole list. Dispatch requests no permission to
+modify, create or delete anything, and <strong>no access to your Google Drive at all</strong> —
+not <code>drive.readonly</code>, which would expose every file you own, and not the narrower
+Meet-files scope either. It cannot list, search or browse your Drive, because it never asks to.</p>
+
+<p><strong>Which document to fetch comes from your calendar, not from searching your Drive.</strong>
+If you have given Dispatch your calendar's secret iCal address for its Meetings view, each event
+in that feed already carries a link to its own Gemini document. So the normal path asks Google
+for one permission only — reading a document whose address it was handed.</p>
+
+<p>Being straightforward about what that one scope covers, because it is broader than it sounds:
+Google grants document-reading permission per application, not per file, so
+<code>documents.readonly</code> technically covers <em>all</em> of your Google Docs, not only the
+meeting ones. Dispatch only ever requests the specific document your calendar pointed at, but the
+permission you grant is the wider one, and you should know that before granting it.</p>
 
 <h3>What the script does with it</h3>
 
 <ol>
-<li>Lists Drive files whose names match the meeting you asked about, by title and date.</li>
-<li>Exports the matching document as Markdown.</li>
-<li>Writes that Markdown into a folder inside your own Obsidian vault.</li>
+<li>Fetches your calendar feed — see below — and finds the event for the meeting you named, by
+date. Google attaches each meeting's Gemini document to its own calendar event, so this is what
+identifies the document.</li>
+<li>Asks the Google Docs API for that one document, by its id.</li>
+<li>Writes it into a folder inside your own Obsidian vault as Markdown — the Gemini summary and,
+when the meeting was transcribed, the transcript that Google appends to it.</li>
 </ol>
 
 <p>That is the entire flow. The content of your meetings is read from Google and written to your
 disk. It is not sent anywhere else, and no copy is retained outside your vault.</p>
 
+<h3>Your calendar feed</h3>
+
+<p>The Meetings view can show upcoming events if you give Dispatch the <strong>secret iCal
+address</strong> of a Google Calendar (<em>Settings → your calendar → Integrate calendar →
+Secret address in iCal format</em>). It is optional, and Dispatch does nothing with calendars
+unless you provide it.</p>
+
+<p>That address is itself a credential — anyone holding it can read that calendar — so it is
+stored with your other device settings, outside your vault, and never syncs. Dispatch fetches
+the feed <strong>read-only</strong>, directly from Google, and it is the transcript import's
+normal route to a document: the feed already names it, so nothing has to search your Drive.
+Nobody but you and Google sees the feed or its contents.</p>
+
 <h3>Where your credentials are stored</h3>
 
-<p>Your OAuth client ID, client secret and refresh token are stored in a plain file at
-<code>~/.dispatch/google.json</code> on your own computer — outside your vault, so that they are
-never picked up by Obsidian Sync, Google Drive, git, or any other sync mechanism that might carry
-your vault to another machine or another person.</p>
+<p>Your OAuth client ID, client secret and refresh token are stored with Dispatch's other
+per-vault settings, in a plain file under <code>~/.dispatch/</code> on your own computer —
+outside your vault, so that they are never picked up by Obsidian Sync, Google Drive, git, or any
+other sync mechanism that might carry your vault to another machine or another person. Your
+calendar's secret address lives in the same file.</p>
 
-<p>These credentials are transmitted only to Google's own OAuth and Drive endpoints, over HTTPS,
-to obtain and use an access token. They are sent to no one else.</p>
+<p>These credentials are transmitted only to Google's own endpoints, over HTTPS, to obtain and
+use an access token and to read the calendar feed. They are sent to no one else.</p>
 
 <h3>What the developer receives</h3>
 
@@ -106,8 +137,8 @@ human other than you.</p>
 <li>No crash or error reporting.</li>
 <li>No advertising identifiers, cookies or tracking of any kind.</li>
 <li>No account, email address or personal profile.</li>
-<li>No network requests at all, except the Google Drive calls described above and any made by the
-agent programs you yourself configure and launch.</li>
+<li>No network requests at all, except the Google calls described above — your calendar feed and
+the meeting documents — and any made by the agent programs you yourself configure and launch.</li>
 </ul>
 
 <h2>Third parties</h2>
@@ -126,8 +157,9 @@ policies. What they send, and to whom, is between you and their providers.</p>
 <ul>
 <li><strong>Downloaded meeting content</strong> stays in your vault until you delete the
 files.</li>
-<li><strong>Your stored credentials</strong> stay in <code>~/.dispatch/google.json</code> until
-you delete that file.</li>
+<li><strong>Your stored credentials</strong> — the OAuth tokens and your calendar's secret
+address — stay in that vault's settings file under <code>~/.dispatch/</code> until you delete
+them. Clearing the calendar URL in Dispatch's settings removes it from the file.</li>
 <li><strong>Dispatch's access to your Google account</strong> can be revoked at any time at
 <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>. Revoking
 takes effect immediately; the stored refresh token stops working, and Dispatch will report that

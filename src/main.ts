@@ -22,6 +22,7 @@ import {
 	DEFAULT_SHARED,
 	LocalSettings,
 	SharedSettings,
+	mergeDeviceFile,
 } from "./settings";
 
 const LOCAL_SETTINGS_FILE = "local.json";
@@ -343,6 +344,10 @@ export default class DispatchPlugin extends Plugin {
 	saveLocal(): Promise<void> {
 		const path = this.localSettingsPath();
 		mkdirSync(dirname(path), { recursive: true });
+		// Re-read before writing: `meet-fetch.mjs` owns the `google` block in this
+		// file (ADR-0027) and writes a refresh token into it while Obsidian is
+		// running. Serialising the copy read at load would silently drop it.
+		this.local = mergeDeviceFile(this.local, existsSync(path) ? readFileSync(path, "utf8") : null);
 		writeFileSync(path, JSON.stringify(this.local, null, 2), "utf8");
 		return Promise.resolve();
 	}

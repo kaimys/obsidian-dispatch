@@ -32,6 +32,8 @@ Notes and shared settings never contain absolute paths. They reference repositor
 
 Because the device layer lives outside the vault (Windows: `%USERPROFILE%\.dispatch\`), it works with **any** sync — Obsidian Sync, Google Drive, git — without exclusion rules, and teammates can never overwrite each other's device config. The exact path is shown in the settings tab. A `local.json` from older versions found next to the plugin is migrated there and removed from the vault automatically.
 
+Scripts Dispatch ships — currently the Meet transcript import — keep their settings in that same per-vault file rather than one of their own, under a `google` key. A script the *project* chooses, such as a tracker sync, is configured by the project and Dispatch never writes it.
+
 The sections below describe both layers as the **settings UI** presents them. If you (or an agent) write the files directly, read [The config files on disk](#the-config-files-on-disk) — the stored JSON does not have the same shape as the UI's compact input forms.
 
 ## Board settings
@@ -251,6 +253,61 @@ const filename = `${vaultName}-${hash.toString(16)}.json`;
 
 *Settings → Dispatch → This device* prints the resolved path — prefer reading it there; the derivation above is for headless setup. The runs file that lifecycle hooks append to sits beside it, under the same basename: `~/.dispatch/runs/<vault>-<hash>.jsonl`.
 
+### The `google` block — optional Meet transcript import
+
+> **You almost certainly do not need this.** The normal way to get a meeting transcript into your vault is to open the Gemini document in Google Docs and use **File → Download → Markdown** for both tabs, saving into your transcripts folder. `/meeting report` reads whatever is in that folder; it does not care how the file arrived, and nothing below is required for it to work.
+>
+> What this section adds is skipping that download. It costs a Google Cloud project of your own, an OAuth consent screen on **a domain you have verified in Search Console**, and a published app — perhaps twenty minutes if you have done it before, and an afternoon if you have not. That is worth it if you run recurring meetings, or are setting Dispatch up for a team who should not each be exporting documents by hand. For one meeting a fortnight, download the file.
+
+`scripts/dispatch/meet-fetch.mjs` imports a Google Meet meeting's Gemini document into the vault. It is a **Dispatch-scope** script — Dispatch ships it and it does the same thing for everyone — so its settings are ordinary device settings and live in the same per-vault file as everything else above, under a `google` key. (A script the *project* chooses, like a tracker sync, is configured by the project instead; that split is the whole of ADR-0027.)
+
+It also **ships in this repository rather than in the plugin bundle**, so the import is available to people working from a clone. Installing Dispatch from the community directory does not put the script on your machine.
+
+Paste the OAuth client JSON the Google Cloud Console gives you **unchanged** under `google` — the nested `installed` block is understood as-is. `account` is optional and only pre-selects the right identity on the consent screen; `refresh_token` is written by the script after consent, never by hand:
+
+```json
+{
+  "repos": { "my-project": "C:\\Users\\me\\Workspace\\my-project" },
+  "calendarUrl": "https://calendar.google.com/calendar/ical/…/basic.ics",
+  "google": {
+    "installed": {
+      "client_id": "….apps.googleusercontent.com",
+      "client_secret": "…"
+    },
+    "account": "you@example.com"
+  }
+}
+```
+
+The script reads `calendarUrl` from the same file: the calendar feed carries each meeting's document as an `ATTACH` property, which is how it finds a transcript without any Drive permission at all.
+
+**Finding the file from a shell.** The script must work with no Obsidian running, so it looks in three places: `--config <path>`, then the `DISPATCH_LOCAL_SETTINGS` environment variable Dispatch sets when it launches the script, then the single `~/.dispatch/<vault>-<hash>.json` on the machine. With more than one vault it stops and asks for `--config` rather than guessing — *Settings → Dispatch → This device* prints the exact path.
+
+> ⚠️ **This file now holds a client secret and a refresh token.** It always lived outside the vault and never syncs, but it used to contain only paths and command templates. Treat it as you would an SSH key, and note that anything copying it — including Dispatch's own "adopt settings" prompt when a vault moves — is copying credentials.
+
+**One-time setup in the Google Cloud Console**, signed in as the account that holds the meetings:
+
+1. **APIs & Services → Library** — enable the **Google Docs API**. Nothing else; the Drive API is not used.
+2. **Google Auth Platform → Branding** — an app home page, privacy policy and terms of service, all on a domain you have verified in [Search Console](https://search.google.com/search-console). Google rejects URLs on a domain you do not own, so a GitHub or plugin-directory page will not do.
+3. **Data Access → Add or remove scopes** — add **one**, pasting it into *Manually add scopes* if the picker does not list it:
+   - `https://www.googleapis.com/auth/documents.readonly` — reads the meeting document. That is all the script needs: the calendar feed tells it *which* document, so nothing has to search your Drive.
+
+   That is the entire list. Dispatch asks for **no Google Drive access of any kind** — a Drive scope is *restricted*, meaning an app verified on one needs an annual third-party security assessment, and the calendar feed makes it unnecessary.
+4. **Audience → Publish app** so the status is **In production**. In *Testing*, Google expires the refresh token after **7 days** and you re-authorise every week. You do not need to submit for verification: an unverified production client works for its owner and for up to 100 consenting accounts, which is far more than a team. (Verification would be a consent-screen review rather than the annual third-party CASA assessment a Drive scope would need — Dispatch asks for no Drive scope.)
+5. **Credentials → Create credentials → OAuth client ID → Desktop app.** Desktop clients accept a loopback redirect with no registered URI, which is what the script uses.
+
+Then, once per machine:
+
+```bash
+node scripts/dispatch/meet-fetch.mjs --auth
+```
+
+An **"unverified app"** screen is expected — *Advanced → Go to … (unsafe)*. That is the consequence of step 4, not a fault. The refresh token is written back into the same device file, under `google`, and every later run is non-interactive. Re-run `--auth` if the script ever reports the token as no longer valid; Google revokes them on a password change.
+
+Editing that file by hand while Obsidian is open is safe in both directions: the plugin re-reads the `google` block before saving its own settings, so it never writes over a token or a client you just put there.
+
+**Setting this up for a team.** One person does the Console setup once; everyone else runs `--auth` against the same client and consents with their own Google account. Each teammate's refresh token stays on their own machine, in their own device file, and grants access only to documents *they* can already open. What is shared is the OAuth client, not the access. Anyone who would rather not is unaffected — they download the document and `/meeting report` reads it either way.
+
 ## Security model
 
 Vault content is data, not code. Because notes sync across a team, Dispatch is built so that a note can never execute an arbitrary command:
@@ -266,6 +323,7 @@ Caveat: commands run through your system shell. On Windows (`cmd.exe`), `%VAR%` 
 - **Executes local processes** — but only commands *you* configure on *your* device. Note content can never introduce a command; the confirmation dialog is on by default.
 - **Reads/writes outside the vault** — device settings at `~/.dispatch/<vault>-<hash>.json` and run records at `~/.dispatch/runs/…jsonl`, deliberately outside the vault so machine paths never sync.
 - **One network request type** — if (and only if) you configure a calendar ICS URL, the plugin fetches that feed read-only (cached 15 min) for the Meetings tab. Nothing else leaves your machine; no telemetry. Commands you configure act under your own credentials.
+- **The plugin makes no Google requests.** `scripts/dispatch/meet-fetch.mjs` does, when you run it — read-only, with credentials you supply. It ships in this repository, not in the plugin bundle; the plugin stores its settings and never uses them. See the [privacy policy](https://eightnine.de/dispatch/privacy.html) for what those scopes cover.
 
 ## Building from source
 
