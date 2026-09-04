@@ -25,15 +25,15 @@ The core loop. Each one is wired to a chip on the ticket card, so the board is t
 | `/update-ticket <id>` | inline note comments, the ticket's threads, tracker comments | folds feedback into the spec, recounts counters | chat MCP, tracker MCP |
 | `/implementation-plan <id>` | the refined spec, engineering docs, existing ADRs | the plan into the ticket, **new ADRs** for durable decisions | — |
 | `/develop <id>` | the plan, the code | code + tests, status moves, `log.md` | — |
+| `/code-review <id>` | the ticket's contract zone, the branch diff, its tests, reviews already on the PR | a dated `## Code review` entry in the ticket — findings with file, line and fix — `open_findings`, and the hand-off to `/test-plan` blocked while a criterion fails. Reviewer ≠ author is its precondition, which a chip launch satisfies by construction | — |
 | `/test-plan <id>` | the ticket, the automated suites | the manual plan (only what automation doesn't cover), `open_tests` | — |
-| `/code-review <id>` | the ticket's contract zone, the branch diff, its tests, reviews already on the PR | a dated `## Code review` entry in the ticket — findings with file, line and fix — and the card back to development when a criterion fails. Reviewer ≠ author is its precondition, which a chip launch satisfies by construction | — |
 | `/fix-bug <report>` | a bug report, a thread, or a description | a bug ticket in both systems, then the fix through the same loop | chat MCP, tracker MCP |
 
 <img src="assets/Tickets.png" alt="Tickets" width="33%" style="float: right; margin:10px" />
 
 Three things make this loop hold together:
 
-- **Counters are gates, not decoration.** `open_questions: 0` is what lets a ticket leave refinement; `open_tests: 0` and `open_findings` at 0-or-empty are what let it leave review. A counter describes the build as it stands — the latest writer overwrites, and a command that invalidates a count clears the property instead of zeroing it, so a 0 always came from something that actually counted. Because they're frontmatter, the gate is visible on the board as a badge instead of living in someone's head.
+- **Counters are gates, not decoration.** `open_questions: 0` lets a ticket leave refinement; `open_findings: 0` lets it *enter* review, because the code review runs before the freeze; `open_tests: 0` lets it leave. Because they're frontmatter, each gate is visible on the board as a badge instead of living in someone's head. A counter describes the build as it stands — the latest writer overwrites, and a command that invalidates a count clears the property rather than zeroing it, so a `0` always came from something that actually counted.
 - **The team answers where it already talks.** Refinement posts questions into the team chat and reads the replies back — nobody is asked to review a spec in a tool they don't open. The thread URL goes in `discussion:` so the conversation stays findable from the card.
 - **A skill knows when to stop.** Root cause unclear, needs a product decision, touches safety-critical copy → hand back with the status set to whatever means "needs a human", and say why. An agent that plows through an ambiguous ticket produces work someone has to unpick.
 
@@ -92,8 +92,8 @@ Refine              | claude | my-project | /refine {{id}}
 Update ticket       | claude | my-project | /update-ticket {{id}}
 Implementation plan | claude | my-project | /implementation-plan {{id}}
 Start development   | claude | my-project | /develop {{id}}
-Write test plan     | claude | my-project | /test-plan {{id}}
 Code review         | claude | my-project | /code-review {{id}}
+Write test plan     | claude | my-project | /test-plan {{id}}
 ```
 
 Column headers get batch versions (`{{ids}}`, `{{status}}`, `{{count}}`) for "update all tickets in refinement"; meeting rows and calendar events get their own sets. The mechanics — variables, tool commands, the busy-gate, run tracking — are in [installation.md](installation.md#chips).

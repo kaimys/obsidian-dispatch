@@ -10,7 +10,7 @@ Writes the manual test plan and performs the `In progress` → `Review` transiti
 ## Prepare
 
 1. Resolve the ticket (spec via `id: $ARGUMENTS` in `wiki/05_Requirements/Tickets`, task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI) and name the session `$ARGUMENTS - <shortened title>` (e.g. `US00042 - Import Meet transcripts`).
-2. **Preconditions:** the ticket is code-complete in `In progress` and the gates are green. This command performs the status move, so verify rather than assume — run them if unsure:
+2. **Preconditions:** the ticket is code-complete in `In progress`, the gates are green, and **`open_findings: 0`** — a code review has run against this build and found nothing blocking. An empty `open_findings` means no review has run: stop and say so, pointing at `/code-review`. This command stamps the freeze, and a contract zone closed before the review turns every later spec↔code finding into an annotation instead of a fix. The command also performs the status move, so verify rather than assume — run them if unsure:
    ```
    npm run build && npm run lint && npm test
    ```

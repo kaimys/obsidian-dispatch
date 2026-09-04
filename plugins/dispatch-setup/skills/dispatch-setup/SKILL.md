@@ -59,8 +59,8 @@ The authoritative schema — every field, every default — is `src/settings.ts`
   | `/update-ticket <id>` | ticket cards | fold inline/thread/tracker feedback into the spec, recount counters |
   | `/implementation-plan <id>` | ticket cards | feedback first, then plan mode, plan stored in the spec |
   | `/develop <id>` | ticket cards | preconditions, status move, set `assignee`, implement with tests |
+  | `/code-review <id>` | ticket cards | reviewer ≠ author by construction; criteria, plan, diff and seams; findings into the ticket's `## Code review`, `open_findings`, and `/test-plan` blocked while a criterion fails |
   | `/test-plan <id>` | ticket cards | manual-only checklist (excluding automated coverage), set `open_tests`, status move |
-  | `/code-review <id>` | ticket cards | reviewer ≠ author by construction; criteria, plan, diff and seams; findings into the ticket's `## Code review`, card back to development when a criterion fails |
   | `/release [version]` | manual / release chip | test pass, version bump, release note with `version`/`date` frontmatter (feeds Milestones), promote tickets, announce |
   | `/meeting agenda\|report` | meeting cards | agenda file; transcript → interpreted report with checkbox action items (the format the Meetings tab counts), decisions folded into the affected tickets |
   | `/daily-routine`, `/weekly-maintenance` | manual / scheduled | sync-and-surface passes: fold feedback, reconcile wiki ↔ tracker, run the report suite from rulebooks in `02_Product/Reports/_definitions/` |

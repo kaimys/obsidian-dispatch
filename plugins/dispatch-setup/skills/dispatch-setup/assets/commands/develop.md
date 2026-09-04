@@ -1,5 +1,5 @@
 ---
-description: Implement a ticket — precondition checks, status move, code with tests, gates green, then hand off to /test-plan.
+description: Implement a ticket — precondition checks, status move, code with tests, gates green, then hand off to /code-review in a fresh session.
 argument-hint: <ticket id>
 ---
 
@@ -30,4 +30,4 @@ Runs development for one ticket. `$ARGUMENTS` is the ticket id.
    For user-facing changes, also run the app and confirm the affected surface actually behaves as the acceptance criteria say. A green suite is not a demonstration that the feature works.
 10. **Update the wiki pages this change made wrong.** The docs go stale in exactly this step, every time.
 11. **If this ticket came back from a review, clear `open_findings:` — to empty, not to `0`.** Fixing the findings does not make the build reviewed; it makes the last review stop describing it, and empty is exactly that statement. `0` would claim *reviewed and clear* about code no review has seen, and the gate out of review would pass on it. Only `/code-review` may write a number there.
-12. When code-complete and green, finish with **`/test-plan $ARGUMENTS`** — it writes the manual plan, sets `open_tests`, stamps the freeze and performs the move to `<<S_REVIEW>>`. Do not make that move by hand; the gate belongs to that command.
+12. When code-complete and green, the next step is **`/code-review $ARGUMENTS`** — and **not from this session.** The reviewer is not the author: the context that wrote the code is the one that will defend it, so recommend the review rather than running it here. The card's **Code review** chip is a fresh session by construction. A clean review then hands off to **`/test-plan $ARGUMENTS`**, which writes the manual plan, sets `open_tests`, stamps the freeze and performs the move to `<<S_REVIEW>>`. Do not make that move by hand; the gate belongs to that command.

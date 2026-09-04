@@ -51,8 +51,8 @@ A name hardcoded in prose merely goes stale when someone joins or leaves. A name
 | `/update-ticket <id>` | ticket card | fold feedback (comments, thread, tracker, code drift) into the spec |
 | `/implementation-plan <id>` | ticket card | plan stored in the ticket, durable decisions extracted as ADRs |
 | `/develop <id>` | ticket card | preconditions → implement with tests → gates green |
+| `/code-review <id>` | ticket card | criteria, plan, diff and seams → `## Code review` in the ticket, `open_findings`; blocks `/test-plan` while a criterion fails |
 | `/test-plan <id>` | ticket card | manual-only checklist, `open_tests`, **freeze**, → `<<S_REVIEW>>` |
-| `/code-review <id>` | ticket card | criteria, plan, diff and seams → `## Code review` in the ticket, `open_findings`, card back to `<<S_DEV>>` when a criterion fails |
 | `/release [version]` | manual | test pass → bump → release note from the board → tag → promote → announce |
 | `/meeting agenda\|report <date> <title>` | meeting + calendar chips | agenda from the board; transcript → report with decisions folded into tickets |
 
@@ -66,5 +66,5 @@ Invariants every command inherits — the [freeze rule](https://github.com/kaimy
 
 - **`<!-- GUIDE: … -->`** in a template is scaffolding — strip it from any section you fill, leave it on sections you don't.
 - **`%% … %%`** in a ticket is a *human's* inline comment — feedback for `/update-ticket` to fold in and then delete. Never use it for machine scaffolding, or the two become indistinguishable.
-- **Counters are gates.** `open_questions: 0` leaves refinement; `open_tests: 0` and `open_findings` at 0-or-empty leave review. All three are frontmatter, so the gate is a badge on the card rather than a memory. A counter describes the current build: the latest writer overwrites, unset is not 0, and a command that invalidates a count clears it rather than writing 0.
+- **Counters are gates.** `open_questions: 0` leaves refinement; `open_findings: 0` *enters* review (the code review runs before the freeze); `open_tests: 0` leaves it. All three are frontmatter, so the gate is a badge on the card rather than a memory. A counter describes the current build: the latest writer overwrites, unset is not 0, and a command that invalidates a count clears it rather than writing 0.
 - **A command that can't proceed stops and says why**, with the status left where a human will see it. Plowing through an ambiguous ticket produces work someone has to unpick.
