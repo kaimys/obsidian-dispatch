@@ -33,7 +33,7 @@ The core loop. Each one is wired to a chip on the ticket card, so the board is t
 
 Three things make this loop hold together:
 
-- **Counters are gates, not decoration.** `open_questions: 0` is what lets a ticket leave refinement; `open_tests: 0` is what lets it leave review. Because they're frontmatter, the gate is visible on the board as a badge instead of living in someone's head.
+- **Counters are gates, not decoration.** `open_questions: 0` is what lets a ticket leave refinement; `open_tests: 0` and `open_findings` at 0-or-empty are what let it leave review. A counter describes the build as it stands — the latest writer overwrites, and a command that invalidates a count clears the property instead of zeroing it, so a 0 always came from something that actually counted. Because they're frontmatter, the gate is visible on the board as a badge instead of living in someone's head.
 - **The team answers where it already talks.** Refinement posts questions into the team chat and reads the replies back — nobody is asked to review a spec in a tool they don't open. The thread URL goes in `discussion:` so the conversation stays findable from the card.
 - **A skill knows when to stop.** Root cause unclear, needs a product decision, touches safety-critical copy → hand back with the status set to whatever means "needs a human", and say why. An agent that plows through an ambiguous ticket produces work someone has to unpick.
 

@@ -197,6 +197,21 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Open-findings property")
+			.setDesc(
+				"Numeric frontmatter property counting blocking findings from the most recent code review. Shown as a \"⚠ N\" badge on cards — green at 0 (reviewed and clear). Leave the property empty on a note that has not been reviewed: empty shows no badge, which is not the same claim as 0. Empty = off."
+			)
+			.addText((t) =>
+				t
+					.setPlaceholder("open_findings")
+					.setValue(this.plugin.shared.board.findingsProperty)
+					.onChange(async (v) => {
+						this.plugin.shared.board.findingsProperty = v.trim();
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Discussion property")
 			.setDesc(
 				"Frontmatter property holding a discussion URL (e.g. a Slack thread). Cards show a chat icon that opens the link. Empty = off."

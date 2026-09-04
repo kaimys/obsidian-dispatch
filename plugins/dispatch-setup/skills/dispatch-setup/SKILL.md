@@ -124,7 +124,8 @@ Write the **full** settings object — missing keys fall back to defaults, but a
   "chips": {
     "defaultTool": "claude",
     "templates": [
-      { "label": "Start refinement", "tool": "claude", "repo": "my-app", "prompt": "/refine {{id}}" }
+      { "label": "Start refinement", "tool": "claude", "repo": "my-app", "prompt": "/refine {{id}}" },
+      { "label": "Code review", "tool": "claude", "repo": "my-app", "prompt": "/code-review {{id}}" }
     ],
     "columnTemplates": [
       { "label": "Refine all tickets", "tool": "claude", "repo": "my-app", "prompt": "Work through these tickets sequentially with the full /refine workflow: {{ids}}." }

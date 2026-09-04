@@ -34,4 +34,5 @@ Runs development for one ticket. `$ARGUMENTS` is the ticket id.
    ```
    For user-facing changes, also run the app and confirm the affected surface actually behaves as the acceptance criteria say. A green suite is not a demonstration that the feature works.
 10. **Update the wiki pages this change made wrong.** The docs go stale in exactly this step, every time.
-11. When code-complete and green, finish with **`/test-plan $ARGUMENTS`** — it writes the manual plan, sets `open_tests`, stamps the freeze and performs the move to `Review`. Do not make that move by hand; the gate belongs to that command.
+11. **If this ticket came back from a review, clear `open_findings:` — to empty, not to `0`.** Fixing the findings does not make the build reviewed; it makes the last review stop describing it, and empty is exactly that statement. `0` would claim *reviewed and clear* about code no review has seen, and the gate out of review would pass on it. Only `/code-review` may write a number there.
+12. When code-complete and green, finish with **`/test-plan $ARGUMENTS`** — it writes the manual plan, sets `open_tests`, stamps the freeze and performs the move to `Review`. Do not make that move by hand; the gate belongs to that command.

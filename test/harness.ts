@@ -93,6 +93,7 @@ export const CARD_SETTINGS = {
 	badgeProperties: ['type', 'priority'],
 	questionsProperty: 'open_questions',
 	testsProperty: 'open_tests',
+	findingsProperty: 'open_findings',
 	discussionProperty: 'discussion',
 	orderProperty: 'rank',
 	columns: SETTINGS.columns,

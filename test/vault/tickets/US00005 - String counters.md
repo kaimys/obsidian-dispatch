@@ -4,6 +4,7 @@ type: story
 status: Refinement
 priority: low
 open_questions: "3"
+open_findings: "2"
 size: "5"
 updated: 2026-08-06
 ---

@@ -49,6 +49,7 @@ The sections below describe both layers as the **settings UI** presents them. If
 - **Assignee property** — shown as an accent-outlined `@Name` badge, always first in the slice-by bar
 - **Open-questions property** — numeric counter rendered as the `? N` badge (amber → green at 0)
 - **Open-tests property** — numeric counter rendered as the `✓ N` badge (purple → green at 0)
+- **Open-findings property** — numeric counter rendered as the `⚠ N` badge (red → green at 0); blocking findings from the latest code review. Leave the property empty on a note nothing has reviewed — empty renders no badge, `0` claims the review found nothing
 - **Discussion property** — a thread URL rendered as a chat icon in the card title
 - **Required properties** — drives the ⚠ problems panel (typically `id, status, updated`)
 
@@ -165,6 +166,7 @@ Missing keys fall back to the defaults in `src/settings.ts`, but writing the ful
     "badgeProperties": ["type", "priority", "version_target"],
     "questionsProperty": "open_questions",
     "testsProperty": "open_tests",
+    "findingsProperty": "open_findings",
     "discussionProperty": "discussion",
     "requiredProperties": ["id", "status", "updated"],
     "automations": [
@@ -218,7 +220,7 @@ Where the stored shape differs from the settings UI:
 
 - **Columns are objects, not `value | Label | progress | WIP` strings.** `label` may be omitted (the `value` is then displayed), an omitted `wip` means no limit, and the UI's `-` progress becomes `"excluded": true` — *not* `"progress": "-"`.
 - **`chips.templates` and `chips.columnTemplates` are separate lists** — card chips vs. batch chips on a column header. Identical object shape (`label`, `tool`, `repo`, `prompt`); only the column prompts get `{{ids}}`, `{{status}}` and `{{count}}`.
-- **Empty means off, and hides the tab.** `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` turns the forecast off, `board.orderProperty: ""` disables manual ordering, and an empty `assigneeProperty`/`questionsProperty`/`testsProperty`/`discussionProperty` drops that badge.
+- **Empty means off, and hides the tab.** `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` turns the forecast off, `board.orderProperty: ""` disables manual ordering, and an empty `assigneeProperty`/`questionsProperty`/`testsProperty`/`findingsProperty`/`discussionProperty` drops that badge.
 - **`milestones.tags` is keyed by normalized `major.minor`** (`"1.2": "Beta"`), while `plannedVersions` holds the canonical *write* form (`"v1.2.0"`) — dropping a card writes that exact string.
 - **Automation rules always carry all four keys.** A `set`-only rule keeps `"repo": ""` and `"command": ""`; an empty `when` means every status change.
 

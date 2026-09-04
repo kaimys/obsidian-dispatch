@@ -12,7 +12,7 @@ Releases one version. `$ARGUMENTS` is the target version (e.g. `v1.4.0`); withou
 ## Scope the release
 
 1. **The release scope is what the board says it is:** every ticket whose `version_target` matches, in `<<WIKI>>/<<TICKETS>>`. Anything shipped without a ticket is invisible here — which is the practical argument for no-ticket-no-merge.
-2. Verify each in-scope ticket is actually ready: at `<<S_REVIEW>>` or beyond with `open_tests: 0`. **List the ones that aren't and stop.** Either they get finished, or they get moved to the next version — both are the user's call, not yours.
+2. Verify each in-scope ticket is actually ready: at `<<S_REVIEW>>` or beyond with `open_tests: 0` and `open_findings` empty or `0`. **List the ones that aren't and stop.** Either they get finished, or they get moved to the next version — both are the user's call, not yours.
 3. Confirm today's date with `date`.
 
 ## Prove it

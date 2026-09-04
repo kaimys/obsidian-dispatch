@@ -162,6 +162,7 @@ export class BoardView extends ItemView {
 			badgeProperties: b.badgeProperties,
 			questionsProperty: b.questionsProperty,
 			testsProperty: b.testsProperty,
+			findingsProperty: b.findingsProperty,
 			discussionProperty: b.discussionProperty,
 			orderProperty: b.orderProperty,
 			columns: b.columns,
@@ -739,6 +740,7 @@ export class BoardView extends ItemView {
 			showStatus ||
 			card.questions !== undefined ||
 			card.tests !== undefined ||
+			card.findings !== undefined ||
 			card.badges.length > 0
 		) {
 			const badges = el.createDiv({ cls: "dispatch-card-badges" });
@@ -777,6 +779,20 @@ export class BoardView extends ItemView {
 							card.tests === 0
 								? "Manual test plan complete"
 								: `${card.tests} open manual test(s) — see the ticket's Test plan`,
+					},
+				});
+			}
+			if (card.findings !== undefined) {
+				badges.createSpan({
+					cls:
+						"dispatch-badge dispatch-badge-findings" +
+						(card.findings === 0 ? " dispatch-badge-findings-zero" : ""),
+					text: `⚠ ${card.findings}`,
+					attr: {
+						title:
+							card.findings === 0
+								? "No blocking findings — the last review passed"
+								: `${card.findings} blocking finding(s) — see the ticket's Code review section`,
 					},
 				});
 			}

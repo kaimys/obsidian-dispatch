@@ -119,6 +119,13 @@ export interface BoardSettings {
 	 */
 	testsProperty: string;
 	/**
+	 * Numeric frontmatter property counting blocking findings from the most
+	 * recent code review. Rendered as a "⚠ N" badge (green at 0 = reviewed
+	 * and clear; empty = not reviewed, which is not the same thing).
+	 * Empty = off.
+	 */
+	findingsProperty: string;
+	/**
 	 * Properties every card note must carry (non-empty, no unrendered template
 	 * stubs). Violations appear in the board's problems panel.
 	 */
@@ -297,6 +304,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 		questionsProperty: "",
 		discussionProperty: "",
 		testsProperty: "",
+		findingsProperty: "",
 		requiredProperties: [],
 		automations: [],
 	},

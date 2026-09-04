@@ -32,6 +32,8 @@ export interface CardData<F extends FileRef = FileRef> {
 	questions?: number;
 	/** Open manual test-plan items. */
 	tests?: number;
+	/** Blocking findings from the most recent code review. */
+	findings?: number;
 	/** Discussion thread URL. */
 	discussion?: string;
 	/** Completion contribution (0–100) of the card's status. */
@@ -59,6 +61,7 @@ export interface CardSettings {
 	badgeProperties: string[];
 	questionsProperty: string;
 	testsProperty: string;
+	findingsProperty: string;
 	discussionProperty: string;
 	orderProperty: string;
 	columns: ColumnConfig[];
@@ -163,6 +166,7 @@ export function buildCard<F extends FileRef>(
 		assignee,
 		questions: s.questionsProperty ? parseCount(fm[s.questionsProperty]) : undefined,
 		tests: s.testsProperty ? parseCount(fm[s.testsProperty]) : undefined,
+		findings: s.findingsProperty ? parseCount(fm[s.findingsProperty]) : undefined,
 		discussion,
 		progress: meta?.progress,
 		excludedFromProgress: meta?.excluded ?? false,

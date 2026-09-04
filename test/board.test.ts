@@ -41,7 +41,16 @@ describe("building a card", () => {
 	it("accepts counters and sizes typed as strings", () => {
 		const c = card("US00005");
 		expect(c.questions).toBe(3);
+		expect(c.findings).toBe(2);
 		expect(c.size).toBe(5);
+	});
+
+	it("leaves a counter undefined when the note never set it", () => {
+		// Unset is not zero (ADR-0028): a ticket no review has touched makes
+		// no claim, so the card renders no badge at all rather than a green
+		// "reviewed and clear" one.
+		expect(card("US00001").findings).toBeUndefined();
+		expect(card("US00001").raw.open_findings).toBeUndefined();
 	});
 
 	it("places a known status in the pipeline and carries its progress weight", () => {
