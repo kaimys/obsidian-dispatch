@@ -108,15 +108,32 @@ function logRunToNote() {
 	}
 }
 
-/** Last assistant text from a Claude Code transcript (JSONL), flattened and truncated. */
+/**
+ * Last agent text from a transcript (JSONL), flattened and truncated. Both
+ * agents write one and neither can read the other's:
+ *
+ * - Claude Code: `{ type: "assistant", message: { content } }`, where content is
+ *   a string or an array of `{ type: "text", text }` blocks.
+ * - Codex: `{ type: "event_msg", payload: { type: "task_complete",
+ *   last_agent_message } }` — note `agent`, not `assistant`.
+ *
+ * Both shapes were read off a real transcript, not assumed. Only reached when
+ * the hook payload did not hand the final message over directly.
+ */
 function lastAssistantExcerpt(transcriptPath, maxLen) {
 	try {
 		if (!transcriptPath || !existsSync(transcriptPath)) return "";
 		let text = "";
 		for (const line of readFileSync(transcriptPath, "utf8").split("\n")) {
-			if (!line.includes('"assistant"')) continue; // cheap prefilter
+			// Cheap prefilter — one marker per agent.
+			if (!line.includes('"assistant"') && !line.includes('"task_complete"')) continue;
 			try {
 				const entry = JSON.parse(line);
+				if (entry.type === "event_msg" && entry.payload?.type === "task_complete") {
+					const last = entry.payload.last_agent_message;
+					if (typeof last === "string" && last.trim()) text = last;
+					continue;
+				}
 				if (entry.type !== "assistant") continue;
 				const content = entry.message?.content;
 				if (typeof content === "string" && content.trim()) {
