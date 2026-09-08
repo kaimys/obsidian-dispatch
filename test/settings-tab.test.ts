@@ -43,3 +43,26 @@ describe("the settings tab renders through display()", () => {
 		expect(controls.length).toBeGreaterThan(20);
 	});
 });
+
+/**
+ * US00002: two settings rows edit an object with more fields than the row
+ * shows, and both used to rebuild that object from scratch. `ToolConfig` also
+ * carries the per-tool prompt overrides; `ChipTemplate` also carries `intent`,
+ * which is the key those overrides are stored under. A rebuild drops the
+ * unseen field silently, on an edit to something else, long after it was set —
+ * so the loss surfaces as "my overrides stopped working", not as an error.
+ *
+ * Asserted on source text because the handlers need a live Obsidian
+ * `PluginSettingTab`, per this file's header.
+ */
+describe("settings rows merge rather than rebuild", () => {
+	it("keeps the fields the Tools row cannot see", () => {
+		// `{ command }` would be the whole ToolConfig; `prompts` must survive.
+		expect(code()).toContain("...existing[name]");
+		expect(code()).not.toMatch(/=>\s*\[\s*name,\s*\{\s*command\s*\}\s*,?\s*\]/);
+	});
+
+	it("keeps the intent the Chip templates row cannot see", () => {
+		expect(code()).toContain("intents.get(label)");
+	});
+});

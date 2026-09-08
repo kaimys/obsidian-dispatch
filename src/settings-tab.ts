@@ -661,6 +661,17 @@ export class DispatchSettingTab extends PluginSettingTab {
 							.join("\n")
 					)
 					.onChange(async (v) => {
+						// Carry `intent` across the rebuild. This row edits four
+						// fields; a ChipTemplate has five, and the fifth keys every
+						// per-tool prompt override on the device. Rebuilding the
+						// object from scratch would drop it on an unrelated edit,
+						// long after it was set — the same silent loss the Tools
+						// row above had.
+						const intents = new Map(
+							this.plugin.shared.chips.templates
+								.filter((t) => t.intent)
+								.map((t) => [t.label, t.intent])
+						);
 						this.plugin.shared.chips.templates = splitLines(v)
 							.map((line) => {
 								const parts = line.split("|");
@@ -672,6 +683,7 @@ export class DispatchSettingTab extends PluginSettingTab {
 								if (!label || !prompt) return null;
 								return {
 									label,
+									intent: intents.get(label),
 									tool: tool || undefined,
 									repo: repo || undefined,
 									prompt,
