@@ -15,9 +15,9 @@ Your coding agents ship faster than you can decide. **You are now the bottleneck
 - **Release planning is drag & drop.** The Release Plan view groups tickets by target version: live weighted progress per release, velocity-based forecasts that accumulate across versions, linked release notes for everything shipped. Drag a card — the plan is up to date the moment you drop it.
 - **Meetings run themselves around you.** The agenda is prepared from the board; after the call, a NoteTaker transcript (e.g. Google Gemini) becomes an interpreted report in your vault, decisions are folded into the affected tickets automatically, and the action items show up per person on the Meetings and Todos tabs.
 - **Testing works like refinement.** Manual test plans cover only what the automated suites don't; a `✓ N` badge counts the open checks through review and turns green when a ticket is safe to ship.
-- **Claude Skills and MCP are the glue.** Chips on the board are one-liners (`/refine US00042`); the workflow logic behind them lives as Claude skills in your code repository — versioned with the code, reviewed like code, shared through git — while MCP connects the agent to your team's Slack, your tracker and your NoteTaker. Wiki, team and codebase become one loop, and the agents run it with you.
+- **Agent skills and MCP are the glue.** Chips on the board are one-liners (`/refine US00042`); the workflow logic behind them lives in your code repository — versioned with the code, reviewed like code, shared through git — while MCP connects the agent to your team's Slack, your tracker and your NoteTaker. Each workflow is **one file**, with a thin stub per agent, so Claude Code and Codex run the same process instead of two copies that drift. Wiki, team and codebase become one loop, and the agents run it with you.
 
-Under the hood, two primitives: **boards** (kanban views driven by note properties — drag & drop writes frontmatter) and **chips** (buttons that launch coding agents with the ticket as context). Desktop only — chips and automations spawn local processes.
+Under the hood, two primitives: **boards** (kanban views driven by note properties — drag & drop writes frontmatter) and **chips** (buttons that launch coding agents with the ticket as context). Configure more than one agent and the chip asks which to run, showing you the exact command before it does. Desktop only — chips and automations spawn local processes.
 
 ## Documentation
 
@@ -52,6 +52,11 @@ The skill behind that button lives in this repo's plugin marketplace:
 The prompt carries those two lines itself, so the button works before you have installed the
 skill. The setup interviews you about your wiki, writes both configuration layers, scaffolds
 ticket templates and workflow commands, and verifies the result.
+
+The guided setup itself runs in Claude Code today. Chips, the workflow files and the run-state
+badges work with **Codex** as well — see
+[Installation & configuration](docs/installation.md) for the tool command, the per-tool prompt
+prefix, and the Codex hook wiring.
 
 Prefer to do it by hand? Every setting the skill writes is documented in
 [Installation & configuration](docs/installation.md).

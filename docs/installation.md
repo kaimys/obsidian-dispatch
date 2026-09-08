@@ -132,7 +132,18 @@ Variables: `{{cwd}}`, `{{prompt}}`, `{{promptFile}}` (the prompt written to a te
 
 When a chip launches a tool, Dispatch records the run in a machine-local file (`~/.dispatch/runs/…jsonl`) and passes `DISPATCH_RUN_ID`, `DISPATCH_RUNS_FILE`, `DISPATCH_NOTE`, `DISPATCH_LABEL` and `DISPATCH_STARTED` into the process.
 
-Lifecycle hooks in the target repo — Claude Code `SessionStart`/`Stop`/`SessionEnd` hooks calling a small script — append records back. A ready-to-copy implementation ships with the setup plugin: [`plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs`](https://github.com/kaimys/obsidian-dispatch/blob/main/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs) — drop it into the target repo (e.g. `scripts/dispatch/run-state.mjs`) and wire the four events in that repo's `.claude/settings.json`. The board then shows a live badge on the card: **started → running ⇄ waiting → done**, where *waiting* means the agent finished its turn and the session needs you. Done fades after 24 h; clicking a badge clears a ghost run. On completion the hook appends a run-log line to the note's `## Dispatch runs` section.
+Lifecycle hooks in the target repo — `SessionStart`/`UserPromptSubmit`/`Stop`/`SessionEnd` calling a small script — append records back. A ready-to-copy implementation ships with the setup plugin: [`plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs`](https://github.com/kaimys/obsidian-dispatch/blob/main/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs) — drop it into the target repo (e.g. `scripts/dispatch/run-state.mjs`) and wire the four events for each agent you run:
+
+| Agent | Where the hooks are wired |
+| --- | --- |
+| Claude Code | `.claude/settings.json`, under `hooks` |
+| Codex | `.codex/hooks.json`, under a top-level `hooks` map keyed by event |
+
+One script serves both: it prefers the final message the agent hands it on the hook payload and otherwise reads that agent's transcript, so the run-log excerpt works either way.
+
+The board then shows a live badge on the card: **started → running ⇄ waiting → done**, where *waiting* means the agent finished its turn and the session needs you. Done fades after 24 h; clicking a badge clears a ghost run. On completion the hook appends a run-log line to the note's `## Dispatch runs` section, naming the agent that ran.
+
+**Codex only — hooks must be trusted, and trust is per entry.** A correct `.codex/hooks.json` does nothing until you run `codex` interactively once in the repo and accept the prompt; until then every badge sits at `started` with nothing in the terminal to explain it. Trust is recorded per hook entry and hashed, so **editing the file silently un-trusts what you changed** — re-accept, then confirm a badge actually moves. A hooks file at the wrong path warns about nothing at all, and a malformed one only warns while the session runs on, so never take a clean start as proof the hooks are live.
 
 The plugin only *observes*: live state stays on the machine running the agent, durable outcomes land in the note and sync with the vault.
 
