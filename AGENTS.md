@@ -10,10 +10,18 @@ two ever disagree, the canonical file wins; fix it there rather than here ([[ADR
 which holds the steps, and is shared with every other agent. A step written into a stub is a step
 Claude never sees — so edit the canonical file.
 
-Invoke one explicitly by name: `$refine US00042`, not `/refine US00042`. Two workflows carry
-`agents/openai.yaml` with `policy.allow_implicit_invocation: false` — `release` and `create-ticket`
-— because their side effects reach outside the repository (a git tag and a GitHub release; a
-tracker issue) and cannot be taken back. They run only when a human names them.
+Invoke one explicitly by name: `$refine US00042`, not `/refine US00042`.
+
+**`release` alone carries `agents/openai.yaml` with `policy.allow_implicit_invocation: false`.** It
+bumps a version, pushes a tag and drafts a GitHub release — the one workflow here that must never be
+started by inference. Everything else, `create-ticket` included, may be picked up from context: a
+ticket is recoverable, a published tag is not.
+
+> ⚠️ **That file is unverified.** The key is recorded in US00002's table from `codex-cli
+> 0.149.0-alpha.4.1` and the string exists in 0.153.4, but neither the nesting under `policy:`, nor
+> the filename, nor Codex's *default* for implicit invocation has been confirmed against a live
+> session — so it may be a no-op, or worse, may stop the skill loading. Check it in the same
+> interactive session that establishes hook trust below, before relying on it.
 
 ## Naming the session
 
