@@ -54,21 +54,36 @@ export function toolChoices(
 }
 
 /**
- * The prompt template this tool wants for this chip.
+ * The prompt template this tool wants for this chip, resolved in three steps.
  *
- * A chip carries an intent, not a tool-specific string: `/refine US1` and
- * `$refine US1` are the same intention spelled for two agents. The override is
- * keyed by {@link ChipTemplate.intent} and falls back to the label, so a chip
- * that never declares an intent still works — and a device that configures no
- * override keeps the note's own prompt, exactly as before.
+ * 1. An **explicit override** for this chip's intent, keyed by
+ *    {@link ChipTemplate.intent} and falling back to the label. This is the only
+ *    thing that can express a skill the person installed under a different
+ *    *name* — `$ticket-refine` is not derivable from `/refine`.
+ * 2. Else the tool's **invocation prefix**: a prompt that starts with `/` has
+ *    that one character swapped. `/refine {{id}}` becomes `$refine {{id}}`, which
+ *    is the whole difference between the two agents in the ordinary case, and
+ *    costs one line of config per tool instead of one per chip per tool.
+ * 3. Else the chip's own prompt, unchanged — so a device that configures nothing
+ *    behaves exactly as it did before any of this existed.
+ *
+ * Step 2 fires only on a leading `/`. A chip whose prompt is prose rather than a
+ * command — the column chips are — is not a command in any agent's dialect and
+ * must reach the tool untouched.
  */
 export function resolvePrompt(
 	chip: ChipTemplate,
 	toolName: string,
 	tools: Record<string, ToolConfig>
 ): string {
-	const key = chip.intent || chip.label;
-	return tools[toolName]?.prompts?.[key] || chip.prompt;
+	const tool = tools[toolName];
+	const override = tool?.prompts?.[chip.intent || chip.label];
+	if (override) return override;
+	const prefix = tool?.promptPrefix;
+	if (prefix && prefix !== "/" && chip.prompt.startsWith("/")) {
+		return prefix + chip.prompt.slice(1);
+	}
+	return chip.prompt;
 }
 
 /**

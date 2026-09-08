@@ -158,6 +158,48 @@ describe("resolvePrompt", () => {
 		expect(resolvePrompt(chip({ intent: "refine" }), "codex", blank)).toBe("/refine {{id}}");
 	});
 
+	it("swaps a leading slash for the tool's own invocation prefix", () => {
+		// The ordinary case: same skill, same name, different sigil. One line of
+		// config per tool instead of one per chip per tool.
+		const codex = tools({ codex: { command: "codex", promptPrefix: "$" } });
+		expect(resolvePrompt(chip(), "codex", codex)).toBe("$refine {{id}}");
+	});
+
+	it("leaves a prompt that is not a command completely alone", () => {
+		// Column chips carry prose, not a slash command. Rewriting their first
+		// character would corrupt the prompt for every batch run.
+		const codex = tools({ codex: { command: "codex", promptPrefix: "$" } });
+		const batch = chip({ label: "Refine all", prompt: "Work through these tickets: {{ids}}." });
+		expect(resolvePrompt(batch, "codex", codex)).toBe("Work through these tickets: {{ids}}.");
+	});
+
+	it("changes nothing for a tool whose prefix is absent or already a slash", () => {
+		expect(resolvePrompt(chip(), "claude", tools({ claude: { command: "claude" } }))).toBe(
+			"/refine {{id}}"
+		);
+		const slash = tools({ claude: { command: "claude", promptPrefix: "/" } });
+		expect(resolvePrompt(chip(), "claude", slash)).toBe("/refine {{id}}");
+	});
+
+	it("lets an explicit override beat the prefix", () => {
+		// The prefix cannot express a skill installed under a different *name*,
+		// which is the case the per-chip override exists for.
+		const codex = tools({
+			codex: { command: "codex", promptPrefix: "$", prompts: { refine: "$ticket-refine {{id}}" } },
+		});
+		expect(resolvePrompt(chip({ intent: "refine" }), "codex", codex)).toBe(
+			"$ticket-refine {{id}}"
+		);
+	});
+
+	it("rewrites only the first character, never a slash inside the prompt", () => {
+		const codex = tools({ codex: { command: "codex", promptPrefix: "$" } });
+		const withPath = chip({ prompt: "/meeting report wiki/09_Meetings/{{title}}" });
+		expect(resolvePrompt(withPath, "codex", codex)).toBe(
+			"$meeting report wiki/09_Meetings/{{title}}"
+		);
+	});
+
 	it("gives an override no more trust than a note's prompt", () => {
 		// An override is device config, but it still reaches a shell, so it goes
 		// through the same single-argument quoting (ADR-0004).

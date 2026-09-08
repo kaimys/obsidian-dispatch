@@ -100,6 +100,24 @@ claude = start "Dispatch" /d {{cwd}} cmd /k claude {{prompt}}
 codex  = start "Dispatch" /d {{cwd}} cmd /k codex {{prompt}}
 ```
 
+With more than one tool configured, clicking a chip offers **one button per tool** — *Run with Claude*, *Run with Codex*, *Cancel* — and the command preview follows whichever button is focused. With one tool the dialog is unchanged. The picker lives in the confirmation dialog only: with *Confirm before running* off, a chip runs its own tool (or the shared default) exactly as before.
+
+**Tool prompt prefix.** Agents invoke a workflow with different characters — Claude `/refine US42`, Codex `$refine US42`. Set the character once per tool rather than a prompt per chip:
+
+```
+codex = $
+```
+
+A chip prompt that *starts* with `/` has that one character swapped for this tool. Prompts that are not commands — the column chips, which read "Work through these tickets…" — are never rewritten.
+
+**Tool prompts** is the escape hatch for the case a prefix cannot express: a skill installed under a different *name*. One line per tool and chip, keyed `tool.intent` (or `tool.<chip label>` when the chip declares no intent):
+
+```
+codex.refine = $ticket-refine {{id}}
+```
+
+An explicit prompt wins over the prefix, and the chip's own prompt is used for anything neither names — so a device that configures nothing keeps working.
+
 macOS:
 
 ```
@@ -233,7 +251,11 @@ Where the stored shape differs from the settings UI:
   },
   "tools": {
     "claude": { "command": "start \"Dispatch\" /d {{cwd}} cmd /k claude {{prompt}}" },
-    "codex": { "command": "start \"Dispatch\" /d {{cwd}} cmd /k codex {{prompt}}" }
+    "codex": {
+      "command": "start \"Dispatch\" /d {{cwd}} cmd /k codex {{prompt}}",
+      "promptPrefix": "$",
+      "prompts": { "refine": "$ticket-refine {{id}}" }
+    }
   },
   "calendarUrl": "",
   "enableHooks": false,
@@ -241,7 +263,7 @@ Where the stored shape differs from the settings UI:
 }
 ```
 
-- **`tools` maps a name to an *object*, not to a string** — `{"claude": {"command": "…"}}`. A bare string is not a valid tool entry.
+- **`tools` maps a name to an *object*, not to a string** — `{"claude": {"command": "…"}}`. A bare string is not a valid tool entry. `promptPrefix` and `prompts` are optional; a tool that omits both runs every chip's own prompt.
 - `repos` is the only place absolute paths may appear anywhere in Dispatch's configuration.
 - `enableHooks` gates automation **commands** on this machine; the `set` assignments of an automation rule always apply.
 

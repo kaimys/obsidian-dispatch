@@ -750,11 +750,38 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Tool prompt prefix")
+			.setDesc(
+				"Optional, one per line: tool = character. A chip prompt starting with / is rewritten " +
+					"to this character for that tool — codex = $ turns /refine {{id}} into $refine {{id}}, " +
+					"for every chip. Prompts that are not commands are never rewritten, and an explicit " +
+					"tool prompt below wins over this."
+			)
+			.addTextArea((ta) =>
+				ta.setPlaceholder("codex = $").setValue(
+					Object.entries(this.plugin.local.tools)
+						.filter(([, cfg]) => cfg.promptPrefix)
+						.map(([tool, cfg]) => `${tool} = ${cfg.promptPrefix}`)
+						.join("\n")
+				).onChange(async (v) => {
+					// Set only this field; the command and the per-chip prompts
+					// are edited by their own rows and must survive this one.
+					const tools = this.plugin.local.tools;
+					for (const cfg of Object.values(tools)) delete cfg.promptPrefix;
+					for (const [name, prefix] of Object.entries(parseKeyValueLines(v))) {
+						if (!tools[name]) tools[name] = { command: "" };
+						tools[name].promptPrefix = prefix;
+					}
+					await this.plugin.saveLocal();
+				})
+			);
+
+		new Setting(containerEl)
 			.setName("Tool prompts")
 			.setDesc(
-				"Optional, one per line: tool.intent = prompt. The prompt this agent wants for a chip, " +
-					"when its own spelling differs — e.g. codex.refine = $refine {{id}} beside Claude's /refine {{id}}. " +
-					"The chip's prompt is used for any tool and intent not listed here."
+				"Optional, one per line: tool.intent = prompt. Only needed when an agent's skill has a " +
+					"different name, not merely a different prefix — the row above already handles the " +
+					"prefix for every chip. The chip's own prompt is used for anything not listed here."
 			)
 			.addTextArea((ta) =>
 				ta

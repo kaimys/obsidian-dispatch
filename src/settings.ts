@@ -224,6 +224,18 @@ export interface ToolConfig {
 	 * Absent, or empty for an intent, means the chip's own prompt is used.
 	 */
 	prompts?: Record<string, string>;
+	/**
+	 * The character this tool invokes a workflow with — Claude `/`, Codex `$`.
+	 * A chip prompt that *starts* with `/` has that one character swapped for
+	 * this one, which covers the whole difference between `/refine {{id}}` and
+	 * `$refine {{id}}` without configuring anything per chip.
+	 *
+	 * Only a leading `/` is rewritten: a chip whose prompt is prose rather than
+	 * a command — the column chips are — must reach the agent untouched. An
+	 * explicit entry in {@link ToolConfig.prompts} still wins, for the case this
+	 * cannot cover: a skill the person installed under a different *name*.
+	 */
+	promptPrefix?: string;
 }
 
 export interface LocalSettings {
