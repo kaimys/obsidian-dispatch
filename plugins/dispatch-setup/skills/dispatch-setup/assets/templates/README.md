@@ -40,6 +40,6 @@ Section headings are the part most worth changing — they encode the questions 
 
 - the **frontmatter keys** the board reads (they must match `data.json`)
 - **`- [ ]` checkboxes** in Open questions, Test plan and Action items — the counters and the Todos tab are derived from them
-- **one section per counter**, so `open_questions` and `open_tests` each have exactly one place to be recounted from
+- **one section per counter**, so `open_questions`, `open_findings` and `open_tests` each have exactly one place to be recounted from (Open questions, `## Code review`, Test plan)
 
 A `## Dispatch runs` heading is included in the ticket templates so agent run logs land somewhere predictable; the lifecycle hook appends it anyway if it's missing.

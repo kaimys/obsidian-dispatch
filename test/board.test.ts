@@ -45,6 +45,19 @@ describe("building a card", () => {
 		expect(c.size).toBe(5);
 	});
 
+	it("renders no counter when the board names no property for it", () => {
+		// Criterion 3's "off" half: an empty findingsProperty means no card
+		// carries the badge, whatever the note says. Pins the ternary that
+		// would otherwise read the property under any name.
+		const f = note("US00005");
+		const off = buildCard({ path: f.path, basename: f.basename }, f.frontmatter, {
+			...CARD_SETTINGS,
+			findingsProperty: "",
+		});
+		expect(off.findings).toBeUndefined();
+		expect(card("US00005").findings).toBe(2);
+	});
+
 	it("leaves a counter undefined when the note never set it", () => {
 		// Unset is not zero (ADR-0028): a ticket no review has touched makes
 		// no claim, so the card renders no badge at all rather than a green

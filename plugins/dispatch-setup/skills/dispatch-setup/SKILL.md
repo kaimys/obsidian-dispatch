@@ -90,6 +90,7 @@ Write the **full** settings object — missing keys fall back to defaults, but a
     "badgeProperties": ["type", "priority", "version_target"],
     "questionsProperty": "open_questions",
     "testsProperty": "open_tests",
+    "findingsProperty": "open_findings",
     "discussionProperty": "discussion",
     "requiredProperties": ["id", "status", "updated"],
     "automations": [

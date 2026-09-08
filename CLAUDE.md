@@ -98,8 +98,9 @@ checkout silently share one board's configuration ([[ADR-0026]]).
   annotation (`> ⚠️ Correction <date>: …`) beneath it, never a rewrite; new scope becomes a new
   linked ticket. A spec that can change after the code was built against it makes every later
   spec↔code mismatch unexplainable.
-- **Gates are gates.** `open_questions: 0` before development starts, `open_tests: 0` before a
-  ticket leaves `Review`. No command crosses a gated boundary on its own. `Refinement` is the
+- **Gates are gates.** `open_questions: 0` before development starts, `open_findings: 0` before
+  `/test-plan` runs (the code review comes before the freeze), `open_tests: 0` before a ticket
+  leaves `Review`. No command crosses a gated boundary on its own. `Refinement` is the
   column, but the counter is still the gate: a ticket sitting in `Refinement` with unanswered
   questions is not buildable, and moving the card does not make it so.
 - **Ownership.** Every page carries `owner:`, a person resolving to `wiki/00_Start-Here/Team/`,

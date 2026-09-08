@@ -19,7 +19,7 @@ Columns are the values of your **status** property, in the order you configure �
 
 - **Drag between columns** to change status; **drag within a column** to change priority. Order is data: it's written back into a `rank` property with gaps of 1024 and midpoint inserts, so a reorder normally rewrites only the moved note.
 - **Cards show what you configure**: a title (optionally prefixed by the ticket `id`), badges for any property (type, priority, size), an accent-outlined `@Name` for the assignee, and a chat icon linking to the discussion thread.
-- **Two counters get their own badges** because they gate the workflow rather than describe it: `? N` for open refinement questions (amber → green at 0) and `✓ N` for open manual test items (purple → green at 0). Green on both means a ticket is build-ready and review-ready respectively.
+- **Three counters get their own badges** because they gate the workflow rather than describe it: `? N` for open refinement questions (amber → green at 0), `⚠ N` for blocking findings from the last code review (red → green at 0) and `✓ N` for open manual test items (purple → green at 0). Green means build-ready, review-ready and sign-off-ready respectively. An *empty* findings counter is not a green one — it means no review has run, so the badge is absent rather than reassuring.
 - **A ⚠ problems panel** lists cards missing required properties, carrying unrendered template stubs, or using a status that isn't a column — malformed tickets surface the moment they appear.
 - **Right-click a card** for its chips, or to edit size and badge properties inline.
 - **Click a column header** for batch chips: one agent session working through every ticket in that column in sequence.
