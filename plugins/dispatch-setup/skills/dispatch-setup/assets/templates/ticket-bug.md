@@ -8,7 +8,7 @@ version_target:
 size:
 assignee:
 open_questions: 0
-open_tests: 0
+open_tests:
 open_findings:
 discussion:
 updated:
