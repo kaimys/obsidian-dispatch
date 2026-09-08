@@ -32,16 +32,35 @@ title was set.
 
 ## Run-lifecycle hooks
 
-**Not wired yet.** Dispatch's chip-run badges are driven by `scripts/dispatch/run-state.mjs`,
-which Claude Code calls from `.claude/settings.json`. The Codex side —
-`.codex/hooks/hooks.json` mapping `SessionStart`/`UserPromptSubmit` → `running`, `Stop` →
-`waiting`, `SessionEnd` → `done` — is US00002 Phase D and is not built.
+`.codex/hooks.json` wires four events to `scripts/dispatch/run-state.mjs`, which reports chip run
+state back to the board and appends the run log to the note:
 
-Two things to know when it is:
+| Event | State |
+| --- | --- |
+| `SessionStart` | `running` |
+| `UserPromptSubmit` | `running` |
+| `Stop` | `waiting` |
+| `SessionEnd` | `done` |
 
-- The handler shape is **not** Claude's. A command handler is `{ "type": "command", "command":
-  "<one string>" }` with optional `commandWindows`, `timeout`, `async` and `statusMessage` — there
-  is no `args` array — grouped under `{ "matcher", "hooks", "enabled" }`.
-- **Hooks do not run until they are trusted.** A fresh checkout with a correct `hooks.json` and no
-  trust shows badges stuck at `launched`, which is indistinguishable from a broken hook. Trust once,
-  interactively, before concluding anything is wrong.
+The script is a silent no-op outside a chip-launched session — it keys off the `DISPATCH_*`
+environment variables the plugin sets, and does nothing when they are absent.
+
+Three things this cost a while to learn, all of which fail *quietly*:
+
+- **The path is `.codex/hooks.json`.** Not `.codex/hooks/hooks.json` — that is a plugin layout —
+  and not `hooks` inside `config.toml`. A hooks file at the wrong path produces **no warning at
+  all**: nothing is read, nothing is reported, and every badge sits at `launched`.
+- **A malformed hooks file is a `warning`, and the session runs anyway.** So the absence of an
+  error proves nothing. Verify by watching a state transition, never by a clean startup.
+- **`codex exec` is the only command that parses this file.** `codex doctor` and `codex debug
+  prompt-input` load project config and `AGENTS.md` but never touch hooks — they will accept any
+  hooks file at all, including contradictory ones.
+
+The handler shape is **not** Claude's: a command handler is `{ "type": "command", "command": "<one
+string>" }` — one string, no `args` array — with optional `commandWindows`, `timeout`, `async` and
+`statusMessage`, grouped under `{ "matcher", "hooks" }` inside a top-level `hooks` map keyed by
+event.
+
+**Hooks still do not run until they are trusted**, and trust can only be granted interactively.
+With the file correct and untrusted, the symptom is identical to having no file: badges stuck at
+`launched`, nothing in the terminal. Run `codex` once in the repo and accept the prompt.

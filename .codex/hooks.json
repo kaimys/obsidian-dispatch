@@ -1,0 +1,17 @@
+{
+  "description": "Dispatch run lifecycle — reports chip-run state to the board.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "node scripts/dispatch/run-state.mjs running" }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "node scripts/dispatch/run-state.mjs running" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "node scripts/dispatch/run-state.mjs waiting" }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "node scripts/dispatch/run-state.mjs done" }] }
+    ]
+  }
+}
