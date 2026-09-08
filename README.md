@@ -58,6 +58,13 @@ codex plugin marketplace add kaimys/obsidian-dispatch
 codex plugin add dispatch-setup@dispatch
 ```
 
+Or, if you would rather have the skill on its own without the plugin, ask Codex to fetch it —
+its bundled `skill-installer` takes a repository path:
+
+```
+$skill-installer install kaimys/obsidian-dispatch plugins/dispatch-setup/skills/dispatch-setup
+```
+
 The prompt carries those two lines itself, so the button works before you have installed the
 skill. The setup interviews you about your wiki, writes both configuration layers, scaffolds
 ticket templates and workflow commands, and verifies the result.

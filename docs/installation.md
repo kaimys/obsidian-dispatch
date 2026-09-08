@@ -122,7 +122,10 @@ macOS:
 
 ```
 claude = osascript -e 'tell app "Terminal" to do script "cd " & quoted form of {{cwd}} & " && claude " & quoted form of {{prompt}}'
+codex  = osascript -e 'tell app "Terminal" to do script "cd " & quoted form of {{cwd}} & " && codex " & quoted form of {{prompt}}'
 ```
+
+The two differ only in the binary: both agents take the prompt as one positional argument, and neither needs a flag. On macOS `codex` is on `PATH` from the installer, as it is on Windows — no hashed path is involved on either platform.
 
 Variables: `{{cwd}}`, `{{prompt}}`, `{{promptFile}}` (the prompt written to a temp file — use it for long or multiline prompts). All expand as quoted arguments; append `Raw` for unquoted (there is deliberately **no** `{{promptRaw}}`).
 

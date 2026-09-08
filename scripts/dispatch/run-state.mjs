@@ -29,9 +29,11 @@
  *   DISPATCH_RUNS_FILE  absolute path of the runs .jsonl to append to
  *   DISPATCH_NOTE       absolute path of the note the chip was launched from
  *   DISPATCH_LABEL      the chip's label (e.g. "Start development")
+ *   DISPATCH_TOOL       the agent the user chose at click time (e.g. "codex")
  *   DISPATCH_STARTED    ISO timestamp of the launch
- * Claude Code passes the hook payload (including `transcript_path`) as JSON on
- * stdin. No dependencies, fully synchronous, and a silent no-op in normal
+ * Both agents pass the hook payload as JSON on stdin. Codex hands over the
+ * final message directly (`last_assistant_message`); Claude does not, so it is
+ * reconstructed from `transcript_path`. Either transcript shape is understood. No dependencies, fully synchronous, and a silent no-op in normal
  * (non-chip) sessions — this must never disturb a session.
  *
  * Zero dependencies. Node 18+.

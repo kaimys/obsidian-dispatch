@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	carryIntents,
 	compareRanks,
 	displayValue,
 	comparePatchKeys,
@@ -10,6 +11,57 @@ import {
 } from "../src/parse";
 
 const TEAM = ["Alex", "Robin", "Morgan"];
+
+/**
+ * R3: the chip-template settings row edits four of a ChipTemplate's five
+ * fields, so `intent` has to survive the rebuild. Matching by label alone lost
+ * it on exactly the edit `intent` exists to survive — a rename — and the
+ * previous guard asserted on source text, so it could not see that.
+ */
+describe("carryIntents", () => {
+	const was = [
+		{ label: "Refine", intent: "refine" },
+		{ label: "Develop", intent: "develop" },
+	];
+
+	it("keeps the intent when a chip is renamed", () => {
+		const rebuilt = [{ label: "Sharpen" }, { label: "Develop" }];
+		expect(carryIntents(was, rebuilt)).toEqual([
+			{ label: "Sharpen", intent: "refine" },
+			{ label: "Develop", intent: "develop" },
+		]);
+	});
+
+	it("keeps intents when an unrelated field changes", () => {
+		const rebuilt = [
+			{ label: "Refine", repo: "other" },
+			{ label: "Develop", repo: "other" },
+		];
+		expect(carryIntents(was, rebuilt).map((t) => t.intent)).toEqual(["refine", "develop"]);
+	});
+
+	it("keeps intents by label when a line is inserted above", () => {
+		const rebuilt = [{ label: "New" }, { label: "Refine" }, { label: "Develop" }];
+		expect(carryIntents(was, rebuilt).map((t) => t.intent)).toEqual([
+			undefined,
+			"refine",
+			"develop",
+		]);
+	});
+
+	it("leaves a chip that never had an intent alone", () => {
+		expect(carryIntents([{ label: "Refine" }], [{ label: "Refine" }])).toEqual([
+			{ label: "Refine" },
+		]);
+	});
+
+	it("prefers the label match over the position for duplicate labels", () => {
+		const dup = [{ label: "Run", intent: "a" }, { label: "Other", intent: "b" }];
+		expect(carryIntents(dup, [{ label: "Other" }, { label: "Run" }]).map((t) => t.intent)).toEqual(
+			["b", "a"]
+		);
+	});
+});
 
 describe("resolveAssignee", () => {
 	it("matches a known name regardless of case and punctuation", () => {

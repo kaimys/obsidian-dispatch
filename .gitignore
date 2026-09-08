@@ -16,3 +16,4 @@ Thumbs.db
 
 # the wiki, symlinked in — the vault itself lives outside this repo
 wiki
+.codex\config.toml

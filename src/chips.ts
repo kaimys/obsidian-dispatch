@@ -2,6 +2,7 @@ import { App, Modal, Notice, TFile, parseYaml, setIcon } from "obsidian";
 import {
 	emptyVars,
 	launchDetached,
+	promptFilePath,
 	quoteArg,
 	resolvePrompt,
 	shellVars,
@@ -168,6 +169,12 @@ interface Candidate {
 	command: string;
 	/** Empty when this tool can run the chip; otherwise why it cannot. */
 	problem: string;
+	/**
+	 * Prompt file this tool's template asked for, written only if this candidate
+	 * is the one launched. The path is reserved up front so the preview can show
+	 * it, but writing every candidate's file would put unused prompts on disk.
+	 */
+	promptFile?: { path: string; contents: string };
 }
 
 /** Shared launch core: tool/repo resolution, command build, busy gate, confirm, run record. */
@@ -179,9 +186,9 @@ function executeChip(
 	noteAbs: string,
 	guardEmpty = false
 ): void {
+	const wanted = spec.tool || plugin.shared.chips.defaultTool;
 	const choices = toolChoices(spec, plugin.local.tools, plugin.shared.chips.defaultTool);
 	if (choices.length === 0) {
-		const wanted = spec.tool || plugin.shared.chips.defaultTool;
 		new Notice(
 			`Dispatch: tool "${wanted}" is not configured on this device (Settings → Dispatch → This device).`
 		);
@@ -222,15 +229,27 @@ function executeChip(
 		const vars = shellVars({ cwd });
 		vars.prompt = quoteArg(prompt); // no {{promptRaw}} on purpose — injection guard
 		const commandTemplate = plugin.local.tools[toolName].command;
+		let promptFile: Candidate["promptFile"];
 		if (commandTemplate.includes("promptFile")) {
-			const promptFile = writePromptFile(prompt);
-			vars.promptFile = quoteArg(promptFile);
-			vars.promptFileRaw = promptFile;
+			const path = promptFilePath();
+			promptFile = { path, contents: prompt };
+			vars.promptFile = quoteArg(path);
+			vars.promptFileRaw = path;
 		}
-		return { tool: toolName, command: substitute(commandTemplate, vars), problem: "" };
+		return {
+			tool: toolName,
+			command: substitute(commandTemplate, vars),
+			problem: "",
+			promptFile,
+		};
 	});
 
 	const execute = (candidate: Candidate) => {
+		// Materialise the prompt file for the chosen tool only, at the path its
+		// command already names.
+		if (candidate.promptFile) {
+			writePromptFile(candidate.promptFile.contents, candidate.promptFile.path);
+		}
 		// Run lifecycle: record the launch; the agent's lifecycle hooks (in the
 		// target repo) append "running"/"done" via the env vars below.
 		const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -297,7 +316,17 @@ function executeChip(
 		new ConfirmModal(plugin.app, candidates, cwd, gate).open();
 		return;
 	}
+	// With no dialog there is nothing to choose from, so the chip's own tool is
+	// the only acceptable answer. Falling through to another configured tool
+	// would silently launch an agent the user never asked for, on a path that
+	// shows them no command first.
 	const preferred = candidates[0];
+	if (!preferred || preferred.tool !== wanted) {
+		new Notice(
+			`Dispatch: tool "${wanted}" is not configured on this device (Settings → Dispatch → This device).`
+		);
+		return;
+	}
 	if (preferred.problem) {
 		new Notice(`Dispatch: "${spec.label}" not launched — ${preferred.problem}`, 8000);
 		return;

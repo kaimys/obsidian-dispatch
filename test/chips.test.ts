@@ -13,6 +13,7 @@
  * The path cannot be derived by the script: it is a hash of the vault's
  * absolute path, which only the plugin knows.
  */
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const launched: { command: string; cwd: string; env?: Record<string, string> }[] = [];
@@ -172,5 +173,54 @@ describe("choosing the agent at click time", () => {
 	it("does not launch a tool whose command template is empty", () => {
 		launchWith({ claude: { command: "" } }, refine);
 		expect(launched.length).toBe(0);
+	});
+
+	// R2: with confirmations off there is no dialog to choose from, so the
+	// chip's own tool is the only acceptable answer. Falling through to another
+	// configured tool would launch an agent the user never asked for, without
+	// ever showing them the command.
+	it("does not substitute another agent when the chip's tool is not configured", () => {
+		const onlyCodex = { codex: { command: "codex {{prompt}}" } };
+		launchWith(onlyCodex, { ...refine, tool: "claude" });
+		expect(launched.length).toBe(0);
+	});
+
+	it("does not substitute another agent when the shared default is not configured", () => {
+		const onlyCodex = { codex: { command: "codex {{prompt}}" } };
+		launchWith(onlyCodex, refine, "claude");
+		expect(launched.length).toBe(0);
+	});
+
+	it("does not substitute another agent when the preferred command is blank", () => {
+		for (const blank of ["", "   "]) {
+			launched.length = 0;
+			const tools = { claude: { command: blank }, codex: { command: "codex {{prompt}}" } };
+			launchWith(tools, { ...refine, tool: "claude" });
+			expect(launched.length, `blank command ${JSON.stringify(blank)}`).toBe(0);
+		}
+	});
+
+	// R1: both candidates' prompt files were materialised before the choice,
+	// named only by Date.now(), so two in the same millisecond shared a path and
+	// the agent you picked was handed the other agent's prompt.
+	it("gives each agent its own prompt file, and writes only the one that runs", () => {
+		const tools = {
+			claude: { command: "claude {{promptFile}}" },
+			codex: {
+				command: "codex {{promptFile}}",
+				prompts: { refine: "$refine {{title}}" },
+			},
+		};
+		const claudeRun = launchWith(tools, { ...refine, tool: "claude" }, "claude");
+		const codexRun = launchWith(tools, { ...refine, tool: "codex" }, "codex");
+
+		const pathOf = (command: string) => command.replace(/^\S+ "?|"$/g, "");
+		const claudeFile = pathOf(claudeRun.command);
+		const codexFile = pathOf(codexRun.command);
+		expect(claudeFile).not.toBe(codexFile);
+
+		const title = "Story - US00002 - Support Codex as a chip tool";
+		expect(readFileSync(claudeFile, "utf8")).toBe(`/refine ${title}`);
+		expect(readFileSync(codexFile, "utf8")).toBe(`$refine ${title}`);
 	});
 });

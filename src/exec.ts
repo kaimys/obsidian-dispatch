@@ -99,9 +99,23 @@ export function emptyVars(template: string, values: Record<string, string>): str
 	return [...new Set(names)];
 }
 
+let promptFileSeq = 0;
+
+/**
+ * A unique temp path for a prompt file.
+ *
+ * Unique per *call*, not per millisecond: a chip builds one candidate per
+ * configured tool, and two of them created in the same millisecond would
+ * otherwise share a path — so the agent you picked would be handed the other
+ * agent's prompt. A clock is not an identity.
+ */
+export function promptFilePath(): string {
+	promptFileSeq += 1;
+	return join(tmpdir(), `dispatch-prompt-${Date.now()}-${promptFileSeq}.md`);
+}
+
 /** Write a prompt to a temp file and return its absolute path. */
-export function writePromptFile(prompt: string): string {
-	const file = join(tmpdir(), `dispatch-prompt-${Date.now()}.md`);
+export function writePromptFile(prompt: string, file: string = promptFilePath()): string {
 	writeFileSync(file, prompt, "utf8");
 	return file;
 }

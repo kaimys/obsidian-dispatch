@@ -122,6 +122,37 @@ export function parseTodoItems(
  * UI as "[object Object]". Lists render as their items; objects render as
  * nothing, which the callers treat as "no value".
  */
+/**
+ * Carry `intent` across a rebuild of the chip-template list.
+ *
+ * The settings row edits four of a ChipTemplate's five fields, so the fifth has
+ * to be recovered from the previous list. Matching by label alone loses it on
+ * exactly the edit `intent` exists to survive — a rename — so position is the
+ * fallback: a renamed chip keeps its line, and an inserted or removed line
+ * keeps every other chip's label. Neither alone is enough.
+ */
+export function carryIntents<T extends { label: string; intent?: string }>(
+	previous: readonly { label: string; intent?: string }[],
+	rebuilt: T[]
+): T[] {
+	const byLabel = new Map<string, string>();
+	for (const t of previous) if (t.intent) byLabel.set(t.label, t.intent);
+	const stillPresent = new Set(rebuilt.map((t) => t.label));
+	return rebuilt.map((t, i) => {
+		// A label that still matches is the reliable signal.
+		let intent = byLabel.get(t.label);
+		// Otherwise this may be a rename: same position, and the label that used
+		// to sit here has left the list entirely. An *inserted* line must not
+		// qualify — the chip it displaced is still there under its own name, so
+		// stealing its intent would give a brand-new chip someone else's skill.
+		if (!intent) {
+			const was = previous[i];
+			if (was?.intent && !stillPresent.has(was.label)) intent = was.intent;
+		}
+		return intent ? { ...t, intent } : t;
+	});
+}
+
 export function displayValue(value: unknown): string {
 	if (value === undefined || value === null) return "";
 	if (Array.isArray(value)) {

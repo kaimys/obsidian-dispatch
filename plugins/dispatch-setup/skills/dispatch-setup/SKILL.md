@@ -193,9 +193,20 @@ If the user already runs Dispatch on another vault, sanity-check the algorithm b
 - Every `repo` alias used by a chip must exist in the device config, and the `tool` must be defined there too — otherwise the chip fails only at click time. Check both after writing the two files.
 - YAML gotcha for block chips in notes: quote values containing `:` or `#`.
 
-## 5 · Project invariants (`CLAUDE.md` in the code repo)
+## 5 · Project invariants (one shared file in the code repo)
 
-Rules that **every** skill must respect belong in the repo's `CLAUDE.md`, not copied into each skill — a rule copied six times holds in four. Write these, adapted to their vocabulary:
+Rules that **every** skill must respect belong in **one** file, not copied into each skill — a rule copied six times holds in four, and a rule copied into two agents' instruction files holds in one.
+
+**Write them to `dispatch/invariants.md`, then give each agent the user runs a pointer at it:**
+
+| Agent | Instruction file | Contains |
+| --- | --- | --- |
+| Claude Code | `CLAUDE.md` | a pointer to `dispatch/invariants.md`, plus what is genuinely Claude-specific (its hook wiring, its session-title call) |
+| Codex | `AGENTS.md` | a pointer to the same file, plus what is genuinely Codex-specific (its hook wiring, hook trust, `$name` invocation) |
+
+Create the pointer file for **every** agent chosen in step 1 — a Codex-only project with no `AGENTS.md` has no instruction entry point at all, and the invariants below simply never reach the agent. Neither pointer file restates a rule; if the two ever disagree, the shared file wins.
+
+Write these, adapted to their vocabulary:
 
 - **The ticket freeze.** Once a ticket leaves development (the status where code exists that depends on it), its **contract zone** — goal/symptom, acceptance criteria, open questions + answers, scope, implementation plan — is read-only; stamp `frozen: <date>`. New information goes into the **record zone** (as-built notes, test results, follow-ups) as a dated entry; a wrong frozen statement gets an annotation (`> ⚠️ Correction <date>: …`) beneath it, never a rewrite; new scope becomes a new linked ticket. Rationale: if a spec can change after the code was built against it, a later spec↔code mismatch has two explanations and no way to tell them apart. Details: [`docs/page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md#the-freeze-rule).
 - **Ownership + maintenance.** Every page carries `owner:` (a **person**, resolving to `00_Start-Here/Team/` — never a team). Every *derived* page also carries `derived_from:` and `maintained_by:`, and **a skill that creates a derived page must register its refresh** — if no recurring job owns it, it may not create it.
@@ -246,6 +257,7 @@ So board cards show launched → running ⇄ waiting → done and completed runs
 - every chip prompt names a command that exists in the repo;
 - **`.claude/settings.json` contains no absolute path** — the hook paths must still be the unexpanded project-directory variable (step 7.2). A drive letter or home directory in there is the single easiest way to commit one machine's layout to the whole team;
 - the run-state hook behaves (step 7.3);
+- **the invariants file and every chosen agent's pointer exist** (step 5) — `dispatch/invariants.md`, plus `CLAUDE.md` and/or `AGENTS.md`; and grepping a pointer file for a rule it should only be pointing at (the freeze, a gate counter) comes back empty;
 - **for Codex: hook trust has actually been granted** (step 7.5). Check `~/.codex/config.toml` for a `[hooks.state.…]` entry naming the repo's `.codex/hooks.json`. Its absence, with everything else correct, is exactly the state that looks like a broken plugin.
 
 Then walk the user through the UI, verifying each:
