@@ -75,7 +75,19 @@ export interface AutomationRule {
 
 export interface ChipTemplate {
 	label: string;
-	/** Tool name; empty = the shared default tool. */
+	/**
+	 * Stable key for what this chip is *for* — `refine`, not "Refine this
+	 * ticket". Per-tool prompt overrides are keyed by it, so renaming the
+	 * button does not silently drop every override a device configured.
+	 * Empty = fall back to the label.
+	 */
+	intent?: string;
+	/**
+	 * Tool name; empty = the shared default tool. A *default*, not a
+	 * constraint: it decides which button the confirmation dialog makes
+	 * primary, and the user may still pick another configured tool
+	 * (ADR-0021 — the agent is chosen at click time).
+	 */
 	tool?: string;
 	/** Repo alias; empty = vault folder. */
 	repo?: string;
@@ -202,6 +214,16 @@ export interface ToolConfig {
 	 * {{promptFile}} (all quoted) — append `Raw` for the unquoted value.
 	 */
 	command: string;
+	/**
+	 * Intent key -> the prompt this tool wants for that intent. Device-local,
+	 * because which skills a person has installed — and under what name — is a
+	 * property of their machine, not of the team's board: `/refine US1` and
+	 * `$refine US1` are the same intention in two agents' spellings, and
+	 * Dispatch cannot derive one from the other (ADR-0021, ADR-0002).
+	 *
+	 * Absent, or empty for an intent, means the chip's own prompt is used.
+	 */
+	prompts?: Record<string, string>;
 }
 
 export interface LocalSettings {

@@ -1,4 +1,5 @@
 import { environment, exec, join, spawn, tmpdir, writeFileSync } from "./node";
+import type { ChipTemplate, ToolConfig } from "./settings";
 
 /** Replace {{var}} placeholders. Unknown placeholders are left untouched. */
 export function substitute(template: string, vars: Record<string, string>): string {
@@ -27,6 +28,60 @@ export function shellVars(raw: Record<string, string>): Record<string, string> {
 		out[key + "Raw"] = value;
 	}
 	return out;
+}
+
+/**
+ * Every tool this device can actually launch, most likely first: the chip's own
+ * tool if it names one, else the shared default. That first entry is the
+ * primary button on the confirmation dialog.
+ *
+ * A tool whose command template is empty is not offered. It is a name in the
+ * settings file rather than something that runs, and a button that can only
+ * fail is worse than no button.
+ */
+export function toolChoices(
+	chip: ChipTemplate,
+	tools: Record<string, ToolConfig>,
+	defaultTool: string
+): string[] {
+	const configured = Object.keys(tools).filter(
+		(name) => (tools[name]?.command ?? "").trim() !== ""
+	);
+	const preferred = chip.tool || defaultTool;
+	return configured.includes(preferred)
+		? [preferred, ...configured.filter((name) => name !== preferred)]
+		: configured;
+}
+
+/**
+ * The prompt template this tool wants for this chip.
+ *
+ * A chip carries an intent, not a tool-specific string: `/refine US1` and
+ * `$refine US1` are the same intention spelled for two agents. The override is
+ * keyed by {@link ChipTemplate.intent} and falls back to the label, so a chip
+ * that never declares an intent still works — and a device that configures no
+ * override keeps the note's own prompt, exactly as before.
+ */
+export function resolvePrompt(
+	chip: ChipTemplate,
+	toolName: string,
+	tools: Record<string, ToolConfig>
+): string {
+	const key = chip.intent || chip.label;
+	return tools[toolName]?.prompts?.[key] || chip.prompt;
+}
+
+/**
+ * Variables the template references that resolve empty for this launch — e.g.
+ * {{id}} on a note with no ticket id, which would launch "/refine " with no
+ * argument. Only variables the caller supplies are checked: an unknown {{var}}
+ * is left literal by substitute() and is a visibly different problem.
+ */
+export function emptyVars(template: string, values: Record<string, string>): string[] {
+	const names = [...template.matchAll(/\{\{(\w+)\}\}/g)]
+		.map((m) => m[1])
+		.filter((name) => name in values && values[name].trim() === "");
+	return [...new Set(names)];
 }
 
 /** Write a prompt to a temp file and return its absolute path. */

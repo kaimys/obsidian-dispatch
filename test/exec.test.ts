@@ -4,7 +4,15 @@
  * to end its own argument and start a command.
  */
 import { describe, expect, it } from "vitest";
-import { quoteArg, shellVars, substitute } from "../src/exec";
+import {
+	emptyVars,
+	quoteArg,
+	resolvePrompt,
+	shellVars,
+	substitute,
+	toolChoices,
+} from "../src/exec";
+import type { ChipTemplate, ToolConfig } from "../src/settings";
 
 describe("quoteArg", () => {
 	it("wraps a plain value in one double-quoted argument", () => {
@@ -58,5 +66,124 @@ describe("shellVars", () => {
 		const vars = shellVars({ prompt: "/refine US1" });
 		expect(vars.prompt).toBe('"/refine US1"');
 		expect(Object.keys(vars).sort()).toEqual(["prompt", "promptRaw"]);
+	});
+});
+
+const chip = (over: Partial<ChipTemplate> = {}): ChipTemplate => ({
+	label: "Refine this ticket",
+	prompt: "/refine {{id}}",
+	...over,
+});
+
+const tools = (map: Record<string, ToolConfig>) => map;
+
+describe("toolChoices", () => {
+	const both = tools({
+		claude: { command: "claude {{prompt}}" },
+		codex: { command: "codex {{prompt}}" },
+	});
+
+	it("puts the chip's own tool first, then every other configured one", () => {
+		expect(toolChoices(chip({ tool: "codex" }), both, "claude")).toEqual(["codex", "claude"]);
+	});
+
+	it("falls back to the shared default when the chip names no tool", () => {
+		expect(toolChoices(chip(), both, "claude")).toEqual(["claude", "codex"]);
+		expect(toolChoices(chip(), both, "codex")).toEqual(["codex", "claude"]);
+	});
+
+	it("offers the one configured tool on a single-tool device", () => {
+		expect(toolChoices(chip(), tools({ claude: { command: "claude {{prompt}}" } }), "claude"))
+			.toEqual(["claude"]);
+	});
+
+	it("does not offer a tool whose command template is empty", () => {
+		// The non-Windows default ships `claude` with no command — a name in the
+		// settings file, not something that runs. A button for it could only fail.
+		const half = tools({ claude: { command: "" }, codex: { command: "codex {{prompt}}" } });
+		expect(toolChoices(chip(), half, "claude")).toEqual(["codex"]);
+		expect(toolChoices(chip(), tools({ claude: { command: "   " } }), "claude")).toEqual([]);
+	});
+
+	it("still offers the others when the preferred tool is not configured here", () => {
+		// A chip pinned to a tool this device does not have is not a dead chip:
+		// the tool is a default, not a constraint (ADR-0021).
+		expect(toolChoices(chip({ tool: "gemini" }), both, "claude")).toEqual(["claude", "codex"]);
+	});
+});
+
+describe("resolvePrompt", () => {
+	const withOverride = tools({
+		claude: { command: "claude {{prompt}}" },
+		codex: { command: "codex {{prompt}}", prompts: { refine: "$refine {{id}}" } },
+	});
+
+	it("uses the tool's override for the chip's intent", () => {
+		expect(resolvePrompt(chip({ intent: "refine" }), "codex", withOverride)).toBe(
+			"$refine {{id}}"
+		);
+	});
+
+	it("falls back to the chip's own prompt when the tool has no override", () => {
+		expect(resolvePrompt(chip({ intent: "refine" }), "claude", withOverride)).toBe(
+			"/refine {{id}}"
+		);
+		expect(resolvePrompt(chip({ intent: "develop" }), "codex", withOverride)).toBe(
+			"/refine {{id}}"
+		);
+	});
+
+	it("keys on the intent, not the label", () => {
+		// Renaming the button must not silently drop the override — which is the
+		// whole reason `intent` exists beside `label`.
+		const renamed = chip({ intent: "refine", label: "Sharpen this spec" });
+		expect(resolvePrompt(renamed, "codex", withOverride)).toBe("$refine {{id}}");
+	});
+
+	it("keys on the label when the chip declares no intent", () => {
+		const byLabel = tools({
+			codex: { command: "codex", prompts: { "Refine this ticket": "$refine {{id}}" } },
+		});
+		expect(resolvePrompt(chip(), "codex", byLabel)).toBe("$refine {{id}}");
+	});
+
+	it("falls back for an unknown tool, an absent map and an empty override", () => {
+		expect(resolvePrompt(chip({ intent: "refine" }), "gemini", withOverride)).toBe(
+			"/refine {{id}}"
+		);
+		expect(resolvePrompt(chip({ intent: "refine" }), "claude", withOverride)).toBe(
+			"/refine {{id}}"
+		);
+		const blank = tools({ codex: { command: "codex", prompts: { refine: "" } } });
+		expect(resolvePrompt(chip({ intent: "refine" }), "codex", blank)).toBe("/refine {{id}}");
+	});
+
+	it("gives an override no more trust than a note's prompt", () => {
+		// An override is device config, but it still reaches a shell, so it goes
+		// through the same single-argument quoting (ADR-0004).
+		const hostile = tools({
+			codex: { command: "codex {{prompt}}", prompts: { refine: 'x"; rm -rf ~; echo "' } },
+		});
+		const resolved = resolvePrompt(chip({ intent: "refine" }), "codex", hostile);
+		const quoted = quoteArg(substitute(resolved, { id: "US00002" }));
+		expect(quoted.startsWith('"')).toBe(true);
+		expect(quoted.endsWith('"')).toBe(true);
+		expect(quoted.slice(1, -1).match(/(?<!\\)"/)).toBeNull();
+	});
+});
+
+describe("emptyVars", () => {
+	it("names the supplied variables that resolve empty", () => {
+		expect(emptyVars("/refine {{id}}", { id: "", status: "Backlog" })).toEqual(["id"]);
+		expect(emptyVars("/refine {{id}}", { id: "US00002" })).toEqual([]);
+	});
+
+	it("ignores variables the caller does not supply", () => {
+		// substitute() leaves those literal, which is a visible problem of its own.
+		expect(emptyVars("{{nope}}", { id: "US1" })).toEqual([]);
+	});
+
+	it("names a repeated variable once", () => {
+		expect(emptyVars("{{id}} and {{id}}", { id: " " })).toEqual(["id"]);
 	});
 });
