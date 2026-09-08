@@ -96,3 +96,28 @@ describe("the per-agent stubs — ADR-0020", () => {
 		}
 	});
 });
+
+/**
+ * N1: `scripts/dispatch/run-state.mjs` and the copy `dispatch-setup` installs
+ * into a fresh project are the same program with different headers. They drifted
+ * once already — the repo copy learned Codex's payload and the shipped one did
+ * not, so every new user got a run log with no excerpt and no agent name. The
+ * headers differ on purpose; the executable body must not.
+ */
+describe("the run-state hook ships as one program", () => {
+	/** Everything after the leading doc comment — the part that runs. */
+	function body(text: string): string {
+		const i = text.indexOf("import { appendFileSync");
+		expect(i, "run-state.mjs no longer starts with its fs import").toBeGreaterThan(-1);
+		return text.slice(i);
+	}
+
+	it("keeps the packaged copy identical to the repo script", () => {
+		const repo = readFileSync(`${repoRoot}/scripts/dispatch/run-state.mjs`, "utf8");
+		const asset = readFileSync(
+			`${repoRoot}/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs`,
+			"utf8"
+		);
+		expect(body(asset)).toBe(body(repo));
+	});
+});

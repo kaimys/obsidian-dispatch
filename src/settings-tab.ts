@@ -9,7 +9,7 @@
  * sentence case.
  */
 import { App, PluginSettingTab, Setting } from "obsidian";
-import { carryIntents, displayValue } from "./parse";
+import { displayValue, formatChipLabel, parseChipLabel } from "./parse";
 import type DispatchPlugin from "./main";
 
 export class DispatchSettingTab extends PluginSettingTab {
@@ -408,7 +408,7 @@ export class DispatchSettingTab extends PluginSettingTab {
 				ta.setPlaceholder("Read transcript | claude | my-project | /meeting report {{title}}")
 					.setValue(
 						this.plugin.shared.meetings.templates
-							.map((t) => `${t.label} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
+							.map((t) => `${formatChipLabel(t)} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
 							.join("\n")
 					)
 					.onChange(async (v) => {
@@ -416,12 +416,18 @@ export class DispatchSettingTab extends PluginSettingTab {
 							.map((line) => {
 								const parts = line.split("|");
 								if (parts.length < 4) return null;
-								const label = parts[0].trim();
+								const { label, intent } = parseChipLabel(parts[0]);
 								const tool = parts[1].trim();
 								const repo = parts[2].trim();
 								const prompt = parts.slice(3).join("|").trim();
 								if (!label || !prompt) return null;
-								return { label, tool: tool || undefined, repo: repo || undefined, prompt };
+								return {
+									label,
+									intent,
+									tool: tool || undefined,
+									repo: repo || undefined,
+									prompt,
+								};
 							})
 							.filter((t): t is NonNullable<typeof t> => t !== null);
 						await this.plugin.saveShared();
@@ -512,7 +518,7 @@ export class DispatchSettingTab extends PluginSettingTab {
 				ta.setPlaceholder("Prepare agenda | claude | my-project | /agenda {{date}} {{title}}")
 					.setValue(
 						this.plugin.shared.meetings.calendarChips
-							.map((t) => `${t.label} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
+							.map((t) => `${formatChipLabel(t)} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
 							.join("\n")
 					)
 					.onChange(async (v) => {
@@ -520,12 +526,18 @@ export class DispatchSettingTab extends PluginSettingTab {
 							.map((line) => {
 								const parts = line.split("|");
 								if (parts.length < 4) return null;
-								const label = parts[0].trim();
+								const { label, intent } = parseChipLabel(parts[0]);
 								const tool = parts[1].trim();
 								const repo = parts[2].trim();
 								const prompt = parts.slice(3).join("|").trim();
 								if (!label || !prompt) return null;
-								return { label, tool: tool || undefined, repo: repo || undefined, prompt };
+								return {
+									label,
+									intent,
+									tool: tool || undefined,
+									repo: repo || undefined,
+									prompt,
+								};
 							})
 							.filter((t): t is NonNullable<typeof t> => t !== null);
 						await this.plugin.saveShared();
@@ -622,7 +634,7 @@ export class DispatchSettingTab extends PluginSettingTab {
 				)
 					.setValue(
 						this.plugin.shared.chips.columnTemplates
-							.map((t) => `${t.label} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
+							.map((t) => `${formatChipLabel(t)} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
 							.join("\n")
 					)
 					.onChange(async (v) => {
@@ -630,13 +642,14 @@ export class DispatchSettingTab extends PluginSettingTab {
 							.map((line) => {
 								const parts = line.split("|");
 								if (parts.length < 4) return null;
-								const label = parts[0].trim();
+								const { label, intent } = parseChipLabel(parts[0]);
 								const tool = parts[1].trim();
 								const repo = parts[2].trim();
 								const prompt = parts.slice(3).join("|").trim();
 								if (!label || !prompt) return null;
 								return {
 									label,
+									intent,
 									tool: tool || undefined,
 									repo: repo || undefined,
 									prompt,
@@ -650,45 +663,35 @@ export class DispatchSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Chip templates")
 			.setDesc(
-				"Virtual chips shown for every card note (board right-click + file menu) — no markdown block needed. One per line: label | tool | repo | prompt. Empty tool/repo = defaults. Prompt variables: {{id}}, {{status}}, {{file}}, {{title}}."
+				"Virtual chips shown for every card note (board right-click + file menu) — no markdown block needed. One per line: label | tool | repo | prompt. Empty tool/repo = defaults. Prompt variables: {{id}}, {{status}}, {{file}}, {{title}}. Add #intent to a label (Refine #refine) to key this chip's per-tool prompts on something that survives renaming it."
 			)
 			.addTextArea((ta) => {
 				ta.inputEl.rows = 5;
 				ta.setPlaceholder("Refine | claude | my-project | /refine {{id}}")
 					.setValue(
 						this.plugin.shared.chips.templates
-							.map((t) => `${t.label} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
+							.map((t) => `${formatChipLabel(t)} | ${t.tool ?? ""} | ${t.repo ?? ""} | ${t.prompt}`)
 							.join("\n")
 					)
 					.onChange(async (v) => {
-						// Carry `intent` across the rebuild. This row edits four
-						// fields; a ChipTemplate has five, and the fifth keys every
-						// per-tool prompt override on the device. Rebuilding the
-						// object from scratch would drop it on an unrelated edit,
-						// long after it was set — the same silent loss the Tools
-						// row above had.
-						const previous = this.plugin.shared.chips.templates;
 						this.plugin.shared.chips.templates = splitLines(v)
 							.map((line) => {
 								const parts = line.split("|");
 								if (parts.length < 4) return null;
-								const label = parts[0].trim();
+								const { label, intent } = parseChipLabel(parts[0]);
 								const tool = parts[1].trim();
 								const repo = parts[2].trim();
 								const prompt = parts.slice(3).join("|").trim();
 								if (!label || !prompt) return null;
 								return {
 									label,
+									intent,
 									tool: tool || undefined,
 									repo: repo || undefined,
 									prompt,
 								};
 							})
 							.filter((t): t is NonNullable<typeof t> => t !== null);
-						this.plugin.shared.chips.templates = carryIntents(
-							previous,
-							this.plugin.shared.chips.templates
-						);
 						await this.plugin.saveShared();
 					});
 			});

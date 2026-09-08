@@ -110,7 +110,7 @@ codex = $
 
 A chip prompt that *starts* with `/` has that one character swapped for this tool. Prompts that are not commands — the column chips, which read "Work through these tickets…" — are never rewritten.
 
-**Tool prompts** is the escape hatch for the case a prefix cannot express: a skill installed under a different *name*. One line per tool and chip, keyed `tool.intent` (or `tool.<chip label>` when the chip declares no intent):
+**Tool prompts** is the escape hatch for the case a prefix cannot express: a skill installed under a different *name*. One line per tool and chip, keyed `tool.intent` — give the chip an intent by suffixing its label in the chip-template row (`Refine #refine`), so the key survives renaming the button; without one the chip's label is the key:
 
 ```
 codex.refine = $ticket-refine {{id}}

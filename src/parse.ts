@@ -123,34 +123,28 @@ export function parseTodoItems(
  * nothing, which the callers treat as "no value".
  */
 /**
- * Carry `intent` across a rebuild of the chip-template list.
+ * A chip row's label cell, which may carry the chip's intent: `Refine #refine`.
  *
- * The settings row edits four of a ChipTemplate's five fields, so the fifth has
- * to be recovered from the previous list. Matching by label alone loses it on
- * exactly the edit `intent` exists to survive — a rename — so position is the
- * fallback: a renamed chip keeps its line, and an inserted or removed line
- * keeps every other chip's label. Neither alone is enough.
+ * The intent has to live **in the text**, not be recovered from the previous
+ * list. The settings textarea rebuilds the whole model on every keystroke and
+ * drops a row whose label is momentarily empty, so a chip being renamed
+ * disappears and comes back — and anything not written down is gone by then.
+ * Two chips may also legitimately share a label, which no by-label recovery
+ * can tell apart. Writing it down is the only thing that survives both.
+ *
+ * A bare `#intent` (mid-rename, the name deleted) parses as an empty label, so
+ * the row drops out for that keystroke and returns intact when the name is
+ * typed back. A `#` anywhere else in the label is left alone: the suffix has to
+ * be a single trailing token.
  */
-export function carryIntents<T extends { label: string; intent?: string }>(
-	previous: readonly { label: string; intent?: string }[],
-	rebuilt: T[]
-): T[] {
-	const byLabel = new Map<string, string>();
-	for (const t of previous) if (t.intent) byLabel.set(t.label, t.intent);
-	const stillPresent = new Set(rebuilt.map((t) => t.label));
-	return rebuilt.map((t, i) => {
-		// A label that still matches is the reliable signal.
-		let intent = byLabel.get(t.label);
-		// Otherwise this may be a rename: same position, and the label that used
-		// to sit here has left the list entirely. An *inserted* line must not
-		// qualify — the chip it displaced is still there under its own name, so
-		// stealing its intent would give a brand-new chip someone else's skill.
-		if (!intent) {
-			const was = previous[i];
-			if (was?.intent && !stillPresent.has(was.label)) intent = was.intent;
-		}
-		return intent ? { ...t, intent } : t;
-	});
+export function parseChipLabel(cell: string): { label: string; intent?: string } {
+	const match = /^(.*?)\s*#([A-Za-z0-9._-]+)$/.exec(cell.trim());
+	return match ? { label: match[1].trim(), intent: match[2] } : { label: cell.trim() };
+}
+
+/** Inverse of {@link parseChipLabel}, for rendering the row. */
+export function formatChipLabel(chip: { label: string; intent?: string }): string {
+	return chip.intent ? `${chip.label} #${chip.intent}` : chip.label;
 }
 
 export function displayValue(value: unknown): string {

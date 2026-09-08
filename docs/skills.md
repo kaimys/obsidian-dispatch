@@ -96,6 +96,8 @@ Code review         | claude | my-project | /code-review {{id}}
 Write test plan     | claude | my-project | /test-plan {{id}}
 ```
 
+A label may carry the chip's **intent** — `Refine #refine` — which is what per-tool prompts are keyed on. It is worth setting only if you use those overrides, and it exists so that renaming the button does not silently drop them.
+
 **One chip per action, however many agents you run.** The `tool` column is a *default*, not a constraint: with more than one agent configured, clicking a chip offers one button per agent and shows the exact command each would run. And you do not write a second prompt per agent — set the tool's invocation prefix once in the device config (`codex = $`), and a prompt that starts with `/` is rewritten for that agent. A prompt that is not a command — the batch ones below — is never touched.
 
 Column headers get batch versions (`{{ids}}`, `{{status}}`, `{{count}}`) for "update all tickets in refinement"; meeting rows and calendar events get their own sets. The mechanics — variables, tool commands, the busy-gate, run tracking — are in [installation.md](installation.md#chips).

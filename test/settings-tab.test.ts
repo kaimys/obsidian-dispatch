@@ -63,11 +63,11 @@ describe("settings rows merge rather than rebuild", () => {
 	});
 
 	it("keeps the intent the Chip templates row cannot see", () => {
-		// The row delegates to `carryIntents`, whose behaviour — rename, insert,
-		// duplicate labels — is covered in parse.test.ts. A source-string
-		// assertion here could only ever prove that *some* code runs, which is
-		// how the previous version of this test passed while renaming a chip
-		// still dropped its intent.
-		expect(code()).toContain("carryIntents(");
+		// The row reads and writes the intent through the label cell, so it is
+		// in the text the user edits rather than recovered from the previous
+		// list — see parse.test.ts for why every recovery scheme fails. Both
+		// four chip rows — card, column, meeting and calendar — must all do it.
+		expect(code().match(/parseChipLabel\(/g) ?? []).toHaveLength(4);
+		expect(code().match(/formatChipLabel\(/g) ?? []).toHaveLength(4);
 	});
 });

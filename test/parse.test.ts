@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-	carryIntents,
+	formatChipLabel,
+	parseChipLabel,
 	compareRanks,
 	displayValue,
 	comparePatchKeys,
@@ -13,55 +14,60 @@ import {
 const TEAM = ["Alex", "Robin", "Morgan"];
 
 /**
- * R3: the chip-template settings row edits four of a ChipTemplate's five
- * fields, so `intent` has to survive the rebuild. Matching by label alone lost
- * it on exactly the edit `intent` exists to survive — a rename — and the
- * previous guard asserted on source text, so it could not see that.
+ * R3: the chip-template row rebuilds the whole model on every keystroke, and
+ * drops a row whose label is momentarily empty. Any scheme that recovers
+ * `intent` from the previous list therefore loses it mid-rename, and cannot
+ * tell two chips apart when they share a label. So the intent lives in the text.
  */
-describe("carryIntents", () => {
-	const was = [
-		{ label: "Refine", intent: "refine" },
-		{ label: "Develop", intent: "develop" },
-	];
-
-	it("keeps the intent when a chip is renamed", () => {
-		const rebuilt = [{ label: "Sharpen" }, { label: "Develop" }];
-		expect(carryIntents(was, rebuilt)).toEqual([
-			{ label: "Sharpen", intent: "refine" },
-			{ label: "Develop", intent: "develop" },
-		]);
+describe("parseChipLabel / formatChipLabel", () => {
+	it("reads an intent off the label cell", () => {
+		expect(parseChipLabel("Refine #refine")).toEqual({ label: "Refine", intent: "refine" });
 	});
 
-	it("keeps intents when an unrelated field changes", () => {
-		const rebuilt = [
-			{ label: "Refine", repo: "other" },
-			{ label: "Develop", repo: "other" },
-		];
-		expect(carryIntents(was, rebuilt).map((t) => t.intent)).toEqual(["refine", "develop"]);
+	it("leaves a plain label alone", () => {
+		expect(parseChipLabel("Start development")).toEqual({ label: "Start development" });
 	});
 
-	it("keeps intents by label when a line is inserted above", () => {
-		const rebuilt = [{ label: "New" }, { label: "Refine" }, { label: "Develop" }];
-		expect(carryIntents(was, rebuilt).map((t) => t.intent)).toEqual([
-			undefined,
-			"refine",
-			"develop",
-		]);
+	it("does not mistake a # inside a label for an intent", () => {
+		expect(parseChipLabel("C# helper")).toEqual({ label: "C# helper" });
+		expect(parseChipLabel("Refine # not an intent")).toEqual({
+			label: "Refine # not an intent",
+		});
 	});
 
-	it("leaves a chip that never had an intent alone", () => {
-		expect(carryIntents([{ label: "Refine" }], [{ label: "Refine" }])).toEqual([
-			{ label: "Refine" },
-		]);
+	it("round-trips", () => {
+		for (const chip of [
+			{ label: "Refine", intent: "refine" },
+			{ label: "Start development" },
+			{ label: "Review", intent: "code-review" },
+		]) {
+			expect(parseChipLabel(formatChipLabel(chip))).toEqual(chip);
+		}
 	});
 
-	it("prefers the label match over the position for duplicate labels", () => {
-		const dup = [{ label: "Run", intent: "a" }, { label: "Other", intent: "b" }];
-		expect(carryIntents(dup, [{ label: "Other" }, { label: "Run" }]).map((t) => t.intent)).toEqual(
-			["b", "a"]
-		);
+	it("survives a rename, because the intent is not tied to the name", () => {
+		const renamed = parseChipLabel("Sharpen #refine");
+		expect(renamed).toEqual({ label: "Sharpen", intent: "refine" });
+	});
+
+	it("survives clearing the name and typing a new one, across separate edits", () => {
+		// The textarea fires per keystroke. Mid-rename the cell is just "#refine":
+		// the row has no label, so it drops out for that event — and comes back
+		// intact, because the intent was never anywhere but the text.
+		const midRename = parseChipLabel("#refine");
+		expect(midRename.label).toBe("");
+		expect(midRename.intent).toBe("refine");
+		expect(parseChipLabel("Sharpen #refine").intent).toBe("refine");
+	});
+
+	it("keeps two chips with the same label apart", () => {
+		// The previous by-label recovery gave both of these the second intent,
+		// which could launch the wrong workflow.
+		expect(parseChipLabel("Run #refine").intent).toBe("refine");
+		expect(parseChipLabel("Run #develop").intent).toBe("develop");
 	});
 });
+
 
 describe("resolveAssignee", () => {
 	it("matches a known name regardless of case and punctuation", () => {
