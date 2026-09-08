@@ -62,7 +62,7 @@ function logRunToNote() {
 	const note = process.env.DISPATCH_NOTE;
 	if (!note || !existsSync(note)) return;
 	try {
-		// Claude Code hands the hook its payload as JSON on stdin; absent when
+		// Both agents hand the hook their payload as JSON on stdin; absent when
 		// this script is invoked by hand.
 		let hookInput = null;
 		try {
@@ -72,6 +72,10 @@ function logRunToNote() {
 		}
 
 		const label = process.env.DISPATCH_LABEL || "run";
+		// Which agent ran. Two agents on one board means a run log that does not
+		// say who ran is not a record (US00002). Absent for a run launched by an
+		// older plugin build, in which case the line reads as it always did.
+		const tool = process.env.DISPATCH_TOOL || "";
 		const started = Date.parse(process.env.DISPATCH_STARTED || "");
 		const minutes = Number.isFinite(started)
 			? Math.max(1, Math.round((Date.now() - started) / 60000))
@@ -81,8 +85,14 @@ function logRunToNote() {
 		const pad = (n) => String(n).padStart(2, "0");
 		const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
-		let entry = `- ${stamp} — ${label} (done${minutes ? `, ${minutes} min` : ""})`;
-		const excerpt = lastAssistantExcerpt(hookInput?.transcript_path, 400);
+		const meta = [tool, "done", minutes ? `${minutes} min` : ""].filter(Boolean).join(", ");
+		let entry = `- ${stamp} — ${label} (${meta})`;
+		// Codex hands the final message over directly; Claude does not, so it is
+		// reconstructed from the transcript. Preferring the field costs nothing
+		// and leaves the working Claude path untouched.
+		const excerpt =
+			flatten(hookInput?.last_assistant_message, 400) ||
+			lastAssistantExcerpt(hookInput?.transcript_path, 400);
 		if (excerpt) entry += `\n    > ${excerpt}`;
 
 		let content = readFileSync(note, "utf8");
@@ -119,9 +129,15 @@ function lastAssistantExcerpt(transcriptPath, maxLen) {
 				/* skip malformed line */
 			}
 		}
-		const flat = text.replace(/\s+/g, " ").trim();
-		return flat.length > maxLen ? flat.slice(0, maxLen) + "…" : flat;
+		return flatten(text, maxLen);
 	} catch {
 		return "";
 	}
+}
+
+/** One line, trimmed to maxLen. Shared by both agents' final-message sources. */
+function flatten(text, maxLen) {
+	if (typeof text !== "string") return "";
+	const flat = text.replace(/\s+/g, " ").trim();
+	return flat.length > maxLen ? flat.slice(0, maxLen) + "…" : flat;
 }
