@@ -1,6 +1,6 @@
 # Workflow skills
 
-A chip on a card carries one line: `/refine US00042`. Everything behind that line — what to read, whom to ask, what to write, when to stop — is a **skill**, and skills live in the **code repository** (`.claude/commands/*.md`), not in the wiki.
+A chip on a card carries one line: `/refine US00042`. Everything behind that line — what to read, whom to ask, what to write, when to stop — is a **skill**, and skills live in the **code repository** (`dispatch/workflow/*.md`, with a thin per-agent stub in `.claude/commands/` and `.codex/skills/`), not in the wiki.
 
 That boundary is the whole design:
 

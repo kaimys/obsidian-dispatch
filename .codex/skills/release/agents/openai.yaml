@@ -1,0 +1,5 @@
+# This workflow has side effects that reach outside the repository and cannot be
+# taken back, so it may only run when a human names it. Keeping it out of the
+# model's context until then is the difference between a tool and an accident.
+policy:
+  allow_implicit_invocation: false
