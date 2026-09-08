@@ -135,11 +135,17 @@ export function parseTodoItems(
  * A bare `#intent` (mid-rename, the name deleted) parses as an empty label, so
  * the row drops out for that keystroke and returns intact when the name is
  * typed back. A `#` anywhere else in the label is left alone: the suffix has to
- * be a single trailing token.
+ * be a single trailing token, **separated from the name by whitespace**. Without
+ * that boundary `C#helper` would parse as the chip `C` with intent `helper` —
+ * the row is reparsed on every keystroke, so editing an unrelated row would have
+ * renamed that chip and redirected its per-tool prompt lookup (R11).
  */
 export function parseChipLabel(cell: string): { label: string; intent?: string } {
-	const match = /^(.*?)\s*#([A-Za-z0-9._-]+)$/.exec(cell.trim());
-	return match ? { label: match[1].trim(), intent: match[2] } : { label: cell.trim() };
+	const trimmed = cell.trim();
+	// The name, when there is one, must end before whitespace: `(.*\S)\s+`.
+	// Omitting the group entirely is the bare `#intent` mid-rename case.
+	const match = /^(?:(.*\S)\s+)?#([A-Za-z0-9._-]+)$/.exec(trimmed);
+	return match ? { label: match[1] ?? "", intent: match[2] } : { label: trimmed };
 }
 
 /** Inverse of {@link parseChipLabel}, for rendering the row. */

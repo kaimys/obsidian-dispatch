@@ -35,11 +35,31 @@ describe("parseChipLabel / formatChipLabel", () => {
 		});
 	});
 
+	// R11: without a whitespace boundary the suffix ate part of the name, and
+	// because every row is reparsed on each keystroke, editing an unrelated row
+	// renamed this chip and moved its per-tool prompt lookup to "helper".
+	it("needs whitespace before the intent, so an embedded hash stays in the name", () => {
+		expect(parseChipLabel("C#helper")).toEqual({ label: "C#helper" });
+		expect(parseChipLabel("Review#draft")).toEqual({ label: "Review#draft" });
+		expect(parseChipLabel(formatChipLabel({ label: "C#helper" }))).toEqual({
+			label: "C#helper",
+		});
+	});
+
+	it("still reads a real intent off a label that contains a hash", () => {
+		expect(parseChipLabel("C#helper #refine")).toEqual({
+			label: "C#helper",
+			intent: "refine",
+		});
+	});
+
 	it("round-trips", () => {
 		for (const chip of [
 			{ label: "Refine", intent: "refine" },
 			{ label: "Start development" },
 			{ label: "Review", intent: "code-review" },
+			{ label: "C#helper" },
+			{ label: "C#helper", intent: "refine" },
 		]) {
 			expect(parseChipLabel(formatChipLabel(chip))).toEqual(chip);
 		}
