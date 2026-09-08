@@ -109,6 +109,10 @@ checkout silently share one board's configuration ([[ADR-0026]]).
 - **Precedence.** ADRs in `wiki/07_Engineering/Decisions` outrank ticket prose; ticket prose
   outranks a stale wiki page; the code outranks any claim about the code. On a wiki ↔ GitHub
   disagreement the **wiki wins** — the issue is a mirror, not the source of truth.
+- **`accepted` and `proposed` ADRs both bind planning; only `superseded` may be ignored.** A
+  proposed decision is agreed but not yet built, so it constrains what may be *planned* even though
+  the code does not reflect it yet — which also means a review must not report existing code as
+  violating one. Contradicting either is a decision to reopen, not to work around.
 - **Never name a person in a command.** Attribution resolves at runtime from `assignee:`, `owner:`,
   and `todos.assignees` — a hardcoded name books the whole team's work to one person.
 - **Name the session after the ticket: `<ID> - <shortened title>`.** As soon as a conversation is
