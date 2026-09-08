@@ -56,8 +56,8 @@ version_target: v1.4.0
 size: 3
 assignee: Alex
 open_questions: 0
-open_tests: 5
-open_findings:                  # empty until a review has counted
+open_tests: 5                  # empty until the test plan is written
+open_findings:                 # empty until a review has counted
 discussion: https://…          # the thread where the team talked
 updated: 2026-08-13
 deployed: 2026-08-07           # stamped on completion
@@ -77,7 +77,7 @@ frozen: 2026-08-05             # stamped when the spec closes (see below)
 | `size` | weighted progress and the velocity forecast |
 | `assignee` | owner badge, slice-by, Todos fallback owner |
 | `open_questions` | the `? N` badge — 0 is the gate out of refinement |
-| `open_tests` | the `✓ N` badge — 0 means manual review is complete |
+| `open_tests` | the `✓ N` badge — 0 means manual review is complete; empty means no test plan has been written, which is not the same as 0 |
 | `open_findings` | the `⚠ N` badge — blocking findings from the *latest* code review; empty means no review describes this build, which is not the same as 0 |
 | `discussion` | chat icon linking to the thread |
 | `deployed` | drives the velocity forecast (completed weight per day) |

@@ -48,7 +48,7 @@ The sections below describe both layers as the **settings UI** presents them. If
 - **Title / badge properties** — what each card shows (e.g. `id` as title prefix, `priority` and `type` as badges)
 - **Assignee property** — shown as an accent-outlined `@Name` badge, always first in the slice-by bar
 - **Open-questions property** — numeric counter rendered as the `? N` badge (amber → green at 0)
-- **Open-tests property** — numeric counter rendered as the `✓ N` badge (purple → green at 0)
+- **Open-tests property** — numeric counter rendered as the `✓ N` badge (purple → green at 0); open items in the manual test plan. Leave the property empty until the plan has been written — empty renders no badge, `0` claims a plan exists and every item is ticked
 - **Open-findings property** — numeric counter rendered as the `⚠ N` badge (red → green at 0); blocking findings from the latest code review. Leave the property empty on a note nothing has reviewed — empty renders no badge, `0` claims the review found nothing
 - **Discussion property** — a thread URL rendered as a chat icon in the card title
 - **Required properties** — drives the ⚠ problems panel (typically `id, status, updated`)

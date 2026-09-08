@@ -26,6 +26,9 @@ frozen:
   assignee        @-badge on the card.
   open_questions  unanswered items in ## Open questions. The `? N` badge — 0 is the gate out of refinement.
   open_tests      unticked items in ## Test plan. The `✓ N` badge — 0 is the gate out of review.
+                  Empty until the test plan is written: empty is no statement, 0 claims every item is ticked.
+  open_findings   blocking findings in the latest ## Code review. The `⚠ N` badge — 0 is the gate into review.
+                  Empty until a review has counted; a fix clears it back to empty, never to 0.
   discussion      permalink of the thread where the team discussed this; rendered as a chat icon.
   updated         bump on every meaningful edit.
   <<P_COMPLETED>>  stamped automatically when the card enters the final column; feeds the forecast.

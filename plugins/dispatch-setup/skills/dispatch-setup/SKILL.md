@@ -48,7 +48,7 @@ The authoritative schema — every field, every default — is `src/settings.ts`
 - Which folder(s) hold ticket notes? Which frontmatter property is the **status**, and what is the exact status vocabulary (order matters — it becomes the Kanban columns)?
 - Per status: display label? milestone **progress** weight (0–100, or excluded — e.g. Rejected)? **WIP limit**?
 - Which property holds the **target version** (milestones)? Which versions are planned? Release notes folder with `version`/`date` frontmatter?
-- Which properties exist / should exist: `assignee`, `size`, `open_questions`, `open_tests`, `discussion` (thread URL)? Required properties for the problems panel (typically `id, status, updated`)?
+- Which properties exist / should exist: `assignee`, `size`, `open_questions`, `open_tests`, `open_findings`, `discussion` (thread URL)? Required properties for the problems panel (typically `id, status, updated`)?
 - Meetings folder (optional third tab)?
 - Grep a few real ticket notes to validate every answer against reality — inconsistent value formats (e.g. `v1.2.0` vs `1.2.0`) are normal; Dispatch normalizes versions by major.minor, but statuses must match exactly.
 - **Last step — propose workflow skills for the CODE repo (the glue).** Chips only carry `/command {{id}}` one-liners; the actual workflow logic must live as Claude skills (`.claude/commands/*.md`) **in the user's code repository** — not the wiki — so it versions with the code, travels through git to every teammate, and is reviewable like code. Derive a catalog from their lifecycle and offer to scaffold it, each skill pre-wired to a chip:
@@ -191,7 +191,8 @@ Rules that **every** skill must respect belong in the repo's `CLAUDE.md`, not co
 - **The ticket freeze.** Once a ticket leaves development (the status where code exists that depends on it), its **contract zone** — goal/symptom, acceptance criteria, open questions + answers, scope, implementation plan — is read-only; stamp `frozen: <date>`. New information goes into the **record zone** (as-built notes, test results, follow-ups) as a dated entry; a wrong frozen statement gets an annotation (`> ⚠️ Correction <date>: …`) beneath it, never a rewrite; new scope becomes a new linked ticket. Rationale: if a spec can change after the code was built against it, a later spec↔code mismatch has two explanations and no way to tell them apart. Details: [`docs/page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md#the-freeze-rule).
 - **Ownership + maintenance.** Every page carries `owner:` (a **person**, resolving to `00_Start-Here/Team/` — never a team). Every *derived* page also carries `derived_from:` and `maintained_by:`, and **a skill that creates a derived page must register its refresh** — if no recurring job owns it, it may not create it.
 - **Precedence** when documents conflict, plus which side wins on a wiki ↔ tracker disagreement (recommend: the wiki).
-- **Gates are gates:** `open_questions: 0` before leaving refinement, `open_tests: 0` before leaving review; no skill moves a ticket across a gated boundary on its own.
+- **Gates are gates:** `open_questions: 0` before leaving refinement, `open_findings: 0` before the test plan is written (the code review runs before the freeze), `open_tests: 0` before leaving review; no skill moves a ticket across a gated boundary on its own.
+- **Unset is not zero.** An empty counter is *no statement* and renders no badge; `0` is *counted, and clear*. So a new ticket leaves `open_tests:` and `open_findings:` empty rather than seeding `0`, and a skill that invalidates a count — fixing code under a review, say — clears the property instead of writing `0`. Only the skill that actually counted may write a number, or the gate can be satisfied by a stale one.
 
 ## 6 · Tracker sync (optional but the biggest win)
 
@@ -219,7 +220,7 @@ So board cards show launched → running ⇄ waiting → done and completed runs
 
 - all four JSON files parse — `data.json`, `community-plugins.json`, the device config, the repo's `.claude/settings.json`;
 - every chip `repo` alias resolves to a directory that exists on this device, and every `tool` a chip names is defined in the device config;
-- for each note in the source folders: required properties present, the `status` value matches a configured column **exactly** (this is what the ⚠ panel flags), `version_target` present in `plannedVersions`, and the counter properties (`open_questions`, `open_tests`) equal to the actual number of unchecked items;
+- for each note in the source folders: required properties present, the `status` value matches a configured column **exactly** (this is what the ⚠ panel flags), `version_target` present in `plannedVersions`, and each counter property (`open_questions`, `open_tests`, `open_findings`) either **empty** — nothing has counted it yet — or equal to the actual number of open items in its section; a `0` on a ticket whose section does not exist yet is the failure worth looking for, because it reads as a passed gate;
 - `milestones.completedProperty` is actually stamped by an automation rule, and matches the completion property in the ticket templates;
 - **no `<<PLACEHOLDER>>` survived** in the scaffolded commands or templates — `grep -r '<<' .claude/commands <vault>/<templates>` must come back empty;
 - every chip prompt names a command that exists in the repo;
