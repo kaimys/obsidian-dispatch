@@ -44,19 +44,27 @@ anything.
 
 The skill behind that button lives in this repo's plugin marketplace:
 
+Claude Code:
+
 ```
 /plugin marketplace add kaimys/obsidian-dispatch
 /plugin install dispatch-setup
+```
+
+Codex:
+
+```
+codex plugin marketplace add kaimys/obsidian-dispatch
+codex plugin add dispatch-setup@dispatch
 ```
 
 The prompt carries those two lines itself, so the button works before you have installed the
 skill. The setup interviews you about your wiki, writes both configuration layers, scaffolds
 ticket templates and workflow commands, and verifies the result.
 
-The guided setup itself runs in Claude Code today. Chips, the workflow files and the run-state
-badges work with **Codex** as well — see
-[Installation & configuration](docs/installation.md) for the tool command, the per-tool prompt
-prefix, and the Codex hook wiring.
+See [Installation & configuration](docs/installation.md) for the tool command, the per-tool
+prompt prefix, and the Codex hook wiring — including the trust step, which a Codex setup does
+nothing without.
 
 Prefer to do it by hand? Every setting the skill writes is documented in
 [Installation & configuration](docs/installation.md).

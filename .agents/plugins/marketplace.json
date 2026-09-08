@@ -1,0 +1,16 @@
+{
+	"name": "dispatch",
+	"interface": {
+		"displayName": "Dispatch"
+	},
+	"plugins": [
+		{
+			"name": "dispatch-setup",
+			"source": {
+				"source": "local",
+				"path": "./plugins/dispatch-setup"
+			},
+			"category": "Developer Tools"
+		}
+	]
+}

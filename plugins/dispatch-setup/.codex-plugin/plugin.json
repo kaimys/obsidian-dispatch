@@ -1,0 +1,18 @@
+{
+	"name": "dispatch-setup",
+	"version": "0.5.2",
+	"description": "Guided integration of the Dispatch Obsidian plugin into your project — boards, device config, agent chips, tracker sync and run-lifecycle hooks.",
+	"author": {
+		"name": "Kai Mysliwiec",
+		"url": "https://github.com/kaimys"
+	},
+	"license": "MIT",
+	"homepage": "https://github.com/kaimys/obsidian-dispatch",
+	"repository": "https://github.com/kaimys/obsidian-dispatch",
+	"keywords": ["obsidian", "kanban", "tickets", "wiki", "agent", "dispatch", "board"],
+	"interface": {
+		"displayName": "Dispatch setup",
+		"shortDescription": "Set up the Dispatch ticket board in your vault and repo"
+	},
+	"skills": "./skills/"
+}

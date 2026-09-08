@@ -1,6 +1,8 @@
 # Starter workflow commands
 
-A generic, adaptable implementation of the catalog in [`docs/skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md). Copy these into the **code repository** as `.claude/commands/*.md` — never into the wiki (see the wiki=state / repo=process boundary in that doc) — then replace every `<<PLACEHOLDER>>`.
+A generic, adaptable implementation of the catalog in [`docs/skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md). Copy these into the **code repository** as `dispatch/workflow/*.md` — never into the wiki (see the wiki=state / repo=process boundary in that doc) — then replace every `<<PLACEHOLDER>>`.
+
+Each agent gets a **stub** beside them rather than a copy: `.claude/commands/<name>.md` and `.codex/skills/<name>/SKILL.md`, each carrying only its own frontmatter and a pointer to `dispatch/workflow/<name>.md`. One body, one process, however many agents.
 
 Dispatch ships these as a *starting point*, not a standard. They encode the loop most projects converge on; the details are the user's.
 

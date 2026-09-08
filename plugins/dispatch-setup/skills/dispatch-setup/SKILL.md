@@ -18,7 +18,7 @@ These live in the plugin repository, **not** in this skill's package — fetch t
 | [`overview.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/overview.md) | The four boards — Kanban, Release Plan, Meetings, Todos — what each shows, the badge semantics, and what the board deliberately does *not* do | The user asks what Dispatch actually gives them, or which tabs are worth configuring |
 | [`wiki-structure.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/wiki-structure.md) | The three layers, the example folder tree, per-folder ownership, the immutable-sources rule, `index.md`/`log.md`, and where the wiki lives relative to the code (symlink vs. monorepo) | There's no vault or no wiki structure yet, or tickets are scattered across folders (step 1) |
 | [`page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md) | The frontmatter contract per page type — tickets (incl. the freeze rule and contract/record zones), ADRs, releases, meetings, legal/domain docs, reports | Deciding ticket frontmatter, scaffolding a ticket template, or writing the `CLAUDE.md` invariants (steps 1 and 5) |
-| [`skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md) | The workflow-skill catalog — what each `/command` reads and writes, and how skills wire to chips | Scaffolding the code repo's `.claude/commands/` (steps 1 and 4) |
+| [`skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md) | The workflow-skill catalog — what each `/command` reads and writes, and how skills wire to chips | Scaffolding the code repo's `dispatch/workflow/` and the per-agent stubs (steps 1 and 4) |
 | [`installation.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/installation.md) | Settings reference, chips and tool commands, run lifecycle, automations, security model — and [the on-disk JSON shapes](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/installation.md#the-config-files-on-disk) | Writing `data.json` or the device config directly (steps 2, 3 and 7) |
 
 The authoritative schema — every field, every default — is `src/settings.ts` in that repo.
@@ -51,7 +51,7 @@ The authoritative schema — every field, every default — is `src/settings.ts`
 - Which properties exist / should exist: `assignee`, `size`, `open_questions`, `open_tests`, `open_findings`, `discussion` (thread URL)? Required properties for the problems panel (typically `id, status, updated`)?
 - Meetings folder (optional third tab)?
 - Grep a few real ticket notes to validate every answer against reality — inconsistent value formats (e.g. `v1.2.0` vs `1.2.0`) are normal; Dispatch normalizes versions by major.minor, but statuses must match exactly.
-- **Last step — propose workflow skills for the CODE repo (the glue).** Chips only carry `/command {{id}}` one-liners; the actual workflow logic must live as Claude skills (`.claude/commands/*.md`) **in the user's code repository** — not the wiki — so it versions with the code, travels through git to every teammate, and is reviewable like code. Derive a catalog from their lifecycle and offer to scaffold it, each skill pre-wired to a chip:
+- **Last step — propose workflow skills for the CODE repo (the glue).** Chips only carry `/command {{id}}` one-liners; the actual workflow logic must live **in the user's code repository** — not the wiki — so it versions with the code, travels through git to every teammate, and is reviewable like code. Derive a catalog from their lifecycle and offer to scaffold it, each skill pre-wired to a chip:
   | Skill (repo) | Chip (Dispatch) | Does |
   |---|---|---|
   | `/create-ticket <desc>` | block chips in reports/meeting notes | duplicate check → spec (full frontmatter, counters seeded) + tracker task, wiki hygiene |
@@ -64,7 +64,16 @@ The authoritative schema — every field, every default — is `src/settings.ts`
   | `/release [version]` | manual / release chip | test pass, version bump, release note with `version`/`date` frontmatter (feeds Milestones), promote tickets, announce |
   | `/meeting agenda\|report` | meeting cards | agenda file; transcript → interpreted report with checkbox action items (the format the Meetings tab counts), decisions folded into the affected tickets |
   | `/daily-routine`, `/weekly-maintenance` | manual / scheduled | sync-and-surface passes: fold feedback, reconcile wiki ↔ tracker, run the report suite from rulebooks in `02_Product/Reports/_definitions/` |
-    **Don't write these from scratch — a starter set ships with this skill in `assets/commands/`** (`create-ticket`, `refine`, `update-ticket`, `implementation-plan`, `develop`, `test-plan`, `code-review`, `release`, `meeting`). Copy them into the repo's `.claude/commands/` and replace the `<<PLACEHOLDER>>` tokens documented in `assets/commands/README.md`; then grep for `<<` to prove none survived. Adapt names, statuses and tracker calls to their answers; every status move must update wiki frontmatter *and* tracker per the source-of-truth decision (step 6). Skills reference repos only via Dispatch's alias mechanism — never hardcode machine paths. The fuller catalog, with what each skill reads and writes, is [`docs/skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md).
+    **Don't write these from scratch — a starter set ships with this skill in `assets/commands/`** (`create-ticket`, `refine`, `update-ticket`, `implementation-plan`, `develop`, `test-plan`, `code-review`, `release`, `meeting`). Copy them into the repo as `dispatch/workflow/<name>.md` and replace the `<<PLACEHOLDER>>` tokens documented in `assets/commands/README.md`; then grep for `<<` to prove none survived.
+
+    **One canonical file, one stub per agent.** The workflow body goes to `dispatch/workflow/<name>.md` — one file, whichever agents the user runs. Each agent then gets a **stub** that carries only its own format's frontmatter and a pointer to that file, and no steps:
+
+    | Agent | Stub | Frontmatter it needs |
+    | --- | --- | --- |
+    | Claude Code | `.claude/commands/<name>.md` | `description`, `argument-hint` |
+    | Codex | `.codex/skills/<name>/SKILL.md` | `name`, `description` |
+
+    A stub says *read `dispatch/workflow/<name>.md` now and follow it exactly*, and substitutes the argument the caller passed. Writing steps into a stub is the failure to avoid: the other agent never sees them, and nothing errors — it just quietly improvises. Grepping a stub for a workflow term (`open_questions`, `frozen:`) must come back empty. Adapt names, statuses and tracker calls to their answers; every status move must update wiki frontmatter *and* tracker per the source-of-truth decision (step 6). Skills reference repos only via Dispatch's alias mechanism — never hardcode machine paths. The fuller catalog, with what each skill reads and writes, is [`docs/skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md).
 
 ## 2 · Shared config (`<vault>/.obsidian/plugins/dispatch/data.json`)
 
@@ -179,7 +188,7 @@ If the user already runs Dispatch on another vault, sanity-check the algorithm b
 ## 4 · Chip templates + workflow commands
 
 - Define **virtual chip templates** in `data.json` — objects `{ "label": …, "tool": …, "repo": …, "prompt": … }` (the `label | tool | repo | prompt` form is the settings UI's input syntax, not the stored shape). Card prompts get `{{id}}`, `{{status}}`, `{{file}}`, `{{title}}`; column-header prompts get `{{ids}}`, `{{status}}`, `{{count}}`; meeting and calendar chips get `{{date}}` and `{{title}}`.
-- Best practice: prompts are slash commands (`/refine {{id}}`) whose step-by-step logic lives as project commands in the target repo's `.claude/commands/`. Scaffold them from **`assets/commands/`** in this skill rather than improvising — nine commands covering the ticket loop, releases and meetings, each a `<<PLACEHOLDER>>` search-and-replace away from working. Their vault-side counterparts (ticket, bug, ADR, release-note and meeting templates) are in **`assets/templates/`**. Rationale and catalog: [`skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md), [`page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md).
+- Best practice: prompts are one-liners (`/refine {{id}}` for Claude, `$refine {{id}}` for Codex) whose step-by-step logic lives in the target repo's `dispatch/workflow/`, with a thin stub per agent. Scaffold them from **`assets/commands/`** in this skill rather than improvising — nine workflows covering the ticket loop, releases and meetings, each a `<<PLACEHOLDER>>` search-and-replace away from working. **The prompt differs per agent only by its leading character**, so set the tool's prompt prefix in the device config (`codex = $`) rather than writing a prompt per chip. Their vault-side counterparts (ticket, bug, ADR, release-note and meeting templates) are in **`assets/templates/`**. Rationale and catalog: [`skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md), [`page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md).
 - Chip labels must match what the commands are actually called — a chip firing `/refine` at a repo with no `refine.md` fails only at click time, with a confusing error.
 - Every `repo` alias used by a chip must exist in the device config, and the `tool` must be defined there too — otherwise the chip fails only at click time. Check both after writing the two files.
 - YAML gotcha for block chips in notes: quote values containing `:` or `#`.
@@ -203,35 +212,47 @@ Add an automation rule in `data.json` so drags push to the tracker:
 Scaffold `scripts/move-ticket.mjs` in their repo: map status → tracker column/section ID, find the task by the ticket-ID naming convention, move it via the tracker's API (token from env/.env — never hardcode), print ONE line (it becomes the Obsidian notice). Statuses without a tracker column: print a skip message, exit 0. **Windows: never `process.exit()` after async work** (libuv teardown race → false failures) — set `process.exitCode` and return. A `--dry-run` flag makes it testable. Add a `set` rule for completion stamping too: `{ "when": ["Done"], "set": { "done": "{{date}}" } }` — it feeds the milestone velocity forecast (completedProperty).
 Decide with the user which side is the **source of truth** (recommend: the vault; tracker follows) and write that down in their project docs. Then enable *automation commands on this device*.
 
-## 7 · Run-lifecycle hooks (Claude Code)
+## 7 · Run-lifecycle hooks
 
-So board cards show launched → running ⇄ waiting → done and completed runs log back into the note:
+So board cards show launched → running ⇄ waiting → done and completed runs log back into the note. **Wire this for every agent the user runs** (step 1's interview) — one script serves them all:
 
 1. **Copy the reference implementation that ships with this skill** — `assets/run-state.mjs` in this skill's own directory — into the target repo as `scripts/dispatch/run-state.mjs`. It is dependency-free, fully synchronous and needs no edits. (What it does: appends `{id, state, ts}` to `$DISPATCH_RUNS_FILE`; on `done` also appends a run-log line plus an excerpt of the agent's final message — read from the `transcript_path` in the hook's **stdin JSON**, not from an env var — to `$DISPATCH_NOTE` under `## Dispatch runs`, newest first; silent no-op when `DISPATCH_RUN_ID` is unset, so normal sessions are undisturbed. Contract: [`installation.md` → Run lifecycle](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/installation.md#run-lifecycle).)
-2. Wire the four events in the **target repo's** `.claude/settings.json` by **copying `assets/claude-settings-hooks.json`** from this skill's directory and merging it into any existing file (never overwrite one). It maps `SessionStart` and `UserPromptSubmit` → `running`, `Stop` → `waiting`, `SessionEnd` → `done`, using the `command` + `args` form, which survives spaces in the project path.
+2. Wire the four events for each agent, in the **target repo**, by **copying** the matching asset from this skill's directory and merging it into any existing file (never overwrite one). Both map `SessionStart` and `UserPromptSubmit` → `running`, `Stop` → `waiting`, `SessionEnd` → `done`.
+
+   | Agent | Target file | Asset to copy |
+   | --- | --- | --- |
+   | Claude Code | `.claude/settings.json` | `assets/claude-settings-hooks.json` |
+   | Codex | `.codex/hooks.json` | `assets/codex-hooks.json` |
+
+   The two formats are **not** interchangeable. Claude takes a `command` + `args` array, which survives spaces in the project path; Codex takes a single `command` **string** and nests the events under a top-level `hooks` key. Copy the file for the agent you are wiring; do not translate one into the other.
 
    ⚠️ **Copy that file — do not retype the JSON from memory or from anything quoted in these instructions.** Each hook path must remain the *literal, unexpanded* project-directory variable (the `CLAUDE_PROJECT_DIR` name in dollar-brace form, exactly as the file has it). That variable is **substituted when this skill is rendered**, so instructions that inline the JSON can reach you with a real absolute path already baked in — and writing that into `.claude/settings.json` hardcodes one machine into a file the whole team commits. After merging, grep the result for the drive letter or home directory: if you find one, you retyped it instead of copying it.
 3. **Verify it without Obsidian** before the smoke test: set the five `DISPATCH_*` variables by hand, run the script for `running`, `waiting` and `done` (piping `{"transcript_path":"…"}` on stdin for the last), then check that the runs file gained three records and a scratch note gained its `## Dispatch runs` entry. On Windows pass **native paths** (`C:\…`) — a Git-Bash `/c/…` path makes the note lookup silently no-op and looks like a broken hook.
-4. Semantics to explain: **done fires when the claude process exits** (`/exit`), not when it finishes answering — that's what `waiting` is for. Ghost badges (killed terminals) are cleared via badge-click → menu.
+4. Semantics to explain: **done fires when the agent process exits** (`/exit`), not when it finishes answering — that's what `waiting` is for. Ghost badges (killed terminals) are cleared via badge-click → menu.
+5. ⚠️ **Codex only — the hooks do nothing until they are trusted, and every failure here is silent.** Walk the user through this explicitly; it is the single most likely reason a correct setup looks broken:
+   - Have them run `codex` **interactively** once in the repo and accept the hook-trust prompt. `codex exec` does not run these hooks, so it cannot be used to test them.
+   - Trust is recorded **per hook entry and hashed** (`~/.codex/config.toml`, `[hooks.state.'<file>:<event>:…']`). **Editing `.codex/hooks.json` un-trusts what you changed**, silently — after any edit, re-accept and re-verify.
+   - The file path is `.codex/hooks.json`. A hooks file at any other path produces **no warning at all**, and a malformed one produces only a warning while the session runs on regardless. **Never treat a clean startup as evidence the hooks are live** — confirm by watching a badge change.
 
 ## 8 · Smoke test
 
 **Verify headlessly first.** All of this is checkable before the user opens Obsidian, and a failure here would otherwise surface as an apparent plugin bug:
 
-- all four JSON files parse — `data.json`, `community-plugins.json`, the device config, the repo's `.claude/settings.json`;
+- every JSON file parses — `data.json`, `community-plugins.json`, the device config, and the hook config of each agent wired in step 7 (`.claude/settings.json`, `.codex/hooks.json`);
 - every chip `repo` alias resolves to a directory that exists on this device, and every `tool` a chip names is defined in the device config;
 - for each note in the source folders: required properties present, the `status` value matches a configured column **exactly** (this is what the ⚠ panel flags), `version_target` present in `plannedVersions`, and each counter property (`open_questions`, `open_tests`, `open_findings`) either **empty** — nothing has counted it yet — or equal to the actual number of open items in its section; a `0` on a ticket whose section does not exist yet is the failure worth looking for, because it reads as a passed gate;
 - `milestones.completedProperty` is actually stamped by an automation rule, and matches the completion property in the ticket templates;
-- **no `<<PLACEHOLDER>>` survived** in the scaffolded commands or templates — `grep -r '<<' .claude/commands <vault>/<templates>` must come back empty;
+- **no `<<PLACEHOLDER>>` survived** in the scaffolded workflow files or templates — `grep -r '<<' <workflow dir> <vault>/<templates>` must come back empty;
 - every chip prompt names a command that exists in the repo;
 - **`.claude/settings.json` contains no absolute path** — the hook paths must still be the unexpanded project-directory variable (step 7.2). A drive letter or home directory in there is the single easiest way to commit one machine's layout to the whole team;
-- the run-state hook behaves (step 7.3).
+- the run-state hook behaves (step 7.3);
+- **for Codex: hook trust has actually been granted** (step 7.5). Check `~/.codex/config.toml` for a `[hooks.state.…]` entry naming the repo's `.codex/hooks.json`. Its absence, with everything else correct, is exactly the state that looks like a broken plugin.
 
 Then walk the user through the UI, verifying each:
 
 1. ↻ reload → Kanban shows the configured columns; ⚠ problems panel reviewed (fix malformed tickets now, not later).
 2. Drag a card one column → frontmatter updated + tracker moved (if step 6) + notice shown.
-3. Right-click a card → chip launches the agent in the right repo; badge lifecycle runs through; `## Dispatch runs` line appears on session exit.
+3. Right-click a card → chip launches the agent in the right repo; badge lifecycle runs through; `## Dispatch runs` line appears on session exit, naming the agent that ran. **With more than one agent configured the chip asks which to run** — check that each button previews its own command, and run the cycle on each agent, not just the first.
 4. Milestones tab: versions grouped correctly, released columns link their notes, forecasts only on unreleased versions.
 
 ## Known pitfalls (tell the user proactively when relevant)
