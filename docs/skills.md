@@ -1,6 +1,6 @@
 # Workflow skills
 
-A chip on a card carries one line: `/refine US00042`. Everything behind that line — what to read, whom to ask, what to write, when to stop — is a **skill**, and skills live in the **code repository** (`dispatch/workflow/*.md`, with a thin per-agent stub in `.claude/commands/` and `.codex/skills/`), not in the wiki.
+A chip on a card carries one line: `/refine US00042` — or `$refine US00042`, if the agent is Codex. Everything behind that line — what to read, whom to ask, what to write, when to stop — is a **skill**, and skills live in the **code repository** (`dispatch/workflow/*.md`, with a thin per-agent stub in `.claude/commands/` and `.codex/skills/`), not in the wiki.
 
 That boundary is the whole design:
 
@@ -10,7 +10,7 @@ That boundary is the whole design:
 
 Keeping process in the repo means it versions with the code, travels through git to every teammate, and is reviewed like code. Keeping it out of the wiki means a note can never define what an agent does — which is also what makes chips safe to click (see [installation.md](installation.md#security-model)).
 
-**Invariants are not skills.** Rules like the ticket [freeze](page-types.md#the-freeze-rule), the precedence order, or "never move a ticket across a gated boundary without the gate being met" belong in `CLAUDE.md`, where every skill inherits them. A rule copied into six skills holds in four.
+**Invariants are not skills.** Rules like the ticket [freeze](page-types.md#the-freeze-rule), the precedence order, or "never move a ticket across a gated boundary without the gate being met" belong in one shared file — `dispatch/invariants.md` — that `CLAUDE.md` and `AGENTS.md` both point at, so every skill inherits them whichever agent is reading. A rule copied into six skills holds in four; a rule copied into two agents' instruction files holds in one.
 
 Dispatch ships none of these skills. What follows is a catalog to adapt — the shape that a project of moderate size converges on.
 
@@ -37,7 +37,7 @@ Three things make this loop hold together:
 - **The team answers where it already talks.** Refinement posts questions into the team chat and reads the replies back — nobody is asked to review a spec in a tool they don't open. The thread URL goes in `discussion:` so the conversation stays findable from the card.
 - **A skill knows when to stop.** Root cause unclear, needs a product decision, touches safety-critical copy → hand back with the status set to whatever means "needs a human", and say why. An agent that plows through an ambiguous ticket produces work someone has to unpick.
 
-Every status move updates **both** the wiki frontmatter and the tracker. Decide once which side wins when they disagree (the wiki, if the board is where people actually work) and write it in `CLAUDE.md`.
+Every status move updates **both** the wiki frontmatter and the tracker. Decide once which side wins when they disagree (the wiki, if the board is where people actually work) and write it in the shared invariants file.
 
 ## Skills for releases
 
@@ -95,6 +95,8 @@ Start development   | claude | my-project | /develop {{id}}
 Code review         | claude | my-project | /code-review {{id}}
 Write test plan     | claude | my-project | /test-plan {{id}}
 ```
+
+**One chip per action, however many agents you run.** The `tool` column is a *default*, not a constraint: with more than one agent configured, clicking a chip offers one button per agent and shows the exact command each would run. And you do not write a second prompt per agent — set the tool's invocation prefix once in the device config (`codex = $`), and a prompt that starts with `/` is rewritten for that agent. A prompt that is not a command — the batch ones below — is never touched.
 
 Column headers get batch versions (`{{ids}}`, `{{status}}`, `{{count}}`) for "update all tickets in refinement"; meeting rows and calendar events get their own sets. The mechanics — variables, tool commands, the busy-gate, run tracking — are in [installation.md](installation.md#chips).
 

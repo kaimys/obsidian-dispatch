@@ -12,13 +12,13 @@ Nothing here is enforced by the plugin. Dispatch needs folder paths and property
 | ----------- | ---------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------ |
 | **Sources** | `01_Sources/`                                  | humans (drop files in)     | **Immutable.** Agents read them, never modify them.                            |
 | **Wiki**    | everything else                                | agents, reviewed by humans | Interpretations of sources plus the project's own decisions. Rewritten freely. |
-| **Schema**  | `CLAUDE.md` in the code repo, `00_Start-Here/` | humans                     | How the wiki is structured, what is authoritative, which rules are inviolable. |
+| **Schema**  | `dispatch/invariants.md` in the code repo, `00_Start-Here/` | humans                     | How the wiki is structured, what is authoritative, which rules are inviolable. |
 
 > "Your curated collection of source documents. Articles, papers, images, data files. These are immutable — the LLM reads from them but never modifies them. This is your source of truth." — Karpathy
 
 The separation is what makes the wiki safe to rewrite. A wiki page is an *interpretation* — of a transcript, a bug report, a regulation — and interpretations get corrected. If the artifact behind it was edited into the page and then discarded, nobody can re-derive it. Keep the artifact.
 
-The **schema layer** is the part most projects forget. Conventions that every workflow must respect — what is authoritative, which sections may never be rewritten, who owns what — belong in `CLAUDE.md`, not in the individual skills. A rule copied into six skills is a rule that will hold in four of them.
+The **schema layer** is the part most projects forget. Conventions that every workflow must respect — what is authoritative, which sections may never be rewritten, who owns what — belong in one shared invariants file that each agent's instruction file points at (`dispatch/invariants.md`, with `CLAUDE.md` and `AGENTS.md` as pointers), not in the individual skills. A rule copied into six skills is a rule that will hold in four of them.
 
 ## The example tree
 
@@ -160,7 +160,7 @@ repo/
   .claude/        skills + scripts shared across all of it
 ```
 
-Skills at the repo root are available anywhere you launch from it; directory-scoped ones resolve to the nearest match; nested `CLAUDE.md` files layer root conventions with per-package specifics. That part works well and is the strongest argument for the layout.
+Skills at the repo root are available anywhere you launch from it; directory-scoped ones resolve to the nearest match; nested instruction files (`CLAUDE.md`, `AGENTS.md`) layer root conventions with per-package specifics. That part works well and is the strongest argument for the layout.
 
 Two things to plan for:
 

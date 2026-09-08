@@ -4,7 +4,7 @@ Every page in the wiki is a page type with a frontmatter contract. The contract 
 
 Property *names* are yours — Dispatch reads whatever you configure. The names below are the ones the examples use.
 
-> **Where these rules live:** in your project's `CLAUDE.md`, not in the individual skills. They are invariants that every workflow must respect; a rule copied into six skills is a rule that will hold in four of them. Skills describe procedure, `CLAUDE.md` describes what is never allowed to happen.
+> **Where these rules live:** in one shared invariants file — `dispatch/invariants.md` — that each agent's instruction file (`CLAUDE.md`, `AGENTS.md`) points at, not in the individual skills. They are invariants that every workflow must respect; a rule copied into six skills is a rule that will hold in four of them, and a rule copied into two agents' instruction files will hold in one. Skills describe procedure; the invariants file describes what is never allowed to happen.
 
 ## Every page
 
