@@ -83,7 +83,12 @@ Prefer to do it by hand? Every setting the skill writes is documented in
 
 ## Conclusion
 
-In the words of Andrej Karpathy:
+Does the setup work for you? Did you run into problems? Is this plugin usefull for you? 
+Any feedback is welcome. Please leave a post on [Github Discussions](https://github.com/kaimys/obsidian-dispatch/discussions). 
+
+Happy prompting!
+
+Or in the words of Andrej Karpathy:
 
 "*... an internal wiki maintained by LLMs, fed by Slack threads, meeting transcripts, project documents, customer calls. Possibly with humans in the loop reviewing updates. The wiki stays current because the LLM does the maintenance that no one on the team wants to do.*"\
 — Andrej Karpathy, [LLM-Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
