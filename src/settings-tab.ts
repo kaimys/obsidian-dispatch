@@ -722,12 +722,56 @@ export class DispatchSettingTab extends PluginSettingTab {
 							.join("\n")
 					)
 					.onChange(async (v) => {
+						// Merge, never rebuild: this row knows only `command`, and a
+						// ToolConfig also carries the per-tool prompt overrides below.
+						// Replacing the object would drop them silently, on an edit
+						// to an unrelated field, long after the overrides were set.
+						const existing = this.plugin.local.tools;
 						this.plugin.local.tools = Object.fromEntries(
 							Object.entries(parseKeyValueLines(v)).map(([name, command]) => [
 								name,
-								{ command },
+								{ ...existing[name], command },
 							])
 						);
+						await this.plugin.saveLocal();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Tool prompts")
+			.setDesc(
+				"Optional, one per line: tool.intent = prompt. The prompt this agent wants for a chip, " +
+					"when its own spelling differs — e.g. codex.refine = $refine {{id}} beside Claude's /refine {{id}}. " +
+					"The chip's prompt is used for any tool and intent not listed here."
+			)
+			.addTextArea((ta) =>
+				ta
+					.setPlaceholder("codex.refine = $refine {{id}}")
+					.setValue(
+						Object.entries(this.plugin.local.tools)
+							.flatMap(([tool, cfg]) =>
+								Object.entries(cfg.prompts ?? {}).map(
+									([intent, prompt]) => `${tool}.${intent} = ${prompt}`
+								)
+							)
+							.join("\n")
+					)
+					.onChange(async (v) => {
+						// Same merge rule in the other direction: rebuild only the
+						// `prompts` maps and keep every command as it stands.
+						const tools = this.plugin.local.tools;
+						for (const cfg of Object.values(tools)) delete cfg.prompts;
+						for (const [key, prompt] of Object.entries(parseKeyValueLines(v))) {
+							const dot = key.indexOf(".");
+							if (dot < 1 || dot === key.length - 1) continue;
+							const tool = key.slice(0, dot);
+							const intent = key.slice(dot + 1);
+							// A prompt for a tool this device does not have is kept
+							// rather than dropped — the row is the user's text, and
+							// silently deleting a line they typed is the bug above.
+							if (!tools[tool]) tools[tool] = { command: "" };
+							(tools[tool].prompts ??= {})[intent] = prompt;
+						}
 						await this.plugin.saveLocal();
 					})
 			);

@@ -1,5 +1,14 @@
 import { App, Modal, Notice, TFile, parseYaml, setIcon } from "obsidian";
-import { launchDetached, quoteArg, shellVars, substitute, writePromptFile } from "./exec";
+import {
+	emptyVars,
+	launchDetached,
+	quoteArg,
+	resolvePrompt,
+	shellVars,
+	substitute,
+	toolChoices,
+	writePromptFile,
+} from "./exec";
 import { displayValue } from "./parse";
 import { frontmatterOf } from "./vault";
 import type DispatchPlugin from "./main";
@@ -23,6 +32,8 @@ import type { ChipTemplate } from "./settings";
  */
 interface ChipSpec {
 	label?: string;
+	/** Stable key for per-tool prompt overrides; a name, never a command. */
+	intent?: string;
 	tool?: string;
 	repo?: string;
 	prompt?: string;
@@ -66,6 +77,7 @@ export function registerChipProcessor(plugin: DispatchPlugin): void {
 				plugin,
 				{
 					label: spec?.label ?? "Run",
+					intent: spec?.intent,
 					tool: spec?.tool,
 					repo: spec?.repo,
 					prompt: spec?.prompt ?? "",
@@ -92,23 +104,12 @@ export function launchChip(plugin: DispatchPlugin, spec: ChipTemplate, sourcePat
 		status: typeof status === "string" ? status : "",
 	};
 
-	// A referenced variable that resolves empty would launch a broken command
-	// (e.g. "/refine " without a ticket ID) — fail loudly instead.
-	const missing = [...spec.prompt.matchAll(/\{\{(\w+)\}\}/g)]
-		.map((m) => m[1])
-		.filter((name) => name in values && values[name].trim() === "");
-	if (missing.length > 0) {
-		new Notice(
-			`Dispatch: "${spec.label}" not launched — {{${missing.join("}}, {{")}}} is empty on this note. ` +
-				`Fix the note's frontmatter (see the board's ⚠ panel).`,
-			8000
-		);
-		return;
-	}
-	const prompt = substitute(spec.prompt, values);
 	const vaultBase = plugin.getVaultBasePath();
 	const noteAbs = vaultBase ? `${vaultBase}\\${sourcePath.replace(/\//g, "\\")}` : "";
-	executeChip(plugin, spec, prompt, sourcePath, noteAbs);
+	// `guardEmpty`: a referenced variable that resolves empty would launch a
+	// broken command (e.g. "/refine " without a ticket ID). The check runs per
+	// tool, because each tool may want a different prompt for this chip.
+	executeChip(plugin, spec, values, sourcePath, noteAbs, true);
 }
 
 /**
@@ -126,12 +127,8 @@ export function launchColumnChip(
 		new Notice("Dispatch: no tickets with IDs in this column.");
 		return;
 	}
-	const prompt = substitute(spec.prompt, {
-		ids: ids.join(" "),
-		status,
-		count: String(ids.length),
-	});
-	executeChip(plugin, spec, prompt, `(batch) ${status || "column"}`, "");
+	const values = { ids: ids.join(" "), status, count: String(ids.length) };
+	executeChip(plugin, spec, values, `(batch) ${status || "column"}`, "");
 }
 
 /**
@@ -144,8 +141,7 @@ export function launchEventChip(
 	date: string,
 	title: string
 ): void {
-	const prompt = substitute(spec.prompt, { date, title });
-	executeChip(plugin, spec, prompt, `(calendar) ${date}`, "");
+	executeChip(plugin, spec, { date, title }, `(calendar) ${date}`, "");
 }
 
 /**
@@ -158,23 +154,36 @@ export function launchEventChip(
  * is the ordinary chip path, so a setup run behaves like any other run.
  */
 export function launchSetup(plugin: DispatchPlugin, prompt: string): void {
-	const spec: ChipTemplate = { label: "Set up Dispatch", prompt };
-	executeChip(plugin, spec, prompt, "(setup)", "");
+	const spec: ChipTemplate = { label: "Set up Dispatch", intent: "setup", prompt };
+	executeChip(plugin, spec, {}, "(setup)", "");
+}
+
+/**
+ * One agent this chip could be launched with: the command that would run, or
+ * the reason it cannot. Built per tool, because the tool is chosen at click
+ * time (ADR-0021) and each tool may want a different prompt for the same chip.
+ */
+interface Candidate {
+	tool: string;
+	command: string;
+	/** Empty when this tool can run the chip; otherwise why it cannot. */
+	problem: string;
 }
 
 /** Shared launch core: tool/repo resolution, command build, busy gate, confirm, run record. */
 function executeChip(
 	plugin: DispatchPlugin,
 	spec: ChipTemplate,
-	prompt: string,
+	values: Record<string, string>,
 	recordFile: string,
-	noteAbs: string
+	noteAbs: string,
+	guardEmpty = false
 ): void {
-	const toolName = spec.tool || plugin.shared.chips.defaultTool;
-	const tool = plugin.local.tools[toolName];
-	if (!tool || !tool.command.trim()) {
+	const choices = toolChoices(spec, plugin.local.tools, plugin.shared.chips.defaultTool);
+	if (choices.length === 0) {
+		const wanted = spec.tool || plugin.shared.chips.defaultTool;
 		new Notice(
-			`Dispatch: tool "${toolName}" is not configured on this device (Settings → Dispatch → This device).`
+			`Dispatch: tool "${wanted}" is not configured on this device (Settings → Dispatch → This device).`
 		);
 		return;
 	}
@@ -195,16 +204,33 @@ function executeChip(
 		return;
 	}
 
-	const vars = shellVars({ cwd });
-	vars.prompt = quoteArg(prompt); // no {{promptRaw}} on purpose — injection guard
-	if (tool.command.includes("promptFile")) {
-		const promptFile = writePromptFile(prompt);
-		vars.promptFile = quoteArg(promptFile);
-		vars.promptFileRaw = promptFile;
-	}
-	const command = substitute(tool.command, vars);
+	// Build every offer up front: the dialog has to show the command each button
+	// would run, which means resolving the prompt per tool before any click.
+	const candidates: Candidate[] = choices.map((toolName) => {
+		const template = resolvePrompt(spec, toolName, plugin.local.tools);
+		const missing = guardEmpty ? emptyVars(template, values) : [];
+		if (missing.length > 0) {
+			return {
+				tool: toolName,
+				command: "",
+				problem:
+					`{{${missing.join("}}, {{")}}} is empty on this note. ` +
+					`Fix the note's frontmatter (see the board's ⚠ panel).`,
+			};
+		}
+		const prompt = substitute(template, values);
+		const vars = shellVars({ cwd });
+		vars.prompt = quoteArg(prompt); // no {{promptRaw}} on purpose — injection guard
+		const commandTemplate = plugin.local.tools[toolName].command;
+		if (commandTemplate.includes("promptFile")) {
+			const promptFile = writePromptFile(prompt);
+			vars.promptFile = quoteArg(promptFile);
+			vars.promptFileRaw = promptFile;
+		}
+		return { tool: toolName, command: substitute(commandTemplate, vars), problem: "" };
+	});
 
-	const execute = () => {
+	const execute = (candidate: Candidate) => {
 		// Run lifecycle: record the launch; the agent's lifecycle hooks (in the
 		// target repo) append "running"/"done" via the env vars below.
 		const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -219,6 +245,12 @@ function executeChip(
 		});
 		const env: Record<string, string> = {
 			DISPATCH_RUN_ID: runId,
+			// Which agent ran. The durable record of a run is the note's
+			// `## Dispatch runs` line, appended by the lifecycle hook — and with
+			// two agents on one board, a line that does not say who ran is not a
+			// record. Set here rather than at resolution time because the agent
+			// is not known until the click.
+			DISPATCH_TOOL: candidate.tool,
 			DISPATCH_RUNS_FILE: plugin.runs.path(),
 			// The device file this vault's settings live in. A Dispatch-scope
 			// script reads its own configuration out of it (ADR-0027), and it
@@ -232,34 +264,45 @@ function executeChip(
 			DISPATCH_STARTED: startedIso,
 		};
 		launchDetached(
-			command,
+			candidate.command,
 			cwd,
-			(err) => new Notice(`Dispatch: failed to launch ${toolName}: ${err.message}`, 8000),
+			(err) =>
+				new Notice(`Dispatch: failed to launch ${candidate.tool}: ${err.message}`, 8000),
 			env
 		);
-		new Notice(`Dispatch: launched ${toolName}`);
+		new Notice(`Dispatch: launched ${candidate.tool}`);
 	};
 
 	// One agent per working tree: if the repo is busy (or has a queue), let
 	// the user queue behind it, run anyway, or back out.
-	const gate = () => {
+	const gate = (candidate: Candidate) => {
+		const run = () => execute(candidate);
 		const active = plugin.runs.activeForCwd(cwd);
 		const waiting = plugin.pendingRunCount(cwd);
 		if (active.length === 0 && waiting === 0) {
-			execute();
+			run();
 			return;
 		}
 		new BusyModal(plugin.app, active[0], waiting, cwd, {
-			onQueue: () => plugin.enqueueRun(cwd, recordFile, spec.label, execute),
-			onRunAnyway: execute,
+			onQueue: () => plugin.enqueueRun(cwd, recordFile, spec.label, run),
+			onRunAnyway: run,
 		}).open();
 	};
 
-	if (plugin.local.confirmBeforeRun) {
-		new ConfirmModal(plugin.app, `Run ${toolName}?`, command, cwd, gate).open();
-	} else {
-		gate();
+	// The picker lives in the confirmation dialog and nowhere else: turning
+	// confirmations off means "don't make me confirm", not "show me a new
+	// dialog". Without it the chip's own tool (else the default) runs, exactly
+	// as before — a person who wants the other agent every time sets that.
+	if (plugin.local.confirmBeforeRun && candidates.some((c) => !c.problem)) {
+		new ConfirmModal(plugin.app, candidates, cwd, gate).open();
+		return;
 	}
+	const preferred = candidates[0];
+	if (preferred.problem) {
+		new Notice(`Dispatch: "${spec.label}" not launched — ${preferred.problem}`, 8000);
+		return;
+	}
+	gate(preferred);
 }
 
 class BusyModal extends Modal {
@@ -307,31 +350,59 @@ class BusyModal extends Modal {
 	}
 }
 
+/**
+ * The confirmation dialog, and — on a device with more than one agent — the
+ * place the agent is chosen (ADR-0021). One button per configured tool, the
+ * chip's own tool first and primary.
+ *
+ * The `<pre>` must always show the command the *next click* would run: showing
+ * the exact command before it runs is the whole reason this dialog exists
+ * (ADR-0004), and a preview that lags the button under the cursor would quietly
+ * break that. So it repaints on hover and on focus, and focus matters as much
+ * as hover — a keyboard user never generates a mouseenter.
+ */
 class ConfirmModal extends Modal {
 	constructor(
 		app: App,
-		private heading: string,
-		private command: string,
+		private candidates: Candidate[],
 		private cwd: string,
-		private onConfirm: () => void
+		private onConfirm: (candidate: Candidate) => void
 	) {
 		super(app);
 	}
 
 	onOpen(): void {
-		this.titleEl.setText(this.heading);
+		const single = this.candidates.length === 1;
+		this.titleEl.setText(single ? `Run ${this.candidates[0].tool}?` : "Run this chip?");
 		this.contentEl.createDiv({
 			cls: "dispatch-confirm-label",
 			text: `Working directory: ${this.cwd}`,
 		});
-		this.contentEl.createEl("pre", { cls: "dispatch-confirm-command", text: this.command });
+		const preview = this.contentEl.createEl("pre", { cls: "dispatch-confirm-command" });
+		const show = (c: Candidate) =>
+			preview.setText(c.problem ? `Cannot run ${c.tool} — ${c.problem}` : c.command);
 
 		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
-		const run = row.createEl("button", { cls: "mod-cta", text: "Run" });
-		run.addEventListener("click", () => {
-			this.close();
-			this.onConfirm();
-		});
+		let primaryTaken = false;
+		for (const candidate of this.candidates) {
+			const name = candidate.tool.charAt(0).toUpperCase() + candidate.tool.slice(1);
+			const button = row.createEl("button", { text: single ? "Run" : `Run with ${name}` });
+			if (candidate.problem) {
+				button.disabled = true;
+			} else if (!primaryTaken) {
+				button.addClass("mod-cta");
+				primaryTaken = true;
+				show(candidate);
+			}
+			for (const event of ["mouseenter", "focus"]) {
+				button.addEventListener(event, () => show(candidate));
+			}
+			button.addEventListener("click", () => {
+				if (candidate.problem) return;
+				this.close();
+				this.onConfirm(candidate);
+			});
+		}
 		const cancel = row.createEl("button", { text: "Cancel" });
 		cancel.addEventListener("click", () => this.close());
 	}
