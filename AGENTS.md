@@ -61,6 +61,18 @@ string>" }` — one string, no `args` array — with optional `commandWindows`, 
 `statusMessage`, grouped under `{ "matcher", "hooks" }` inside a top-level `hooks` map keyed by
 event.
 
-**Hooks still do not run until they are trusted**, and trust can only be granted interactively.
-With the file correct and untrusted, the symptom is identical to having no file: badges stuck at
-`launched`, nothing in the terminal. Run `codex` once in the repo and accept the prompt.
+**Hooks do not run until they are trusted**, and trust can only be granted interactively. With the
+file correct and untrusted, the symptom is identical to having no file: badges stuck at `launched`,
+nothing in the terminal. Run `codex` once in the repo and accept the prompt.
+
+Trust is recorded in `~/.codex/config.toml` per **hook entry**, not per file:
+
+```toml
+[hooks.state.'…\.codex\hooks.json:session_start:0:0']
+trusted_hash = "sha256:349e…"
+```
+
+The hash covers the handler, so **editing a hook silently un-trusts that entry** — it stops firing
+until it is approved again, with no error and no change in the terminal. After any edit to
+`.codex/hooks.json`, run `codex` interactively once and re-accept, then confirm a badge actually
+moves.
