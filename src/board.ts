@@ -643,7 +643,7 @@ export class BoardView extends ItemView {
 			const input = createEl("input", {
 				cls: "dispatch-version-tag-input",
 				value: current,
-				attr: { placeholder: "MVP, Closed Beta, …" },
+				attr: { placeholder: "MVP, Closed beta, …" },
 			});
 			tag.replaceWith(input);
 			input.focus();

@@ -1,12 +1,6 @@
 /**
- * Most strings here are example DATA, not prose, which is why this file
- * carries ~26 `ui/sentence-case` warnings that are deliberately left standing.
- * Placeholders show frontmatter KEYS (`open_questions`, `assignee`), which YAML
- * matches case-sensitively; folder names; status values; version patterns; and
- * people's names. Sentence-casing them would make every example wrong, and the
- * rule cannot be suppressed — eslint-plugin-obsidianmd puts `obsidianmd/*` on
- * `eslint-comments/no-restricted-disable`. New PROSE here should still be
- * sentence case.
+ * Placeholder examples are case-sensitive data. The sentence-case rule in
+ * eslint.config.mjs preserves these literals while still checking UI prose.
  */
 import { App, PluginSettingTab, Setting } from "obsidian";
 import { displayValue, formatChipLabel, parseChipLabel } from "./parse";
@@ -343,7 +337,7 @@ export class DispatchSettingTab extends PluginSettingTab {
 			)
 			.addTextArea((ta) =>
 				ta
-					.setPlaceholder("1.1 = MVP\n1.2 = Closed Beta")
+					.setPlaceholder("1.1 = MVP\n1.2 = Closed beta")
 					.setValue(
 						Object.entries(this.plugin.shared.milestones.tags)
 							.map(([k, v]) => `${k} = ${v}`)

@@ -36,7 +36,7 @@ export interface MilestoneSettings {
 	 * keyed/grouped by the normalized major.minor.
 	 */
 	plannedVersions: string[];
-	/** Optional tag per version (MVP, Closed Beta, …), keyed by major.minor. */
+	/** Optional tag per version (MVP, Closed beta, …), keyed by major.minor. */
 	tags: Record<string, string>;
 	/** Frontmatter property with the ticket size/weight (numeric). Missing/invalid = 1. */
 	sizeProperty: string;
