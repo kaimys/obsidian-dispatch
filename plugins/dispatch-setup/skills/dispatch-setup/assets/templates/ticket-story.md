@@ -7,6 +7,7 @@ rank: 1000
 version_target:
 size:
 assignee:
+owner:
 open_questions: 0
 open_tests:
 open_findings:
@@ -31,7 +32,7 @@ frozen:
                   Empty until a review has counted; a fix clears it back to empty, never to 0.
   discussion      permalink of the thread where the team discussed this; rendered as a chat icon.
   updated         bump on every meaningful edit.
-  <<P_COMPLETED>>  stamped automatically when the card enters the final column; feeds the forecast.
+  <<P_COMPLETED>>  stamped on completion by a board drag automation or explicitly by the writing workflow; feeds the forecast.
   frozen          stamped when the ticket leaves development — see the zone markers below.
 -->
 

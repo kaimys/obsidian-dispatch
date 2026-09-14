@@ -3,14 +3,17 @@ description: Start or continue refinement of a ticket — read the spec and ever
 argument-hint: <ticket id>
 ---
 
-# /refine $ARGUMENTS
+# Workflow: refine
 
-Runs refinement for one ticket. `$ARGUMENTS` is the ticket id.
+Read `dispatch/invariants.md` first. `<ARGS>` is supplied by the invoking agent stub.
+Tracker: <<TRACKER>>. Chat: <<CHAT>>. If either is `none`, skip only that integration's lookups, writes and missing-side preconditions; continue the wiki work. With no chat, record questions for the requester in the ticket. A configured but unavailable integration is an error to report, not `none`.
+
+Runs refinement for one ticket. `<ARGS>` is the ticket id.
 
 ## Resolve
 
-1. Find the spec: grep `id: $ARGUMENTS` in `<<WIKI>>/<<TICKETS>>`. Find the matching task in <<TRACKER>>. If either side is missing, stop and report it — don't refine a one-sided ticket.
-2. Name the session `$ARGUMENTS <short name>` so the terminal is identifiable.
+1. Find the spec: grep `id: <ARGS>` in `<<WIKI>>/<<TICKETS>>`. Find the matching task in <<TRACKER>>. If either side is missing, stop and report it — don't refine a one-sided ticket.
+2. Name the session `<ARGS> <short name>` so the terminal is identifiable.
 3. **Check `frozen:`.** If set, the contract zone is closed: do not reopen it. Either append to the record zone or propose a follow-up ticket, and say which you did.
 
 ## Refine
@@ -25,6 +28,6 @@ Runs refinement for one ticket. `$ARGUMENTS` is the ticket id.
 
 ## Close
 
-11. **Refinement ends when the user says so**, not when the questions run out. Then: acceptance criteria final and testable, `open_questions: 0`, `version_target:` set, status → `<<S_READY_DEV>>` in both systems. **`size:` is not a gate** — it is a numeric weight for progress and the velocity forecast, and a missing value already means 1. Set it when it is known; never hold a refined ticket for it.
-12. If the ticket is non-trivial, suggest `/implementation-plan $ARGUMENTS` before development.
+11. **Refinement ends when the user says so**, not when the questions run out. Then acceptance criteria are final and testable, `open_questions: 0`, and `version_target:` is set. Leave the ticket in `<<S_REFINEMENT>>`; do not move it merely because you answered the questions. The human may explicitly authorize a move to the optional `<<S_READY_DEV>>` queue, or invoke development directly. **`size:` is not a gate** — set it when known; a missing value means weight 1.
+12. If the ticket is non-trivial, suggest `/implementation-plan <ARGS>` before development.
 13. **Stop instead of guessing** when a question needs a product decision, has no owner, or touches something safety- or legally-critical. Leave the status where a human will see it and say what you're waiting on.

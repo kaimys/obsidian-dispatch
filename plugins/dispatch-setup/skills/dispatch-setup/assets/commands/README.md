@@ -4,7 +4,7 @@ A generic, adaptable implementation of the catalog in [`docs/skills.md`](https:/
 
 Each agent gets a **stub** beside them rather than a copy: `.claude/commands/<name>.md` and `.codex/skills/<name>/SKILL.md`, each carrying only its own frontmatter and a pointer to `dispatch/workflow/<name>.md`. One body, one process, however many agents.
 
-Dispatch ships these as a *starting point*, not a standard. They encode the loop most projects converge on; the details are the user's.
+These are working defaults with an adaptation contract: change project vocabulary while preserving durable note artifacts, their review surfaces, human gate ownership, honest counters, freeze/correction-by-annotation, personal ownership, registered maintenance and declared precedence. Put the shared rules once in `dispatch/invariants.md` and point each agent at it. The explicit small-bug shortcut below is the bounded exception, not a general review toggle.
 
 ## Adapting them
 
@@ -12,7 +12,7 @@ Every project-specific value is a `<<PLACEHOLDER>>` token. Replace all of them, 
 
 | Placeholder | Is | Example |
 | --- | --- | --- |
-| `<<WIKI>>` | vault root, as reachable **from the repo root** | `docs/wiki` or `C:\Users\me\Vaults\Acme` |
+| `<<WIKI>>` | vault root, as reachable **from the repo root** | `wiki` (relative path or git-ignored symlink), or a temporary absolute vault path |
 | `<<TICKETS>>` | ticket folder, vault-relative | `05_Requirements/Tickets` |
 | `<<TEMPLATES>>` | template folder, vault-relative | `00_Start-Here/Templates` |
 | `<<RELEASES>>` | release-notes folder | `08_Delivery-and-QA/Releases` |
@@ -25,12 +25,28 @@ Every project-specific value is a `<<PLACEHOLDER>>` token. Replace all of them, 
 | `<<ID_SCHEME>>` | ticket id prefixes and width | `US story / BUG bug / SEC security, 5 digits (US00042)` |
 | `<<S_NEW>>` | status a new ticket starts in | `Ready for Refinement` |
 | `<<S_REFINEMENT>>` | refinement in progress | `Refinement` |
-| `<<S_READY_DEV>>` | refined, buildable | `Ready for Dev` |
+| `<<S_READY_DEV>>` | optional ready queue, entered only with human authorization | `Ready for Dev` |
 | `<<S_DEV>>` | being implemented | `Development` |
 | `<<S_REVIEW>>` | code-complete, awaiting manual review | `Ready for Review` |
-| `<<S_DONE>>` | shipped | `Deployed` |
+| `<<S_DONE>>` | completion status, also used by the small-bug shortcut | `Done` |
+| `<<P_COMPLETED>>` | completion-date property; must match `milestones.completedProperty` and the drag automation | `completed` |
 
-**If there is no tracker or no chat**, replace `<<TRACKER>>`/`<<CHAT>>` with `none` and delete the steps that use them — don't leave an instruction the agent can't satisfy. The wiki is then the only system, which is simpler, not worse.
+**If there is no tracker or no chat**, substitute `none`. Every workflow explicitly skips that integration's lookups, writes and missing-side preconditions while continuing wiki work. Questions go to the requester when chat is absent. A configured service being unavailable is a reported failure, not `none`.
+
+`<<WIKI>>` is the workflow's vault lookup, not a chip repository path. Prefer repo-relative lookup (including a git-ignored symlink). Absolute paths may temporarily remain in generated workflows until portable project setup is implemented (US00033 in Dispatch); they need adaptation on another machine. Never write them into notes, shared settings or chip repo fields. This repository continues using `wiki`.
+
+**Statuses describe transition roles, not every board column.** `refine` and `implementation-plan` leave the card in refinement. A human can authorize the ready queue or invoke development directly; a queue name is not permission. Example mappings:
+
+| Role | Solo | Queued delivery |
+| --- | --- | --- |
+| `<<S_NEW>>` | Backlog | Intake |
+| `<<S_REFINEMENT>>` | Refinement | Refinement |
+| `<<S_READY_DEV>>` | Refinement | Ready for development |
+| `<<S_DEV>>` | In progress | Development |
+| `<<S_REVIEW>>` | Review | Review |
+| `<<S_DONE>>` | Done | Done |
+
+The queued board can additionally contain `Awaiting build` and `Ready for delivery`, entered by the team's humans or automations. No extra workflow token is needed; configure their order, progress and actors in the board. Do not describe a delivery queue as completed just to reuse `S_DONE`.
 
 ### Never substitute a person
 
@@ -46,21 +62,28 @@ A name hardcoded in prose merely goes stale when someone joins or leaves. A name
 
 ## What's here
 
-| Command | Chip | Does |
-| --- | --- | --- |
-| `/create-ticket <desc>` | block chip in reports/meeting notes | duplicate check → spec from template (+ tracker task) |
-| `/refine <id>` | ticket card | read spec + context, work open questions to 0, → `<<S_READY_DEV>>` |
-| `/update-ticket <id>` | ticket card | fold feedback (comments, thread, tracker, code drift) into the spec |
-| `/implementation-plan <id>` | ticket card | plan stored in the ticket, durable decisions extracted as ADRs |
-| `/develop <id>` | ticket card | preconditions → implement with tests → gates green |
-| `/code-review <id>` | ticket card | criteria, plan, diff and seams → `## Code review` in the ticket, `open_findings`; blocks `/test-plan` while a criterion fails |
-| `/test-plan <id>` | ticket card | manual-only checklist, `open_tests`, **freeze**, → `<<S_REVIEW>>` |
-| `/release [version]` | manual | test pass → bump → release note from the board → tag → promote → announce |
-| `/meeting agenda\|report <date> <title>` | meeting + calendar chips | agenda from the board; transcript → report with decisions folded into tickets |
+<!-- shipped-workflows:start -->
 
-Deliberately **not** included, because they depend on infrastructure no starter set can guess: `/promote <env>` (deployment topology), `/daily-routine` and `/weekly-maintenance` (their rulebooks live in the wiki), `/sync-wiki` (only if the vault is in git). All four are described in `docs/skills.md`. `/fix-bug` is `/create-ticket` with `type: bug` followed by the normal loop — add it as a wrapper if bug intake is frequent.
+| File | Invocation argument | Reads | Writes / review surface | Exit and authority |
+| --- | --- | --- | --- | --- |
+| `create-ticket.md` | `description + source` | source, templates, existing tickets | ticket + tracker task; index/log | Intake is ungated; starts in the new-ticket column |
+| `refine.md` | `id` | spec, links, code, discussion | answers and criteria in the ticket; open_questions | Human ends refinement; card stays put |
+| `update-ticket.md` | `id` | inline feedback, thread, tracker, code drift | updated spec and recounted counters | No status move; respects frozen contracts |
+| `implementation-plan.md` | `id` | refreshed spec, code, binding ADRs | plan in the ticket; ADRs after sign-off | Human signs off; card stays put |
+| `develop.md` | `id` | approved plan and criteria | code/tests; as-built notes; invalidated counts cleared | Explicit invocation + preconditions enter development; fresh reviewer next |
+| `code-review.md` | `id` | ticket, diff, current build, tests | dated findings in the ticket; open_findings | Independent session; blocking findings prevent test-plan |
+| `test-plan.md` | `id` | code-complete ticket, green gates, clean review | manual checks; open_tests; frozen contract | Enters review after verified preconditions; human completes remaining checks |
+| `fix-bug.md` | `report` | report, duplicates, affected code | bug ticket, small fix, actual verification and completion record | Explicit shortcut only; stops when full workflow or a human check is needed |
+| `release.md` | `version` | version scope, verified tickets, project release policy | release note, version/build; completed tickets + tracker | Explicit release request and readiness gates; publishing follows project policy |
+| `meeting.md` | `agenda or report` | board, or transcript and discussion | meeting note; decisions folded into tickets | Agenda before; report requires transcript; no invented decisions |
 
-## What belongs in `CLAUDE.md`, not here
+<!-- shipped-workflows:end -->
+
+Optional, **not shipped**: `/daily-routine` and `/weekly-maintenance` need project rulebooks; `/sync-wiki` applies only to a git-backed vault. See `docs/skills.md` for examples.
+
+**`fix-bug` is an explicit shortcut**, not a wrapper around five separate commands. Create the ticket before code, verify the small fix, record the result and omitted independent review, and leave `open_findings` empty. Finish only with no outstanding questions/manual checks and a known version target; stamp freeze/completion and mirror the tracker. Stop and warn when scope grows or verification needs a human. It does not invoke release, merge or publish.
+
+## What belongs in `dispatch/invariants.md`
 
 Invariants every command inherits — the [freeze rule](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md#the-freeze-rule), the precedence order, wiki-vs-tracker source of truth, and "no command moves a ticket across a gated boundary on its own". A rule copied into eight commands holds in six. These files reference those invariants; they don't restate them.
 
@@ -70,3 +93,7 @@ Invariants every command inherits — the [freeze rule](https://github.com/kaimy
 - **`%% … %%`** in a ticket is a *human's* inline comment — feedback for `/update-ticket` to fold in and then delete. Never use it for machine scaffolding, or the two become indistinguishable.
 - **Counters are gates.** `open_questions: 0` leaves refinement; `open_findings: 0` *enters* review (the code review runs before the freeze); `open_tests: 0` leaves it. All three are frontmatter, so the gate is a badge on the card rather than a memory. A counter describes the current build: the latest writer overwrites, unset is not 0, and a command that invalidates a count clears it rather than writing 0.
 - **A command that can't proceed stops and says why**, with the status left where a human will see it. Plowing through an ambiguous ticket produces work someone has to unpick.
+
+## Updating an existing setup
+
+Review a diff against the new starter and merge the intended behavioral changes into the project's canonical files. Do not overwrite adaptations. Update the shared invariants and stubs consistently, then check the invocation and resulting artifacts for each configured agent.

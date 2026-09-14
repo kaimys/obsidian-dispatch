@@ -7,6 +7,7 @@ rank: 1000
 version_target:
 size:
 assignee:
+owner:
 open_questions: 0
 open_tests:
 open_findings:
@@ -61,8 +62,9 @@ frozen:
 
 ## Acceptance criteria
 
-<!-- GUIDE: At minimum: the reproduction above no longer reproduces, and a regression
-     test exists that fails without the fix. -->
+<!-- GUIDE: At minimum: the reproduction above no longer reproduces, with a regression
+     test that fails without the fix where it meaningfully asserts behavior. For a
+     small wording/layout fix, record direct verification instead of a test that only repeats the implementation. -->
 
 ## Implementation plan
 

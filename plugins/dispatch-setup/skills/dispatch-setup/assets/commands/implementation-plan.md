@@ -3,16 +3,19 @@ description: Write the implementation plan for a refined ticket — stored in th
 argument-hint: <ticket id>
 ---
 
-# /implementation-plan $ARGUMENTS
+# Workflow: implementation-plan
 
-Produces the implementation plan for one refined ticket. `$ARGUMENTS` is the ticket id.
+Read `dispatch/invariants.md` first. `<ARGS>` is supplied by the invoking agent stub.
+Tracker: <<TRACKER>>. Chat: <<CHAT>>. If either is `none`, skip only that integration's lookups, writes and missing-side preconditions; continue the wiki work. With no chat, record questions for the requester in the ticket. A configured but unavailable integration is an error to report, not `none`.
+
+Produces the implementation plan for one refined ticket. `<ARGS>` is the ticket id.
 
 ## Prepare
 
-1. Resolve the ticket (spec via `id: $ARGUMENTS` in `<<WIKI>>/<<TICKETS>>`, task in <<TRACKER>>) and name the session `$ARGUMENTS <short name>`.
+1. Resolve the ticket (spec via `id: <ARGS>` in `<<WIKI>>/<<TICKETS>>`, task in <<TRACKER>>) and name the session `<ARGS> <short name>`.
 2. **Run the `/update-ticket` steps first.** Never plan against a stale spec — the thread usually moved after the last edit.
 3. **Verify ground truth**: read the code the ticket touches, not just the description of it. Check external contracts (APIs, schemas, designs) against their actual current state.
-4. **Read the ADR index** (`<<WIKI>>/<<DECISIONS>>`) for the areas in scope. Plan *within* the accepted decisions. If the ticket requires contradicting one, that is a decision to reopen — surface it, don't quietly work around it.
+4. **Read the ADR index** (`<<WIKI>>/<<DECISIONS>>`) for the areas in scope. Plan *within* the accepted and proposed decisions; only superseded decisions may be ignored. If the ticket requires contradicting one, that is a decision to reopen — surface it, don't quietly work around it.
 5. Confirm refinement actually closed: `open_questions: 0`. If a decision the plan depends on is still open, finish refinement first rather than planning around a hole.
 
 ## Plan
@@ -40,4 +43,4 @@ Produces the implementation plan for one refined ticket. `$ARGUMENTS` is the tic
 
 ## Close
 
-11. Status → `<<S_READY_DEV>>` in both systems once the plan is signed off. Suggest `/develop $ARGUMENTS`.
+11. Plan sign-off moves no card. Leave it in `<<S_REFINEMENT>>` (or a ready queue the human already authorized). Suggest `/develop <ARGS>`; that invocation supplies the approval to start development. Never move to `<<S_READY_DEV>>` on your own.

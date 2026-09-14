@@ -1,0 +1,81 @@
+{
+  "values": {
+    "TICKETS": "tickets",
+    "TEMPLATES": "templates",
+    "RELEASES": "releases",
+    "MEETINGS": "meetings",
+    "DECISIONS": "decisions",
+    "SOURCES": "sources",
+    "ID_SCHEME": "US story / BUG bug / SEC security, 5 digits",
+    "GATES": "npm run build && npm run lint && npm test",
+    "S_REFINEMENT": "Refinement",
+    "S_REVIEW": "Review",
+    "S_DONE": "Done",
+    "WIKI": "C:\\Team Vaults\\Demo $& vault",
+    "TRACKER": "the fixture issue store through node tracker.mjs",
+    "CHAT": "the fixture discussion store",
+    "S_NEW": "Intake",
+    "S_READY_DEV": "Ready for development",
+    "S_DEV": "Development",
+    "P_COMPLETED": "finished_on"
+  },
+  "board": {
+    "columns": [
+      {
+        "value": "Intake",
+        "progress": 0
+      },
+      {
+        "value": "Refinement",
+        "progress": 0
+      },
+      {
+        "value": "Ready for development",
+        "progress": 0
+      },
+      {
+        "value": "Development",
+        "progress": 0
+      },
+      {
+        "value": "Awaiting build",
+        "progress": 0
+      },
+      {
+        "value": "Review",
+        "progress": 0
+      },
+      {
+        "value": "Ready for delivery",
+        "progress": 0
+      },
+      {
+        "value": "Done",
+        "progress": 100
+      },
+      {
+        "value": "Rejected",
+        "progress": 0
+      }
+    ],
+    "automations": [
+      {
+        "when": [
+          "Done"
+        ],
+        "set": {
+          "finished_on": "{{date}}"
+        },
+        "repo": "",
+        "command": ""
+      }
+    ]
+  },
+  "milestones": {
+    "completedProperty": "finished_on"
+  },
+  "extraColumns": [
+    "Awaiting build",
+    "Ready for delivery"
+  ]
+}

@@ -1,6 +1,7 @@
 ---
 meeting_date:
 participants: []
+owner:
 discussion:
 decisions_folded:
 open_actions: 0

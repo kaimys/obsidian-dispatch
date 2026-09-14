@@ -3,16 +3,19 @@ description: Ship a version — test pass, bump, release note generated from the
 argument-hint: [version]
 ---
 
-# /release $ARGUMENTS
+# Workflow: release
 
-Releases one version. `$ARGUMENTS` is the target version (e.g. `v1.4.0`); without it, use the next planned version from the Release Plan.
+Read `dispatch/invariants.md` first. `<ARGS>` is supplied by the invoking agent stub.
+Tracker: <<TRACKER>>. Chat: <<CHAT>>. If either is `none`, skip only that integration's lookups, writes and missing-side preconditions; continue the wiki work. With no chat, record questions for the requester in the ticket. A configured but unavailable integration is an error to report, not `none`.
+
+Releases one version. `<ARGS>` is the target version (e.g. `v1.4.0`); without it, use the next planned version from the Release Plan.
 
 **The step order is load-bearing.** Prove the candidate before touching production; refresh any mirror of a backend *before* promoting it; build production *after* the promotion, because that build talks to the promoted backend. Each reordering has bitten someone — if you change the order, write down why.
 
 ## Scope the release
 
 1. **The release scope is what the board says it is:** every ticket whose `version_target` matches, in `<<WIKI>>/<<TICKETS>>`. Anything shipped without a ticket is invisible here — which is the practical argument for no-ticket-no-merge.
-2. Verify each in-scope ticket is actually ready: at `<<S_REVIEW>>` or beyond with `open_tests: 0` and `open_findings` empty or `0` — empty is tolerated here, unlike in `/test-plan`, because tickets that predate the review step never had one. **List the ones that aren't and stop.** Either they get finished, or they get moved to the next version — both are the user's call, not yours.
+2. Verify each in-scope ticket is actually ready: at `<<S_REVIEW>>` or beyond with `open_tests: 0` and `open_findings` empty or `0` — empty is tolerated here, unlike in `/test-plan`, for legacy tickets or an explicitly recorded `/fix-bug` shortcut that omitted review; it never means reviewed. Include already-completed shortcut tickets in the release scope, verify their recorded results and target version, and do not require a second trip through review. **List the ones that aren't and stop.** Either they get finished, or they get moved to the next version — both are the user's call, not yours.
 3. Confirm today's date with `date`.
 
 ## Prove it
@@ -32,6 +35,6 @@ Releases one version. `$ARGUMENTS` is the target version (e.g. `v1.4.0`); withou
 
 ## Land it
 
-9. **Promote the shipped tickets:** status → `<<S_DONE>>` in both systems, which stamps the completion date the velocity forecast reads. Anything deferred gets its `version_target` moved forward — not silently dropped.
+9. **Complete the shipped tickets:** write status → `<<S_DONE>>` and stamp `<<P_COMPLETED>>: <today>` yourself, then mirror the tracker. Preserve the original completion date on tickets already completed by `/fix-bug`. Board automations fire on a drag, never on frontmatter an agent writes. A tracker failure is a reported partial synchronization failure; retain the record and retry that operation on the existing issue, not a new ticket. Anything deferred gets its `version_target` moved forward — not silently dropped.
 10. Announce in <<CHAT>> with a link to the release note.
 11. Report: version, ticket count, anything deferred and why.

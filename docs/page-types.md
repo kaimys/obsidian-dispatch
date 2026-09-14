@@ -82,6 +82,13 @@ frozen: 2026-08-05             # stamped when the spec closes (see below)
 | `discussion` | chat icon linking to the thread |
 | `deployed` | drives the velocity forecast (completed weight per day) |
 
+The [explicit small-bug shortcut](skills.md#small-bug-shortcut) may complete without
+an independent review: its record says review was omitted and `open_findings` stays
+empty. It still assesses coverage, records actual verification and requires no
+outstanding manual checks before `open_tests: 0` and completion. It finalizes and
+freezes the contract before completing, and writes the configured completion date
+and tracker state itself. This does not relax the ordinary `/test-plan` review gate.
+
 Two conventions worth adopting: **quote status values**, since they contain spaces, and **make `id` mandatory** via the required-properties setting, so the problems panel catches a missing one immediately.
 
 ### The freeze rule

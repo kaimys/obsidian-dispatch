@@ -3,20 +3,23 @@ description: Review a ticket's branch against its acceptance criteria, plan and 
 argument-hint: <ticket id>
 ---
 
-# /code-review $ARGUMENTS
+# Workflow: code-review
 
-Reviews the code built for one ticket and records the review in the ticket. `$ARGUMENTS` is the ticket id.
+Read `dispatch/invariants.md` first. `<ARGS>` is supplied by the invoking agent stub.
+Tracker: <<TRACKER>>. Chat: <<CHAT>>. If either is `none`, skip only that integration's lookups, writes and missing-side preconditions; continue the wiki work. With no chat, record questions for the requester in the ticket. A configured but unavailable integration is an error to report, not `none`.
+
+Reviews the code built for one ticket and records the review in the ticket. `<ARGS>` is the ticket id.
 
 ## Resolve
 
-1. Resolve the ticket (spec via `id: $ARGUMENTS` in `<<WIKI>>/<<TICKETS>>`, task in <<TRACKER>>) and name the session `$ARGUMENTS <short name>`. Confirm today's date with `date`.
+1. Resolve the ticket (spec via `id: <ARGS>` in `<<WIKI>>/<<TICKETS>>`, task in <<TRACKER>>) and name the session `<ARGS> <short name>`. Confirm today's date with `date`.
 2. **The reviewer is not the author.** If this session wrote any of the code under review, stop and say so: a context that produced the code is the context that will defend it, and the review has to come from one that reads only the ticket and the diff. A chip launch is a fresh session by construction; a terminal session that just finished `/develop` is not.
 3. **Find the change.** The branch is the current one unless the ticket's as-built notes name another; the range is the default branch to `HEAD`; the commit reviewed is `HEAD`'s short sha and goes into the entry's heading, so a later reader knows which build the findings describe. If a pull request is open on the branch, its body and any reviews already posted on it are input, to be folded rather than repeated.
 4. **Preconditions:** the ticket is in `<<S_DEV>>`, code-complete with its gates green. That is where the review belongs — **before** `/test-plan` stamps the freeze, so a finding that lands in the contract zone can still be corrected rather than annotated. `<<S_REVIEW>>` is also valid: a re-review of a card that has already moved. A ticket that has not reached development has no code to review; say so and stop.
 
 ## Read
 
-5. **The ticket first, all of it.** The contract zone — acceptance criteria, decisions, the plan with every revision block and annotation — is what the code is measured against; the record zone — as-built notes, test plan, earlier reviews — is what the author already knows went differently. Then the ADRs it links (`<<WIKI>>/<<DECISIONS>>`), and the invariants in the repository's `CLAUDE.md`.
+5. **The ticket first, all of it.** The contract zone — acceptance criteria, decisions, the plan with every revision block and annotation — is what the code is measured against; the record zone — as-built notes, test plan, earlier reviews — is what the author already knows went differently. Then the ADRs it links (`<<WIKI>>/<<DECISIONS>>`), and the invariants in `dispatch/invariants.md`.
 6. **Then the diff, in full.** The commit log for the shape of the work, the diff stat for its extent, then every new file read whole and every changed file read around its hunks. Tests are part of the diff, not an appendix: read what they assert before judging what the code does.
 7. **Run the gates yourself:**
    ```
@@ -33,7 +36,7 @@ Reviews the code built for one ticket and records the review in the ticket. `$AR
    - **Seams.** Look hardest where the change meets code it did not write: a setting one side writes and the other overwrites, an environment variable documented as injected and never set, a message that names a flag that no longer exists. Seam defects are the ones a green suite cannot see, because each side's tests assume the other.
    - **Tests.** What the suite asserts against what actually bit during development (the as-built notes say). Name each gap with the case that would close it, not with "needs more tests".
    - **Drift in words.** User-facing messages first, then comments, then docs: anything describing a path that no longer exists. Cheap to fix, expensive to leave — it is what sends the next reader down a removed code path.
-   - **Invariants.** Whatever the repository's `CLAUDE.md` declares must always hold, plus the ADRs the ticket links.
+   - **Invariants.** Whatever `dispatch/invariants.md` declares must always hold, plus the ADRs the ticket links.
    - **Branch hygiene.** Commits that belong to another ticket, or to none.
 9. **Rank by severity, verdict first.** Blocking: a defect a user would hit, a failed acceptance criterion, an invariant broken. Then what should be fixed before merge but fails nothing. Then what can wait. Say plainly whether the ticket can leave `<<S_REVIEW>>` as it stands.
 10. **Name what is good and should stay** — specifically, with the reason. A review that lists only defects teaches the next author to hide the design; naming the decision that held up under pressure is how it survives the next refactor.

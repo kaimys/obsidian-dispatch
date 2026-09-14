@@ -52,28 +52,69 @@ The authoritative schema — every field, every default — is `src/settings.ts`
 - Meetings folder (optional third tab)?
 - Grep a few real ticket notes to validate every answer against reality — inconsistent value formats (e.g. `v1.2.0` vs `1.2.0`) are normal; Dispatch normalizes versions by major.minor, but statuses must match exactly.
 - **Last step — propose workflow skills for the CODE repo (the glue).** Chips only carry `/command {{id}}` one-liners; the actual workflow logic must live **in the user's code repository** — not the wiki — so it versions with the code, travels through git to every teammate, and is reviewable like code. Derive a catalog from their lifecycle and offer to scaffold it, each skill pre-wired to a chip:
-  | Skill (repo) | Chip (Dispatch) | Does |
-  |---|---|---|
-  | `/create-ticket <desc>` | block chips in reports/meeting notes | duplicate check → spec (full frontmatter, counters seeded) + tracker task, wiki hygiene |
-  | `/refine <id>` | ticket cards | read spec + linked context, open a team thread (`discussion:`), maintain `open_questions` → 0 gates the next status |
-  | `/update-ticket <id>` | ticket cards | fold inline/thread/tracker feedback into the spec, recount counters |
-  | `/implementation-plan <id>` | ticket cards | feedback first, then plan mode, plan stored in the spec |
-  | `/develop <id>` | ticket cards | preconditions, status move, set `assignee`, implement with tests |
-  | `/code-review <id>` | ticket cards | reviewer ≠ author by construction; criteria, plan, diff and seams; findings into the ticket's `## Code review`, `open_findings`, and `/test-plan` blocked while a criterion fails |
-  | `/test-plan <id>` | ticket cards | manual-only checklist (excluding automated coverage), set `open_tests`, status move |
-  | `/release [version]` | manual / release chip | test pass, version bump, release note with `version`/`date` frontmatter (feeds Milestones), promote tickets, announce |
-  | `/meeting agenda\|report` | meeting cards | agenda file; transcript → interpreted report with checkbox action items (the format the Meetings tab counts), decisions folded into the affected tickets |
-  | `/daily-routine`, `/weekly-maintenance` | manual / scheduled | sync-and-surface passes: fold feedback, reconcile wiki ↔ tracker, run the report suite from rulebooks in `02_Product/Reports/_definitions/` |
-    **Don't write these from scratch — a starter set ships with this skill in `assets/commands/`** (`create-ticket`, `refine`, `update-ticket`, `implementation-plan`, `develop`, `test-plan`, `code-review`, `release`, `meeting`). Copy them into the repo as `dispatch/workflow/<name>.md` and replace the `<<PLACEHOLDER>>` tokens documented in `assets/commands/README.md`; then grep for `<<` to prove none survived.
 
-    **One canonical file, one stub per agent.** The workflow body goes to `dispatch/workflow/<name>.md` — one file, whichever agents the user runs. Each agent then gets a **stub** that carries only its own format's frontmatter and a pointer to that file, and no steps:
+<!-- shipped-workflows:start -->
 
-    | Agent | Stub | Frontmatter it needs |
-    | --- | --- | --- |
-    | Claude Code | `.claude/commands/<name>.md` | `description`, `argument-hint` |
-    | Codex | `.codex/skills/<name>/SKILL.md` | `name`, `description` |
+| File | Invocation argument | Reads | Writes / review surface | Exit and authority |
+| --- | --- | --- | --- | --- |
+| `create-ticket.md` | `description + source` | source, templates, existing tickets | ticket + tracker task; index/log | Intake is ungated; starts in the new-ticket column |
+| `refine.md` | `id` | spec, links, code, discussion | answers and criteria in the ticket; open_questions | Human ends refinement; card stays put |
+| `update-ticket.md` | `id` | inline feedback, thread, tracker, code drift | updated spec and recounted counters | No status move; respects frozen contracts |
+| `implementation-plan.md` | `id` | refreshed spec, code, binding ADRs | plan in the ticket; ADRs after sign-off | Human signs off; card stays put |
+| `develop.md` | `id` | approved plan and criteria | code/tests; as-built notes; invalidated counts cleared | Explicit invocation + preconditions enter development; fresh reviewer next |
+| `code-review.md` | `id` | ticket, diff, current build, tests | dated findings in the ticket; open_findings | Independent session; blocking findings prevent test-plan |
+| `test-plan.md` | `id` | code-complete ticket, green gates, clean review | manual checks; open_tests; frozen contract | Enters review after verified preconditions; human completes remaining checks |
+| `fix-bug.md` | `report` | report, duplicates, affected code | bug ticket, small fix, actual verification and completion record | Explicit shortcut only; stops when full workflow or a human check is needed |
+| `release.md` | `version` | version scope, verified tickets, project release policy | release note, version/build; completed tickets + tracker | Explicit release request and readiness gates; publishing follows project policy |
+| `meeting.md` | `agenda or report` | board, or transcript and discussion | meeting note; decisions folded into tickets | Agenda before; report requires transcript; no invented decisions |
 
-    A stub says *read `dispatch/workflow/<name>.md` now and follow it exactly*, and substitutes the argument the caller passed. Writing steps into a stub is the failure to avoid: the other agent never sees them, and nothing errors — it just quietly improvises. Grepping a stub for a workflow term (`open_questions`, `frozen:`) must come back empty. Adapt names, statuses and tracker calls to their answers; every status move must update wiki frontmatter *and* tracker per the source-of-truth decision (step 6). Skills reference repos only via Dispatch's alias mechanism — never hardcode machine paths. The fuller catalog, with what each skill reads and writes, is [`docs/skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md).
+<!-- shipped-workflows:end -->
+
+**Scaffold from `assets/commands/`**, not from memory. Read its README for the adaptation contract and complete placeholder vocabulary, including `P_COMPLETED`. Copy each body into `dispatch/workflow/<name>.md` and substitute the values. Retain its description for stub metadata. `<ARGS>` is a runtime argument, not an installation token; the agent stub supplies it explicitly. No canonical body relies on Claude expanding `$ARGUMENTS`.
+
+**Existing setup:** review differences and merge the intended changes into canonical files rather than overwriting adaptations. Document optional recurring examples separately; they are not shipped workflows.
+
+**One canonical file, one stub per agent.** The workflow body goes to `dispatch/workflow/<name>.md` — one file, whichever agents the user runs. Each agent then gets a **stub** that carries only its own format's frontmatter and a pointer to that file, and no steps:
+
+| Agent | Stub | Frontmatter it needs |
+| --- | --- | --- |
+| Claude Code | `.claude/commands/<name>.md` | `description`, `argument-hint` |
+| Codex | `.codex/skills/<name>/SKILL.md` | `name`, `description` |
+
+A stub says *read `dispatch/workflow/<name>.md` now and follow it exactly*, and substitutes the argument the caller passed. Writing steps into a stub is the failure to avoid: the other agent never sees them, and nothing errors — it just quietly improvises. Check the stub body (excluding descriptive YAML metadata) for workflow steps: it contains only the canonical path and argument hand-off, never gate or status instructions. Adapt names, statuses and tracker calls to their answers; every status move must update wiki frontmatter *and* tracker per the source-of-truth decision (step 6). Chip repository fields reference aliases only. The workflow vault lookup may be repo-relative (preferred, including a git-ignored symlink) or temporarily absolute pending portable project setup; explain that an absolute workflow path needs adaptation on other machines. Never put absolute paths in notes/shared settings. Follow the command README's status-role mapping: a ready queue needs human authorization, while extra human/automation columns need no workflow token. The fuller catalog, with what each skill reads and writes, is [`docs/skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md).
+
+### Stub hand-off examples
+
+Use the workflow name and its description in these existing formats. Replace `<name>` and
+`Workflow description` when scaffolding; leave runtime argument instructions intact.
+
+<!-- claude-stub:start -->
+```markdown
+---
+description: Workflow description
+argument-hint: <argument>
+---
+# /<name> $ARGUMENTS
+Read `dispatch/workflow/<name>.md` now and follow it exactly.
+Wherever it says `<ARGS>`, substitute: $ARGUMENTS
+```
+<!-- claude-stub:end -->
+
+<!-- codex-stub:start -->
+```markdown
+---
+name: <name>
+description: Workflow description
+---
+# <name>
+Read `dispatch/workflow/<name>.md` now and follow it exactly.
+Wherever it says `<ARGS>`, substitute the argument supplied with this skill invocation.
+```
+<!-- codex-stub:end -->
+
+`fix-bug` requires the user's explicit shortcut request in its body; availability as a
+skill does not grant that request. Preserve the existing release invocation policy
+when updating a project. Validate both agent hand-offs against a real invocation.
 
 ## 2 · Shared config (`<vault>/.obsidian/plugins/dispatch/data.json`)
 
@@ -188,7 +229,7 @@ If the user already runs Dispatch on another vault, sanity-check the algorithm b
 ## 4 · Chip templates + workflow commands
 
 - Define **virtual chip templates** in `data.json` — objects `{ "label": …, "tool": …, "repo": …, "prompt": … }` (the `label | tool | repo | prompt` form is the settings UI's input syntax, not the stored shape). Card prompts get `{{id}}`, `{{status}}`, `{{file}}`, `{{title}}`; column-header prompts get `{{ids}}`, `{{status}}`, `{{count}}`; meeting and calendar chips get `{{date}}` and `{{title}}`.
-- Best practice: prompts are one-liners (`/refine {{id}}` for Claude, `$refine {{id}}` for Codex) whose step-by-step logic lives in the target repo's `dispatch/workflow/`, with a thin stub per agent. Scaffold them from **`assets/commands/`** in this skill rather than improvising — nine workflows covering the ticket loop, releases and meetings, each a `<<PLACEHOLDER>>` search-and-replace away from working. **The prompt differs per agent only by its leading character**, so set the tool's prompt prefix in the device config (`codex = $`) rather than writing a prompt per chip. Their vault-side counterparts (ticket, bug, ADR, release-note and meeting templates) are in **`assets/templates/`**. Rationale and catalog: [`skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md), [`page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md).
+- Best practice: prompts are one-liners (`/refine {{id}}` for Claude, `$refine {{id}}` for Codex) whose step-by-step logic lives in the target repo's `dispatch/workflow/`, with a thin stub per agent. Scaffold them from **`assets/commands/`** in this skill rather than improvising — the shipped workflows above covering the ticket loop, releases and meetings, each a `<<PLACEHOLDER>>` search-and-replace away from working. **The prompt differs per agent only by its leading character**, so set the tool's prompt prefix in the device config (`codex = $`) rather than writing a prompt per chip. Their vault-side counterparts (ticket, bug, ADR, release-note and meeting templates) are in **`assets/templates/`**. Rationale and catalog: [`skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md), [`page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md).
 - Chip labels must match what the commands are actually called — a chip firing `/refine` at a repo with no `refine.md` fails only at click time, with a confusing error.
 - Every `repo` alias used by a chip must exist in the device config, and the `tool` must be defined there too — otherwise the chip fails only at click time. Check both after writing the two files.
 - YAML gotcha for block chips in notes: quote values containing `:` or `#`.
@@ -210,8 +251,11 @@ Write these, adapted to their vocabulary:
 
 - **The ticket freeze.** Once a ticket leaves development (the status where code exists that depends on it), its **contract zone** — goal/symptom, acceptance criteria, open questions + answers, scope, implementation plan — is read-only; stamp `frozen: <date>`. New information goes into the **record zone** (as-built notes, test results, follow-ups) as a dated entry; a wrong frozen statement gets an annotation (`> ⚠️ Correction <date>: …`) beneath it, never a rewrite; new scope becomes a new linked ticket. Rationale: if a spec can change after the code was built against it, a later spec↔code mismatch has two explanations and no way to tell them apart. Details: [`docs/page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md#the-freeze-rule).
 - **Ownership + maintenance.** Every page carries `owner:` (a **person**, resolving to `00_Start-Here/Team/` — never a team). Every *derived* page also carries `derived_from:` and `maintained_by:`, and **a skill that creates a derived page must register its refresh** — if no recurring job owns it, it may not create it.
-- **Precedence** when documents conflict, plus which side wins on a wiki ↔ tracker disagreement (recommend: the wiki).
+- **Precedence**: accepted and proposed ADRs both bind; only superseded decisions may be ignored. Declare precedence when documents conflict, plus which side wins on a wiki ↔ tracker disagreement (recommend: the wiki).
+- **Artifact and review surface:** each workflow leaves its durable result in the note, which is where the human reviews it.
 - **Gates are gates:** `open_questions: 0` before leaving refinement, `open_findings: 0` before the test plan is written (the code review runs before the freeze), `open_tests: 0` before leaving review; no skill moves a ticket across a gated boundary on its own.
+- **Explicit small-bug exception:** `/fix-bug` may omit independent code review only for a known, small-blast-radius fix. Create its ticket before code; run mechanical gates and verify the reproduction; record the actual results and omitted review. Leave `open_findings` empty. Complete only with no open questions/manual checks and a known target version; freeze the finalized contract, stamp completion and mirror the tracker. Stop and warn when the work grows, verification fails or needs a human. Never run `/test-plan` with its review gate unmet, or treat this as a general review toggle.
+- **Direct status writes:** workflows stamp the configured completion property themselves and mirror the tracker; drag automations do not fire for frontmatter writes. Preserve existing completion dates.
 - **Unset is not zero.** An empty counter is *no statement* and renders no badge; `0` is *counted, and clear*. So a new ticket leaves `open_tests:` and `open_findings:` empty rather than seeding `0`, and a skill that invalidates a count — fixing code under a review, say — clears the property instead of writing `0`. Only the skill that actually counted may write a number, or the gate can be satisfied by a stale one.
 
 ## 6 · Tracker sync (optional but the biggest win)

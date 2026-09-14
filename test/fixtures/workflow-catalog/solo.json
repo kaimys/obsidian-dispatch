@@ -1,0 +1,66 @@
+{
+  "values": {
+    "TICKETS": "tickets",
+    "TEMPLATES": "templates",
+    "RELEASES": "releases",
+    "MEETINGS": "meetings",
+    "DECISIONS": "decisions",
+    "SOURCES": "sources",
+    "ID_SCHEME": "US story / BUG bug / SEC security, 5 digits",
+    "GATES": "npm run build && npm run lint && npm test",
+    "S_REFINEMENT": "Refinement",
+    "S_REVIEW": "Review",
+    "S_DONE": "Done",
+    "WIKI": "wiki",
+    "TRACKER": "none",
+    "CHAT": "none",
+    "S_NEW": "Backlog",
+    "S_READY_DEV": "Refinement",
+    "S_DEV": "In progress",
+    "P_COMPLETED": "completed"
+  },
+  "board": {
+    "columns": [
+      {
+        "value": "Backlog",
+        "progress": 0
+      },
+      {
+        "value": "Refinement",
+        "progress": 0
+      },
+      {
+        "value": "In progress",
+        "progress": 0
+      },
+      {
+        "value": "Review",
+        "progress": 0
+      },
+      {
+        "value": "Done",
+        "progress": 100
+      },
+      {
+        "value": "Rejected",
+        "progress": 0
+      }
+    ],
+    "automations": [
+      {
+        "when": [
+          "Done"
+        ],
+        "set": {
+          "completed": "{{date}}"
+        },
+        "repo": "",
+        "command": ""
+      }
+    ]
+  },
+  "milestones": {
+    "completedProperty": "completed"
+  },
+  "extraColumns": []
+}

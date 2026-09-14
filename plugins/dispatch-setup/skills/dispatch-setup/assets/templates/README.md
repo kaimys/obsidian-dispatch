@@ -2,7 +2,7 @@
 
 Copy these into the **vault** (`<<TEMPLATES>>`, e.g. `00_Start-Here/Templates/`) — unlike the commands, which live in the code repo. The frontmatter contract they implement is documented in [`docs/page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md).
 
-Replace the `<<PLACEHOLDER>>` tokens (same vocabulary as `../commands/README.md`), plus one that is template-only:
+Replace the `<<PLACEHOLDER>>` tokens (same vocabulary as `../commands/README.md`), including the completion property used by both templates and completion-writing workflows:
 
 | Placeholder | Is | Example |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ Both are invisible in Obsidian's reading view, and they mean different things. K
 
 The ticket templates mark a **contract zone** and a **record zone** with banner comments, because [the freeze rule](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md#the-freeze-rule) is far easier to follow when the boundary is visible while writing than when it lives in a document somewhere. Contract = what the implementation was built against, frozen when the ticket leaves development. Record = what actually happened, always appendable.
 
-If your pipeline has no freeze point, delete the markers and the `frozen:` property rather than leaving a rule nobody applies.
+The freeze and correction-by-annotation are part of the method. Adapt the column names, not this boundary. The small-bug shortcut finalizes the contract and stamps `frozen:` before completion too.
 
 ## Adapting
 

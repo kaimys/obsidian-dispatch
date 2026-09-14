@@ -3,13 +3,16 @@ description: Fold everything that arrived since the last edit — inline comment
 argument-hint: <ticket id>
 ---
 
-# /update-ticket $ARGUMENTS
+# Workflow: update-ticket
 
-Brings one spec up to date with feedback that landed since its `updated:` date. `$ARGUMENTS` is the ticket id.
+Read `dispatch/invariants.md` first. `<ARGS>` is supplied by the invoking agent stub.
+Tracker: <<TRACKER>>. Chat: <<CHAT>>. If either is `none`, skip only that integration's lookups, writes and missing-side preconditions; continue the wiki work. With no chat, record questions for the requester in the ticket. A configured but unavailable integration is an error to report, not `none`.
+
+Brings one spec up to date with feedback that landed since its `updated:` date. `<ARGS>` is the ticket id.
 
 ## Resolve
 
-1. Find the spec (grep `id: $ARGUMENTS` in `<<WIKI>>/<<TICKETS>>`) and the task in <<TRACKER>>. Stop and report if either is missing.
+1. Find the spec (grep `id: <ARGS>` in `<<WIKI>>/<<TICKETS>>`) and the task in <<TRACKER>>. Stop and report if either is missing.
 2. Note the current `updated:` date — it is the cutoff for everything below.
 3. **Check `frozen:`.** On a frozen ticket, feedback goes into the record zone as a dated entry; the contract zone stays as built. A wrong frozen statement gets an annotation beneath it (`> ⚠️ Correction <date>: …`), never a rewrite.
 
@@ -25,5 +28,5 @@ Brings one spec up to date with feedback that landed since its `updated:` date. 
 8. Fold it in: update the affected sections, record decisions with who and when, adjust scope and acceptance criteria.
 9. **Keep unresolved contradictions visible** as open questions. Do not silently pick a side — ask when a decision is needed. A contradiction quietly resolved by an agent is a decision nobody made.
 10. **Delete each inline comment once its content is incorporated** — that is the "resolved" signal, and the reason the note doesn't accumulate stale margin notes. Leave threads, tracker and git history untouched; they are sources, not targets.
-11. **Recount `open_questions:`** from the actual unanswered items, `open_tests:` from the unticked test-plan items, and `open_findings:` from the blocking findings of the *latest* `## Code review` entry — earlier entries describe earlier builds and are never added in. Leave `open_findings` empty when no review has run, or when the code moved after the last one. Bump `updated:` (confirm the date with `date`).
+11. **Recount `open_questions:`** from the actual unanswered items, `open_tests:` from the unticked test-plan items, and `open_findings:` from the blocking findings of the *latest* `## Code review` entry — earlier entries describe earlier builds and are never added in. Leave `open_findings` empty when no review has run (including a recorded shortcut), or when the code moved after the last one. Leave `open_tests` empty if no coverage assessment/test plan exists; otherwise count its outstanding checks. Never recount acceptance criteria as tests. Bump `updated:` (confirm the date with `date`).
 12. If team decisions were folded in, post one line back in the thread so the team knows the spec now reflects it. Report what changed as a short list.

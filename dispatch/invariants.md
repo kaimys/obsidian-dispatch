@@ -118,6 +118,8 @@ checkout silently share one board's configuration ([[ADR-0026]]).
   leaves `Review`. No command crosses a gated boundary on its own. `Refinement` is the
   column, but the counter is still the gate: a ticket sitting in `Refinement` with unanswered
   questions is not buildable, and moving the card does not make it so.
+- **Small-bug shortcut (ADR-0030).** An explicitly invoked `/fix-bug` may omit the separate review session only for a known, small-blast-radius fix. It must create the durable ticket first, verify the reproduction and mechanical gates, record actual results, count remaining checks, freeze the finalized contract and stamp completion plus the tracker mirror. No outstanding questions or manual checks may remain. An omitted review leaves `open_findings` empty, never a fabricated `0`. Scope growth or a failed check stops before Done. Ordinary development and `/test-plan` keep their review gate; the shortcut does not invoke `/test-plan` with that gate unmet.
+- **Starter portability (ADR-0029).** This repo continues to use its git-ignored `wiki` symlink. Consuming projects may temporarily retain an absolute vault lookup in scaffolded workflows until US00033; notes, shared settings and chip repo fields remain path-free.
 - **Ownership.** Every page carries `owner:`, a person resolving to `wiki/00_Start-Here/Team/`,
   never a team. A derived page also carries `derived_from:` and `maintained_by:`, and a command
   that creates one must register its refresh — if no recurring job owns it, it may not create it.

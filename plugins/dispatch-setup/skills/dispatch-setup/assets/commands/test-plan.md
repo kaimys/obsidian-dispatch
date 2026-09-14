@@ -3,13 +3,16 @@ description: Write the manual test plan for a code-complete ticket — only what
 argument-hint: <ticket id>
 ---
 
-# /test-plan $ARGUMENTS
+# Workflow: test-plan
 
-Writes the manual test plan and performs the `<<S_DEV>>` → `<<S_REVIEW>>` transition. `$ARGUMENTS` is the ticket id.
+Read `dispatch/invariants.md` first. `<ARGS>` is supplied by the invoking agent stub.
+Tracker: <<TRACKER>>. Chat: <<CHAT>>. If either is `none`, skip only that integration's lookups, writes and missing-side preconditions; continue the wiki work. With no chat, record questions for the requester in the ticket. A configured but unavailable integration is an error to report, not `none`.
+
+Writes the manual test plan and performs the `<<S_DEV>>` → `<<S_REVIEW>>` transition. `<ARGS>` is the ticket id.
 
 ## Prepare
 
-1. Resolve the ticket (spec via `id: $ARGUMENTS` in `<<WIKI>>/<<TICKETS>>`, task in <<TRACKER>>) and name the session `$ARGUMENTS <short name>`.
+1. Resolve the ticket (spec via `id: <ARGS>` in `<<WIKI>>/<<TICKETS>>`, task in <<TRACKER>>) and name the session `<ARGS> <short name>`.
 2. **Preconditions:** the ticket is code-complete in `<<S_DEV>>`, the gates are green, and **`open_findings: 0`** — a code review has run against this build and found nothing blocking. An empty `open_findings` means no review has run: stop and say so, pointing at `/code-review`. This command stamps the freeze, and a contract zone closed before the review turns every later spec↔code finding into an annotation instead of a fix. The command also performs the status move, so verify rather than assume — run them if unsure:
    ```
    <<GATES>>

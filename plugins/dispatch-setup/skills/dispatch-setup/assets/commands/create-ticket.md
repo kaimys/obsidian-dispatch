@@ -3,9 +3,12 @@ description: Create a new ticket from a short description — duplicate check, s
 argument-hint: short description + where it came from
 ---
 
-# /create-ticket $ARGUMENTS
+# Workflow: create-ticket
 
-Creates one ticket. `$ARGUMENTS` is a short description, ideally with a source pointer (a report row, a meeting note, a thread, a bug report).
+Read `dispatch/invariants.md` first. `<ARGS>` is supplied by the invoking agent stub.
+Tracker: <<TRACKER>>. Chat: <<CHAT>>. If either is `none`, skip only that integration's lookups, writes and missing-side preconditions; continue the wiki work. With no chat, record questions for the requester in the ticket. A configured but unavailable integration is an error to report, not `none`.
+
+Creates one ticket. `<ARGS>` is a short description, ideally with a source pointer (a report row, a meeting note, a thread, a bug report).
 
 ## Prepare
 
@@ -16,7 +19,7 @@ Creates one ticket. `$ARGUMENTS` is a short description, ideally with a source p
 
 ## Create — both systems, never one-sided
 
-5. **Spec:** `<<WIKI>>/<<TICKETS>>/<Type> - <ID> - <Short name>.md`, started from `<<WIKI>>/<<TEMPLATES>>/ticket-story.md` (bugs: `ticket-bug.md`). Fill the frontmatter — `id`, `type`, `status: "<<S_NEW>>"`, `priority`, `rank` (highest in the column + 1000), `size` if estimable, `assignee` only if actually decided, `updated`, `open_questions: <number of questions you drafted>`, `owner`. **Leave `open_tests` and `open_findings` unset** — no test plan has been written and no review has run, and empty and `0` are different claims: `0` says the count was taken and came back clear, so a new ticket showing a green `✓ 0` claims a test plan it does not have. Leave `version_target` empty unless it is genuinely known.
+5. **Spec:** `<<WIKI>>/<<TICKETS>>/<Type> - <ID> - <Short name>.md`, started from `<<WIKI>>/<<TEMPLATES>>/ticket-story.md` (bugs: `ticket-bug.md`). Fill the frontmatter — `id`, `type`, `status: "<<S_NEW>>"`, `priority`, `rank` (highest in the column + 1000), `size` if estimable, `assignee` only if actually decided, `updated`, `open_questions: <number of questions you drafted>`, `owner` (resolve the accountable person from the source/requester and team directory; never substitute a fixed name). **Leave `open_tests` and `open_findings` unset** — no test plan has been written and no review has run, and empty and `0` are different claims: `0` says the count was taken and came back clear, so a new ticket showing a green `✓ 0` claims a test plan it does not have. Leave `version_target` empty unless it is genuinely known.
 6. **Fill what creation can support:** the summary line, User story (bugs: Symptom — observed vs. expected), Context with links to the source, Open questions, and a first Scope / Out of scope. Leave Acceptance criteria, Implementation plan and Test plan to the commands that own them. **Strip the `<!-- GUIDE: … -->` of every section you fill; leave the rest.**
 7. **Tracker task** in <<TRACKER>>, in the column matching `<<S_NEW>>`: name `<ID> <short name>`, body = a 2–3 line summary plus the spec's path. Skip this step entirely if `<<TRACKER>>` is `none`.
 8. **Never paste chip buttons into the note** — the board renders chips virtually, and a pasted one goes stale.

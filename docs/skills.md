@@ -1,74 +1,121 @@
 # Workflow skills
 
-A chip on a card carries one line: `/refine US00042` — or `$refine US00042`, if the agent is Codex. Everything behind that line — what to read, whom to ask, what to write, when to stop — is a **skill**, and skills live in the **code repository** (`dispatch/workflow/*.md`, with a thin per-agent stub in `.claude/commands/` and `.codex/skills/`), not in the wiki.
+Dispatch ships **ten starter workflows through the `dispatch-setup` agent plugin**.
+They are working defaults to adapt to your project. The Obsidian plugin renders the
+board and launches chips; it does not bundle or execute a fixed development process.
 
-That boundary is the whole design:
+## Install and adapt
 
-- **Wiki = state.** What is true, what is decided, what is still open.
-- **Code repo = process.** How state changes.
-- **Chips = the bridge.** One line, launched from the card, executed in the repo.
+Install `dispatch-setup` using the [setup instructions](installation.md), then invoke
+it in your code repository. It interviews you about the vault, lifecycle, tracker,
+chat and coding agents and scaffolds the workflows alongside your code. Existing
+projects should compare and merge updated starters into their adapted files; setup
+must not overwrite an established workflow without reviewing that change with you.
 
-Keeping process in the repo means it versions with the code, travels through git to every teammate, and is reviewed like code. Keeping it out of the wiki means a note can never define what an agent does — which is also what makes chips safe to click (see [installation.md](installation.md#security-model)).
+Three different artifacts make this work:
 
-**Invariants are not skills.** Rules like the ticket [freeze](page-types.md#the-freeze-rule), the precedence order, or "never move a ticket across a gated boundary without the gate being met" belong in one shared file — `dispatch/invariants.md` — that `CLAUDE.md` and `AGENTS.md` both point at, so every skill inherits them whichever agent is reading. A rule copied into six skills holds in four; a rule copied into two agents' instruction files holds in one.
-
-Dispatch ships none of these skills. What follows is a catalog to adapt — the shape that a project of moderate size converges on.
-
-## Skills for the ticket workflow
-
-The core loop. Each one is wired to a chip on the ticket card, so the board is the launcher.
-
-| Skill | Reads | Writes | Typically needs |
-| --- | --- | --- | --- |
-| `/create-ticket <description>` | templates, existing tickets (duplicate check) | new ticket **and** tracker task, `index.md`, `log.md` | tracker MCP |
-| `/refine <id>` | the spec, linked context, domain guardrails, ADRs | open questions into the team thread, answers back into the spec, `open_questions` | chat MCP (Slack/Teams), tracker MCP |
-| `/update-ticket <id>` | inline note comments, the ticket's threads, tracker comments | folds feedback into the spec, recounts counters | chat MCP, tracker MCP |
-| `/implementation-plan <id>` | the refined spec, engineering docs, existing ADRs | the plan into the ticket, **new ADRs** for durable decisions | — |
-| `/develop <id>` | the plan, the code | code + tests, status moves, `log.md` | — |
-| `/code-review <id>` | the ticket's contract zone, the branch diff, its tests, reviews already on the PR | a dated `## Code review` entry in the ticket — findings with file, line and fix — `open_findings`, and the hand-off to `/test-plan` blocked while a criterion fails. Reviewer ≠ author is its precondition, which a chip launch satisfies by construction | — |
-| `/test-plan <id>` | the ticket, the automated suites | the manual plan (only what automation doesn't cover), `open_tests` | — |
-| `/fix-bug <report>` | a bug report, a thread, or a description | a bug ticket in both systems, then the fix through the same loop | chat MCP, tracker MCP |
-
-<img src="assets/Tickets.png" alt="Tickets" width="33%" style="float: right; margin:10px" />
-
-Three things make this loop hold together:
-
-- **Counters are gates, not decoration.** `open_questions: 0` lets a ticket leave refinement; `open_findings: 0` lets it *enter* review, because the code review runs before the freeze; `open_tests: 0` lets it leave. Because they're frontmatter, each gate is visible on the board as a badge instead of living in someone's head. A counter describes the build as it stands — the latest writer overwrites, and a command that invalidates a count clears the property rather than zeroing it, so a `0` always came from something that actually counted.
-- **The team answers where it already talks.** Refinement posts questions into the team chat and reads the replies back — nobody is asked to review a spec in a tool they don't open. The thread URL goes in `discussion:` so the conversation stays findable from the card.
-- **A skill knows when to stop.** Root cause unclear, needs a product decision, touches safety-critical copy → hand back with the status set to whatever means "needs a human", and say why. An agent that plows through an ambiguous ticket produces work someone has to unpick.
-
-Every status move updates **both** the wiki frontmatter and the tracker. Decide once which side wins when they disagree (the wiki, if the board is where people actually work) and write it in the shared invariants file.
-
-## Skills for releases
-
-| Skill | Does |
-| --- | --- |
-| `/release [version]` | full test pass → version bump → release note from the tickets in the target version → build → tag → promote every *Ready for Build* ticket to *Ready for Review* → announce |
-| `/promote <env>` | move backend/infrastructure changes from the development environment to production, as its own reviewable step |
-
-Two properties of a release skill matter more than the steps:
-
-- **The order is load-bearing, so write down why.** Prove the candidate on a test environment *before* touching production; refresh any backend mirror *before* promoting it; build production *after* the promotion, because that build talks to the promoted backend. A step order without reasons gets "optimized" by the next person.
-- **The release note is generated from the board**, not written from memory. Every ticket carrying the target version is in scope; anything shipped without a ticket is invisible to the note — which is a good reason for the no-ticket-no-merge rule.
-
-Release notes then feed the Release Plan tab back: a shipped version shows its date and links its note instead of a forecast.
-
-## Skills for meetings
-
-One skill with two modes, both wired to chips on the Meetings tab.
-
-| Mode | Before / after | Does |
+| Artifact | Location | Purpose |
 | --- | --- | --- |
-| `/meeting agenda` | before | builds the agenda from the board — open refinement questions, tests awaiting sign-off, what blocks the next release — writes the meeting note, announces it in the team thread and stores that URL in `discussion:` |
-| `/meeting report` | after | reads the transcript from `01_Sources/` **together with** the discussion thread, appends summary / decisions / action items with ticket IDs, folds decisions into the affected tickets, stamps `decisions_folded:`, posts a short summary |
+| Templated starter | `plugins/dispatch-setup/skills/dispatch-setup/assets/commands/` | Seed shipped with setup; project values are substituted at installation |
+| Project's canonical workflow | `dispatch/workflow/<name>.md` | One instruction body per workflow, versioned with that project's code |
+| Agent invocation stub | `.claude/commands/<name>.md` or `.codex/skills/<name>/SKILL.md` | Agent-specific metadata and argument hand-off; points to the canonical body, carries no steps |
 
-The step people skip is **folding decisions into the tickets**. A decision that lives only in a meeting note has to be rediscovered by whoever next opens the ticket — and won't be. Fold first, summarize second; on a frozen ticket, append to the record zone rather than editing the contract.
+The starter and an existing project's adapted workflow need not be byte-identical.
+Claude invokes `/refine US00042`; Codex invokes `$refine US00042`. Both read the same
+canonical body with the supplied argument. Wiki = state, repo = process, chips = the
+bridge. A note names a tool and repository alias; device settings resolve commands
+and paths.
 
-Action items land in an allowlisted section with owners, which is what the Todos tab collects.
+## Shipped workflows
 
-## Skills for recurring work
+Each filename below is present in the starter directory. Invoke its name without
+`.md`, using your agent's prefix. `meeting` has two modes, not two files.
 
-These are the ones that keep the wiki honest. Nobody does this bookkeeping by hand for long.
+<!-- shipped-workflows:start -->
+
+| File | Invocation argument | Reads | Writes / review surface | Exit and authority |
+| --- | --- | --- | --- | --- |
+| `create-ticket.md` | `description + source` | source, templates, existing tickets | ticket + tracker task; index/log | Intake is ungated; starts in the new-ticket column |
+| `refine.md` | `id` | spec, links, code, discussion | answers and criteria in the ticket; open_questions | Human ends refinement; card stays put |
+| `update-ticket.md` | `id` | inline feedback, thread, tracker, code drift | updated spec and recounted counters | No status move; respects frozen contracts |
+| `implementation-plan.md` | `id` | refreshed spec, code, binding ADRs | plan in the ticket; ADRs after sign-off | Human signs off; card stays put |
+| `develop.md` | `id` | approved plan and criteria | code/tests; as-built notes; invalidated counts cleared | Explicit invocation + preconditions enter development; fresh reviewer next |
+| `code-review.md` | `id` | ticket, diff, current build, tests | dated findings in the ticket; open_findings | Independent session; blocking findings prevent test-plan |
+| `test-plan.md` | `id` | code-complete ticket, green gates, clean review | manual checks; open_tests; frozen contract | Enters review after verified preconditions; human completes remaining checks |
+| `fix-bug.md` | `report` | report, duplicates, affected code | bug ticket, small fix, actual verification and completion record | Explicit shortcut only; stops when full workflow or a human check is needed |
+| `release.md` | `version` | version scope, verified tickets, project release policy | release note, version/build; completed tickets + tracker | Explicit release request and readiness gates; publishing follows project policy |
+| `meeting.md` | `agenda or report` | board, or transcript and discussion | meeting note; decisions folded into tickets | Agenda before; report requires transcript; no invented decisions |
+
+<!-- shipped-workflows:end -->
+
+## The adaptation contract
+
+Change folder and property names, columns, IDs, tracker/chat providers, chip labels
+and local commands to match your project. Keep these parts of the method:
+
+- A workflow produces a durable artifact in the note; that artifact is the review surface.
+- Human decisions are not manufactured by the skill that wrote the artifact. A human
+  drag or explicit next-step invocation supplies approval; mechanical gates must actually run.
+- Counters describe the current build. Empty means uncounted; zero means counted and
+  clear. Recounts replace earlier counts, and code changes invalidate review counts.
+- The contract freezes when work leaves development. Later corrections are annotations,
+  and new scope gets a linked ticket. See [page types](page-types.md#the-freeze-rule).
+- Every page has an accountable person. Derived pages register their maintenance.
+  The project declares precedence and which system wins a wiki/tracker disagreement.
+
+Put these rules once in `dispatch/invariants.md`; `CLAUDE.md` and `AGENTS.md` point
+there. Ordinary development still requires independent code review before the test
+plan and freeze. A general review-toggle feature is not part of these starters.
+
+The setup README documents substitution tokens. `S_*` tokens describe statuses a
+workflow may write with the required authorization; they do not enumerate every
+column on your board. A solo board can use the same value for refinement and the
+optional ready queue. A queued-delivery board can add human/automation-only columns
+without inventing workflow tokens or granting a skill permission to advance there.
+
+For vault lookup, prefer a repo-relative path, including a git-ignored symlink to an
+external vault. Setup temporarily permits an absolute vault path in generated
+workflow files; it will need adaptation on another machine until portable project
+setup is implemented. This allowance never applies to notes, shared settings, or
+chip repository fields, which still use aliases. It does not move the device config
+into the repository or vault.
+
+## Small-bug shortcut
+
+Explicitly invoke `/fix-bug <report>` (or `$fix-bug <report>`) for a small bug with a
+small blast radius, such as wording or layout, usually fixed in one file. Before
+changing code it asks whether the full workflow is worthwhile. If so, it creates the
+bug record, leaves it for refinement and warns you instead of starting a larger fix.
+
+For a suitable bug, it creates the ticket and tracker mirror first, fixes and verifies
+it, records the result and remaining checks, then finalizes/freezes the contract,
+stamps completion and mirrors the tracker. It can reach Done in one invocation.
+The record states that independent review was omitted; `open_findings` stays empty,
+never a fabricated zero. No unresolved question, failed gate, or outstanding manual
+check may remain. A layout fix needing your visual judgment stays open.
+
+The ticket must carry its known target version so release notes can include it. The
+shortcut does not merge, tag or publish. A tracker failure leaves a visible partial
+synchronization record; retry reconciles the existing issue rather than creating a
+duplicate. A completed ticket's original completion date survives later release runs.
+
+## Releases and meetings
+
+Release takes its scope from ticket target versions, including completed shortcut
+fixes, and checks recorded verification before writing the release note. The project's
+release policy defines building/tagging/publishing; in Dispatch itself a tag builds
+a draft and a human publishes it. A workflow writing status directly also writes the
+completion date and tracker state: board drag automations do not fire for that write.
+
+`meeting agenda` builds decisions to discuss from the board. `meeting report` requires
+the transcript and folds actual decisions into tickets before reporting back. Frozen
+contracts get dated record entries, not rewrites. With no tracker or chat configured,
+work stays in the wiki and questions go to the requester; an unavailable configured
+service is reported as a failure rather than silently treated as absent.
+
+## Optional examples — not shipped
+
+These examples require project-specific infrastructure and rulebooks. They are not part of the starter inventory above.
 
 | Skill | Cadence | Does |
 | --- | --- | --- |

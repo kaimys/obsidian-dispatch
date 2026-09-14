@@ -3,9 +3,12 @@ description: Meeting support in two modes — build the agenda from the board be
 argument-hint: agenda|report <date> <title>
 ---
 
-# /meeting $ARGUMENTS
+# Workflow: meeting
 
-Two modes over the meeting notes in `<<WIKI>>/<<MEETINGS>>` (`YYYY-MM-DD - <title>.md`). `$ARGUMENTS` starts with `agenda` or `report`, followed by the date and/or title identifying the meeting.
+Read `dispatch/invariants.md` first. `<ARGS>` is supplied by the invoking agent stub.
+Tracker: <<TRACKER>>. Chat: <<CHAT>>. If either is `none`, skip only that integration's lookups, writes and missing-side preconditions; continue the wiki work. With no chat, record questions for the requester in the ticket. A configured but unavailable integration is an error to report, not `none`.
+
+Two modes over the meeting notes in `<<WIKI>>/<<MEETINGS>>` (`YYYY-MM-DD - <title>.md`). `<ARGS>` starts with `agenda` or `report`, followed by the date and/or title identifying the meeting.
 
 ---
 
