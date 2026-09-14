@@ -8,7 +8,7 @@
  *
  * Dispatch runs it with cwd = the repo root and `{{file}}` = the note's
  * VAULT-relative path. The vault is reached through `wiki`, a git-ignored,
- * repo-relative symlink to wherever it actually lives (ADR-0025) — the note
+ * repo-relative symlink to wherever it actually lives (ADR-0029) — the note
  * is resolved against VAULT_DIR below, which names that link rather than a
  * location. Get that wrong and every run silently reports "note not found".
  *

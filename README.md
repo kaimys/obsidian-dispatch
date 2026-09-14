@@ -26,7 +26,7 @@ Under the hood, two primitives: **boards** (kanban views driven by note properti
 | [Overview](docs/overview.md) | The four boards — Kanban, Release Plan, Meetings, Todos — and how each one behaves |
 | [Wiki structure](docs/wiki-structure.md) | The three layers, an example folder tree to adapt, and where the wiki lives relative to your code |
 | [Page types](docs/page-types.md) | The frontmatter contract: every page, tickets (incl. the freeze rule), ADRs, releases, meetings |
-| [Workflow skills](docs/skills.md) | The skill catalog to adapt — ticket loop, releases, meetings, recurring maintenance |
+| [Workflow skills](docs/skills.md) | The ten starter workflows that ship and adapt — ticket loop, small-bug shortcut, releases, meetings |
 | [Installation & configuration](docs/installation.md) | Install, settings, chips and tool commands, run lifecycle, automations, security model |
 
 New to the idea? Read [Overview](docs/overview.md), then [Wiki structure](docs/wiki-structure.md).

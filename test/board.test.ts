@@ -59,7 +59,7 @@ describe("building a card", () => {
 	});
 
 	it("leaves a counter undefined when the note never set it", () => {
-		// Unset is not zero (ADR-0028): a ticket no review has touched makes
+		// Unset is not zero (ADR-0030): a ticket no review has touched makes
 		// no claim, so the card renders no badge at all rather than a green
 		// "reviewed and clear" one.
 		expect(card("US00001").findings).toBeUndefined();

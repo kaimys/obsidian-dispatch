@@ -9,6 +9,7 @@ const templates = `${setup}/assets/templates`;
 const read = (path: string) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 const markdownFiles = (dir: string) => readdirSync(dir).filter((f) => f.endsWith(".md") && f !== "README.md").sort();
 const inventory = markdownFiles(commands);
+const catalogSurfaces = ["docs/skills.md", `${setup}/SKILL.md`, `${commands}/README.md`];
 
 function region(text: string, name: string): string {
 	const start = `<!-- ${name}:start -->`;
@@ -20,8 +21,12 @@ function region(text: string, name: string): string {
 	return text.slice(from, to);
 }
 
+function catalogRows(text: string): string[] {
+	return [...region(text, "shipped-workflows").matchAll(/^\| `[a-z-]+\.md` \|.*$/gm)].map((m) => m[0].trim());
+}
+
 function advertised(text: string): string[] {
-	return [...region(text, "shipped-workflows").matchAll(/^\| `([a-z-]+\.md)` \|/gm)].map((m) => m[1]);
+	return catalogRows(text).map((row) => /^\| `([a-z-]+\.md)` \|/.exec(row)![1]);
 }
 
 function checkInventory(files: string[], rows: string[]): void {
@@ -36,6 +41,13 @@ function substitute(text: string, values: Record<string, string>): string {
 	});
 }
 
+// Raw, because YAML would read `[version]` as a flow sequence rather than the hint text.
+function argumentHint(text: string): string {
+	const match = /^argument-hint: (.+)$/m.exec(/^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? "");
+	if (!match) throw new Error("Missing argument-hint");
+	return match[1];
+}
+
 function frontmatter(text: string): Record<string, unknown> {
 	const match = /^---\n([\s\S]*?)\n---/.exec(text);
 	if (!match) throw new Error("Missing frontmatter");
@@ -43,9 +55,14 @@ function frontmatter(text: string): Record<string, unknown> {
 }
 
 describe("shipped workflow inventory", () => {
-	for (const path of ["docs/skills.md", `${setup}/SKILL.md`, `${commands}/README.md`]) {
+	for (const path of catalogSurfaces) {
 		it(`matches actual files in ${path}`, () => checkInventory(inventory, advertised(read(path))));
 	}
+
+	it("advertises the same Reads, Writes and authority on every surface", () => {
+		const [reference, ...rest] = catalogSurfaces.map((path) => catalogRows(read(path)));
+		rest.forEach((surface, i) => expect(surface, catalogSurfaces[i + 1]).toEqual(reference));
+	});
 
 	it("detects missing, extra and duplicated advertised workflows", () => {
 		const rows = advertised(read("docs/skills.md"));
@@ -62,7 +79,7 @@ describe("shipped workflow inventory", () => {
 	});
 
 	it("does not advertise removed command invocations on current product surfaces", () => {
-		const paths = ["docs/skills.md", `${setup}/SKILL.md`, `${commands}/README.md`,
+		const paths = [...catalogSurfaces,
 			...inventory.map((f) => join(commands, f)), ...markdownFiles("dispatch/workflow").map((f) => join("dispatch/workflow", f))];
 		for (const path of paths) expect(read(path), path).not.toMatch(/[/\$]promote\b/);
 	});
@@ -138,16 +155,19 @@ describe("agent stub hand-off examples", () => {
 				const name = file.slice(0, -3);
 				const body = read(join(commands, file));
 				const description = frontmatter(body).description as string;
-				const stub = example.replaceAll("<name>", name).replace("Workflow description", description);
+				const hint = argumentHint(body);
+				const stub = example.replaceAll("<name>", name).replace("Workflow description", description).replace("<hint>", hint);
 				expect(stub).toContain(`dispatch/workflow/${file}`);
 				expect(stub).toContain("<ARGS>");
 				expect(stub.replace(/^---\n[\s\S]*?\n---/, "")).not.toMatch(/open_questions|open_tests|open_findings|frozen:|<<[A-Z_]+>>/);
 				expect(body).not.toContain("$ARGUMENTS");
 				expect(frontmatter(stub).description).toBe(description);
-				if (agent === "claude") expect(stub).toContain("substitute: $ARGUMENTS");
-				else {
+				if (agent === "claude") {
+					expect(stub).toContain("substitute: $ARGUMENTS");
+					expect(argumentHint(stub), file).toBe(hint);
+				} else {
 					expect(frontmatter(stub).name).toBe(name);
-					expect(stub).toContain("argument supplied with this skill invocation");
+					expect(stub, file).toContain(`invoked with (\`${hint}\`)`);
 				}
 			}
 		});

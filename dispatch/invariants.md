@@ -63,7 +63,7 @@ The repo dogfoods its own plugin. `docs/` holds only the plugin's published docu
 (`overview.md`, `installation.md`, `page-types.md`, `skills.md`, `wiki-structure.md`, `assets/`).
 The project's tickets, ADRs and release notes live in their own Obsidian vault, `Dispatch-Wiki`,
 synced via Google Drive and reached from this repo through `wiki` — a git-ignored, repo-relative
-symlink ([[ADR-0025]]; `git ls-files wiki` is empty). `wiki/` holds `00_Start-Here/`,
+symlink ([[ADR-0029]]; `git ls-files wiki` is empty). `wiki/` holds `00_Start-Here/`,
 `05_Requirements/`, `07_Engineering/`, `.obsidian/` etc. directly, no nested `wiki/` level inside
 it.
 

@@ -6,7 +6,7 @@ Replace the `<<PLACEHOLDER>>` tokens (same vocabulary as `../commands/README.md`
 
 | Placeholder | Is | Example |
 | --- | --- | --- |
-| `<<P_COMPLETED>>` | the completion-date property — must equal `milestones.completedProperty` in `data.json`, and be what the board automation stamps on entering the final column | `deployed` |
+| `<<P_COMPLETED>>` | the completion-date property — must equal `milestones.completedProperty` in `data.json`, and be stamped on completion by a board drag automation or explicitly by the writing workflow | `deployed` |
 
 Then grep for `<<` to prove none survived.
 

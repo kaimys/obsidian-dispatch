@@ -1,5 +1,5 @@
 ---
-description: Ship a version — test pass, bump, release note generated from the board, tag, promote the shipped tickets, announce.
+description: Ship a version — test pass, bump, release note generated from the board, tag, complete the shipped tickets, announce.
 argument-hint: [version]
 ---
 

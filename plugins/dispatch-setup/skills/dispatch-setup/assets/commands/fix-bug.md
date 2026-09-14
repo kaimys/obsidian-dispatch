@@ -31,15 +31,19 @@ integration is an error, not `none`. With no chat, ask the requester directly.
    existing + 1, checking both systems). Resolve `owner` and `assignee` from the
    requester/source and team directory. Fill symptom, reproduction, environment,
    known root cause or what is unknown, scope, criteria, source links and actual
-   questions; start in `<<S_NEW>>`. Leave `open_tests` and `open_findings` empty.
+   questions; start in `<<S_NEW>>`. Set `open_questions: <number of questions you
+   drafted>` — the template ships `0`, and leaving that in place claims a decided
+   ticket and passes the development precondition on undecided questions. Leave
+   `open_tests` and `open_findings` empty.
    Set the target version when established by the project/report; do not guess it.
    Create the matching tracker task when configured and store its reference.
    Register the note in the wiki's index/log. Retain source evidence and remove
    GUIDE scaffolding only from filled sections. Do all this **before editing code**.
-4. If the full workflow is warranted, warn the requester and leave the ticket in
-   `<<S_REFINEMENT>>` with its questions and tracker state accurate. Stop; suggest
-   refinement of that ticket. If intake/tracker creation failed, retain any created
-   note, report the missing side and stop instead of beginning a one-sided fix.
+4. If the full workflow is warranted, warn the requester and move the ticket to
+   `<<S_REFINEMENT>>` in both systems, with its questions and tracker state
+   accurate. Stop; suggest refinement of that ticket. If intake/tracker creation
+   failed, retain any created note, report the missing side and stop instead of
+   beginning a one-sided fix.
 
 ## Fix and verify
 
@@ -49,8 +53,9 @@ integration is an error, not `none`. With no chat, ask the requester directly.
    implementation approach in the ticket before editing.
 6. Make the smallest change that addresses the known cause. If investigation expands
    the scope, reveals uncertainty or needs a product decision, **stop editing**.
-   Record the findings and any code already written, leave the ticket in
-   `<<S_REFINEMENT>>` in both systems, and warn that the full workflow is needed.
+   Record the findings and any code already written, move the ticket back from
+   `<<S_DEV>>` to `<<S_REFINEMENT>>` in both systems, and warn that the full
+   workflow is needed.
 7. Run the configured gates and verify the original reproduction:
 
    ```
@@ -75,8 +80,9 @@ integration is an error, not `none`. With no chat, ask the requester directly.
 
 ## Complete the durable record
 
-10. Complete only when the cause remains small and understood, `open_questions: 0`,
-    gates and reproduction passed, and `open_tests: 0` is backed by the recorded
+10. Complete only when the cause remains small and understood, `open_questions`
+    recounted from the still-unanswered items and standing at `0`, gates and
+    reproduction passed, and `open_tests: 0` is backed by the recorded
     assessment. If `version_target` is unknown, ask the requester and leave the
     ticket open rather than claiming it will appear in release notes. Commit the
     fix with its ticket ID; record the branch/commit and finalized contract.

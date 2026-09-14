@@ -14,7 +14,7 @@ Two modes over the meeting notes in `<<WIKI>>/<<MEETINGS>>` (`YYYY-MM-DD - <titl
 
 ## Mode: agenda (before)
 
-1. Confirm the date with `date`. Locate or create the note from `<<WIKI>>/<<TEMPLATES>>/meeting.md`.
+1. Confirm the date with `date`. Locate or create the note from `<<WIKI>>/<<TEMPLATES>>/meeting.md`. Fill `owner` — resolve the accountable person from the requester and the team directory; never substitute a fixed name. Every page carries an accountable person, and a note created without one has nobody to chase for the fold-back in step 8.
 2. **Build the agenda from the board, not from memory.** Pull:
    - open refinement questions (`open_questions > 0`) — the ones actually blocking, ranked by what they hold up
    - tickets waiting for manual sign-off (`open_tests > 0`)

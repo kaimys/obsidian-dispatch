@@ -51,7 +51,7 @@ The authoritative schema — every field, every default — is `src/settings.ts`
 - Which properties exist / should exist: `assignee`, `size`, `open_questions`, `open_tests`, `open_findings`, `discussion` (thread URL)? Required properties for the problems panel (typically `id, status, updated`)?
 - Meetings folder (optional third tab)?
 - Grep a few real ticket notes to validate every answer against reality — inconsistent value formats (e.g. `v1.2.0` vs `1.2.0`) are normal; Dispatch normalizes versions by major.minor, but statuses must match exactly.
-- **Last step — propose workflow skills for the CODE repo (the glue).** Chips only carry `/command {{id}}` one-liners; the actual workflow logic must live **in the user's code repository** — not the wiki — so it versions with the code, travels through git to every teammate, and is reviewable like code. Derive a catalog from their lifecycle and offer to scaffold it, each skill pre-wired to a chip:
+- **Last step — propose workflow skills for the CODE repo (the glue).** Chips only carry `/command {{id}}` one-liners; the actual workflow logic must live **in the user's code repository** — not the wiki — so it versions with the code, travels through git to every teammate, and is reviewable like code. Scaffold the shipped catalog below and adapt its vocabulary to their lifecycle, each skill pre-wired to a chip:
 
 <!-- shipped-workflows:start -->
 
@@ -85,14 +85,17 @@ A stub says *read `dispatch/workflow/<name>.md` now and follow it exactly*, and 
 
 ### Stub hand-off examples
 
-Use the workflow name and its description in these existing formats. Replace `<name>` and
-`Workflow description` when scaffolding; leave runtime argument instructions intact.
+Use the workflow name, its description and its argument hint in these existing formats.
+Replace `<name>`, `Workflow description` and `<hint>` when scaffolding, taking all three
+from the canonical body's own frontmatter — copy its `argument-hint` verbatim rather than
+inventing one, since the hint is what the user sees when the command is offered. Leave
+runtime argument instructions intact.
 
 <!-- claude-stub:start -->
 ```markdown
 ---
 description: Workflow description
-argument-hint: <argument>
+argument-hint: <hint>
 ---
 # /<name> $ARGUMENTS
 Read `dispatch/workflow/<name>.md` now and follow it exactly.
@@ -108,7 +111,7 @@ description: Workflow description
 ---
 # <name>
 Read `dispatch/workflow/<name>.md` now and follow it exactly.
-Wherever it says `<ARGS>`, substitute the argument supplied with this skill invocation.
+Wherever it says `<ARGS>`, substitute the arguments you were invoked with (`<hint>`).
 ```
 <!-- codex-stub:end -->
 
@@ -229,7 +232,7 @@ If the user already runs Dispatch on another vault, sanity-check the algorithm b
 ## 4 · Chip templates + workflow commands
 
 - Define **virtual chip templates** in `data.json` — objects `{ "label": …, "tool": …, "repo": …, "prompt": … }` (the `label | tool | repo | prompt` form is the settings UI's input syntax, not the stored shape). Card prompts get `{{id}}`, `{{status}}`, `{{file}}`, `{{title}}`; column-header prompts get `{{ids}}`, `{{status}}`, `{{count}}`; meeting and calendar chips get `{{date}}` and `{{title}}`.
-- Best practice: prompts are one-liners (`/refine {{id}}` for Claude, `$refine {{id}}` for Codex) whose step-by-step logic lives in the target repo's `dispatch/workflow/`, with a thin stub per agent. Scaffold them from **`assets/commands/`** in this skill rather than improvising — the shipped workflows above covering the ticket loop, releases and meetings, each a `<<PLACEHOLDER>>` search-and-replace away from working. **The prompt differs per agent only by its leading character**, so set the tool's prompt prefix in the device config (`codex = $`) rather than writing a prompt per chip. Their vault-side counterparts (ticket, bug, ADR, release-note and meeting templates) are in **`assets/templates/`**. Rationale and catalog: [`skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md), [`page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md).
+- Best practice: prompts are one-liners (`/refine {{id}}` for Claude, `$refine {{id}}` for Codex) whose step-by-step logic lives in the target repo's `dispatch/workflow/`, with a thin stub per agent. Scaffold them from **`assets/commands/`** in this skill rather than improvising — the shipped workflows above cover the ticket loop, the small-bug shortcut, releases and meetings, each a `<<PLACEHOLDER>>` search-and-replace away from working. **The prompt differs per agent only by its leading character**, so set the tool's prompt prefix in the device config (`codex = $`) rather than writing a prompt per chip. Their vault-side counterparts (ticket, bug, ADR, release-note and meeting templates) are in **`assets/templates/`**. Rationale and catalog: [`skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md), [`page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md).
 - Chip labels must match what the commands are actually called — a chip firing `/refine` at a repo with no `refine.md` fails only at click time, with a confusing error.
 - Every `repo` alias used by a chip must exist in the device config, and the `tool` must be defined there too — otherwise the chip fails only at click time. Check both after writing the two files.
 - YAML gotcha for block chips in notes: quote values containing `:` or `#`.

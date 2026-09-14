@@ -85,7 +85,7 @@ into the repository or vault.
 Explicitly invoke `/fix-bug <report>` (or `$fix-bug <report>`) for a small bug with a
 small blast radius, such as wording or layout, usually fixed in one file. Before
 changing code it asks whether the full workflow is worthwhile. If so, it creates the
-bug record, leaves it for refinement and warns you instead of starting a larger fix.
+bug record, moves it to refinement and warns you instead of starting a larger fix.
 
 For a suitable bug, it creates the ticket and tracker mirror first, fixes and verifies
 it, records the result and remaining checks, then finalizes/freezes the contract,

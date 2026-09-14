@@ -9,6 +9,8 @@ open_actions: 0
 <!-- GUIDE — frontmatter. Delete this block once written.
   meeting_date      YYYY-MM-DD. The file is named `YYYY-MM-DD - <meeting>.md`.
   participants      list — feeds the Meetings tab.
+  owner             the accountable person for the note — resolve from the requester
+                    and the team directory; never a fixed name.
   discussion        permalink of the thread where the agenda was announced.
   decisions_folded  the date the decisions were written into the tickets they affect.
                     Empty means the outcomes haven't landed yet — the one genuinely
