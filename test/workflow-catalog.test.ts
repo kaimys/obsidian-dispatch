@@ -41,6 +41,12 @@ function substitute(text: string, values: Record<string, string>): string {
 	});
 }
 
+// Callbacks, for the same reason substitute() uses one: a `$&` or `$1` in a description
+// or hint would be expanded by a string replacement instead of inserted literally.
+function fillStub(example: string, name: string, description: string, hint: string): string {
+	return example.replaceAll("<name>", () => name).replace("Workflow description", () => description).replace("<hint>", () => hint);
+}
+
 // Raw, because YAML would read `[version]` as a flow sequence rather than the hint text.
 function argumentHint(text: string): string {
 	const match = /^argument-hint: (.+)$/m.exec(/^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? "");
@@ -148,6 +154,10 @@ describe("starter substitution contract", () => {
 });
 
 describe("agent stub hand-off examples", () => {
+	it("inserts stub values literally, dollar prefixes included", () => {
+		expect(fillStub("<name> | Workflow description | <hint>", "n", "d $& d", "h $1 h")).toBe("n | d $& d | h $1 h");
+	});
+
 	for (const agent of ["claude", "codex"]) {
 		it(`${agent} examples point every workflow at its single body`, () => {
 			const example = region(read(`${setup}/SKILL.md`), `${agent}-stub`).match(/```markdown\n([\s\S]*?)\n```/)![1];
@@ -156,7 +166,7 @@ describe("agent stub hand-off examples", () => {
 				const body = read(join(commands, file));
 				const description = frontmatter(body).description as string;
 				const hint = argumentHint(body);
-				const stub = example.replaceAll("<name>", name).replace("Workflow description", description).replace("<hint>", hint);
+				const stub = fillStub(example, name, description, hint);
 				expect(stub).toContain(`dispatch/workflow/${file}`);
 				expect(stub).toContain("<ARGS>");
 				expect(stub.replace(/^---\n[\s\S]*?\n---/, "")).not.toMatch(/open_questions|open_tests|open_findings|frozen:|<<[A-Z_]+>>/);

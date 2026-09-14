@@ -25,6 +25,7 @@ frozen:
   version_target  groups the card on the Release Plan. Empty = unscheduled.
   size            numeric weight for progress and the velocity forecast. Missing = 1.
   assignee        @-badge on the card.
+  owner           the accountable person for this page — a person, never a team.
   open_questions  unanswered items in ## Open questions. The `? N` badge — 0 is the gate out of refinement.
   open_tests      unticked items in ## Test plan. The `✓ N` badge — 0 is the gate out of review.
                   Empty until the test plan is written: empty is no statement, 0 claims every item is ticked.

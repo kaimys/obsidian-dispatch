@@ -32,7 +32,7 @@ integration is an error, not `none`. With no chat, ask the requester directly.
    requester/source and team directory. Fill symptom, reproduction, environment,
    known root cause or what is unknown, scope, criteria, source links and actual
    questions; start in `<<S_NEW>>`. Set `open_questions: <number of questions you
-   drafted>` — the template ships `0`, and leaving that in place claims a decided
+   drafted>` — whatever the template seeds, leaving it in place claims a decided
    ticket and passes the development precondition on undecided questions. Leave
    `open_tests` and `open_findings` empty.
    Set the target version when established by the project/report; do not guess it.

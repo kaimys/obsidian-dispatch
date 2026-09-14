@@ -86,10 +86,10 @@ A stub says *read `dispatch/workflow/<name>.md` now and follow it exactly*, and 
 ### Stub hand-off examples
 
 Use the workflow name, its description and its argument hint in these existing formats.
-Replace `<name>`, `Workflow description` and `<hint>` when scaffolding, taking all three
-from the canonical body's own frontmatter — copy its `argument-hint` verbatim rather than
-inventing one, since the hint is what the user sees when the command is offered. Leave
-runtime argument instructions intact.
+Replace `<name>` with the body's filename without `.md`, and `Workflow description` and
+`<hint>` with that body's own `description` and `argument-hint` — copy the hint verbatim
+rather than inventing one, since it is what the user sees when the command is offered.
+Leave runtime argument instructions intact.
 
 <!-- claude-stub:start -->
 ```markdown
