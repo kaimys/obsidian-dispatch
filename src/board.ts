@@ -579,9 +579,11 @@ export class BoardView extends ItemView {
 	}
 
 	/**
-	 * Completed weight per day over the look-back window, across the whole
-	 * board (not just one column). Null when the feature is off or no
-	 * completions fall inside the window.
+	 * Completed weight per observed day, across the whole board (not just one
+	 * column): the completions after a unique earliest one in the look-back
+	 * window, over the inclusive UTC days they span (ADR-0031). Null when the
+	 * feature is off or the evidence is insufficient — `velocityPerDay` in
+	 * `cards.ts` owns those rules.
 	 */
 	private velocityPerDay(allCards: Card[]): VelocityResult | null {
 		const { completedProperty, velocityWindowDays, velocityMinimumCompletions } =

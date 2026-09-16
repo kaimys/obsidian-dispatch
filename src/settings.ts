@@ -12,6 +12,7 @@
  *   on this machine and defines which tool commands exist here. (A local.json
  *   from before 0.2, found next to the plugin, is migrated there on load.)
  */
+import { MIN_VELOCITY_COMPLETIONS } from "./cards";
 import { platform } from "./node";
 
 export interface ColumnConfig {
@@ -322,6 +323,36 @@ export function mergeDeviceFile(local: LocalSettings, onDisk: string | null): Lo
 	} catch {
 		return local;
 	}
+}
+
+/**
+ * A whole number of at least `min`, read from a settings field or a
+ * hand-edited `data.json`: floored first, so `0.5` falls back rather than
+ * becoming `0`; `fallback` for anything that is not a number or numeric string.
+ */
+export function wholeNumberAtLeast(value: unknown, min: number, fallback: number): number {
+	const n = Math.floor(typeof value === "number" || typeof value === "string" ? Number(value) : NaN);
+	return Number.isFinite(n) && n >= min ? n : fallback;
+}
+
+/**
+ * The stored milestone settings with the two forecast numbers made whole and
+ * in range (BUG00003 review, finding 6). `data.json` is spread as-is on load,
+ * so without this `"4"` or `4.5` reached `velocityPerDay`, which rejected it:
+ * the forecast vanished on every device while the settings tab showed a
+ * plausible value. Normalising once makes both read the same number.
+ */
+export function normalizeMilestones(stored: MilestoneSettings): MilestoneSettings {
+	const defaults = DEFAULT_SHARED.milestones;
+	return {
+		...stored,
+		velocityWindowDays: wholeNumberAtLeast(stored.velocityWindowDays, 1, defaults.velocityWindowDays),
+		velocityMinimumCompletions: wholeNumberAtLeast(
+			stored.velocityMinimumCompletions,
+			MIN_VELOCITY_COMPLETIONS,
+			defaults.velocityMinimumCompletions
+		),
+	};
 }
 
 export const DEFAULT_SHARED: SharedSettings = {

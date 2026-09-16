@@ -271,6 +271,12 @@ export function milestonePercent<F extends FileRef>(cards: CardData<F>[]): numbe
 
 const DAY_MS = 86_400_000;
 
+/**
+ * The lowest usable minimum-completions setting (ADR-0031): the earliest
+ * completion is a zero-weight baseline, so a rate needs at least one more.
+ */
+export const MIN_VELOCITY_COMPLETIONS = 2;
+
 /** Completed weight per observed UTC day, or null when the evidence is insufficient. */
 export function velocityPerDay<F extends FileRef>(
 	cards: CardData<F>[],
@@ -288,7 +294,7 @@ export function velocityPerDay<F extends FileRef>(
 		!Number.isFinite(velocityWindowDays) ||
 		velocityWindowDays <= 0 ||
 		!Number.isInteger(minimumCompletions) ||
-		minimumCompletions <= 0
+		minimumCompletions < MIN_VELOCITY_COMPLETIONS
 	) {
 		return null;
 	}

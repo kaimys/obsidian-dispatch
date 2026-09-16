@@ -15,7 +15,8 @@ import {
 } from "../src/cards";
 import type { CardData } from "../src/cards";
 import { versionKey } from "../src/parse";
-import { DEFAULT_SHARED } from "../src/settings";
+import { DEFAULT_SHARED, normalizeMilestones } from "../src/settings";
+import type { MilestoneSettings } from "../src/settings";
 import { CARD_SETTINGS, PROBLEM_SETTINGS, loadVault, note } from "./harness";
 
 function card(prefix: string): CardData<{ path: string; basename: string }> {
@@ -198,26 +199,43 @@ describe("progress and forecast", () => {
 		expect(milestonePercent([])).toBeNull();
 	});
 
+	/**
+	 * Four completions that forecast under the default policy. The fail-closed
+	 * cases change one input of this set, so their null can only come from the
+	 * rule that input exercises — not from falling short of the minimum.
+	 */
+	const forecastable = () => [
+		completed("2026-08-17T23:59:00Z", 99),
+		completed("2026-08-18T00:01:00Z", 1),
+		completed("2026-08-19T12:00:00Z", 2),
+		completed("2026-08-20T23:00:00Z", 3),
+	];
+	const forecastOpts = {
+		completedProperty: "deployed",
+		velocityWindowDays: 28,
+		minimumCompletions: DEFAULT_SHARED.milestones.velocityMinimumCompletions,
+		now: Date.parse("2026-08-21T00:00:00Z"),
+	};
+
 	it("measures later weight across the observed span after a unique baseline", () => {
 		expect(DEFAULT_SHARED.milestones.velocityMinimumCompletions).toBe(4);
-		const v = velocityPerDay(
-			[
-				completed("2026-08-17T23:59:00Z", 99),
-				completed("2026-08-18T00:01:00Z", 1),
-				completed("2026-08-19T12:00:00Z", 2),
-				completed("2026-08-20T23:00:00Z", 3),
-			],
-			{
-				completedProperty: "deployed",
-				velocityWindowDays: 28,
-				minimumCompletions: DEFAULT_SHARED.milestones.velocityMinimumCompletions,
-				now: Date.parse("2026-08-21T00:00:00Z"),
-			}
-		);
-		expect(v).toEqual({ perDay: 6 / 4, samples: 3, spanDays: 4 });
+		expect(velocityPerDay(forecastable(), forecastOpts)).toEqual({
+			perDay: 6 / 4,
+			samples: 3,
+			spanDays: 4,
+		});
 	});
 
-	it("uses the configured minimum completion count", () => {
+	it("finds the baseline by completion date, not by input order", () => {
+		// The board hands over cards in vault file order (BUG00003 review, finding 1).
+		expect(velocityPerDay(forecastable().reverse(), forecastOpts)).toEqual({
+			perDay: 6 / 4,
+			samples: 3,
+			spanDays: 4,
+		});
+	});
+
+	it("uses the configured minimum completion count, never below two", () => {
 		const cards = [
 			completed("2026-08-18", 8),
 			completed("2026-08-19", 2),
@@ -234,25 +252,44 @@ describe("progress and forecast", () => {
 			samples: 2,
 			spanDays: 3,
 		});
+		// Two is the floor: one baseline, one weighted completion.
+		expect(velocityPerDay(cards.slice(0, 2), { ...opts, minimumCompletions: 2 })).toEqual({
+			perDay: 2 / 2,
+			samples: 1,
+			spanDays: 2,
+		});
 	});
 
 	it("gives no forecast when the earliest UTC date is tied", () => {
+		// The tied pair is last and apart in the input, so only sorting brings it
+		// to the front — input-order tie-breaking would forecast here.
 		expect(
 			velocityPerDay(
 				[
-					completed("2026-08-17T01:00:00Z", 1),
-					completed("2026-08-17T23:00:00Z", 13),
 					completed("2026-08-18", 2),
+					completed("2026-08-17T23:00:00Z", 13),
 					completed("2026-08-19", 3),
+					completed("2026-08-17T01:00:00Z", 1),
 				],
-				{
-					completedProperty: "deployed",
-					velocityWindowDays: 28,
-					minimumCompletions: 4,
-					now: Date.parse("2026-08-20"),
-				}
+				{ ...forecastOpts, now: Date.parse("2026-08-20") }
 			)
 		).toBeNull();
+	});
+
+	it("weighs and counts every completion that shares a later date", () => {
+		// Only the earliest date must be unique. `/release` stamps one date on
+		// every shipped ticket at once (BUG00003 review, finding 2).
+		expect(
+			velocityPerDay(
+				[
+					completed("2026-08-17", 5),
+					completed("2026-08-18", 1),
+					completed("2026-08-19", 2),
+					completed("2026-08-19", 4),
+				],
+				{ ...forecastOpts, now: Date.parse("2026-08-20") }
+			)
+		).toEqual({ perDay: 7 / 3, samples: 3, spanDays: 3 });
 	});
 
 	it("admits the exact cutoff but excludes older completions", () => {
@@ -292,18 +329,46 @@ describe("progress and forecast", () => {
 		expect(calculate("2026-08-20")).toEqual({ perDay: 1, samples: 3, spanDays: 7 });
 	});
 
-	it("gives no forecast without valid configuration or admitted history", () => {
-		const valid = {
-			completedProperty: "deployed",
-			velocityWindowDays: 28,
-			minimumCompletions: 4,
-		};
-		expect(velocityPerDay(tickets(), { ...valid, completedProperty: "" })).toBeNull();
-		expect(velocityPerDay(tickets(), { ...valid, velocityWindowDays: 0 })).toBeNull();
-		expect(velocityPerDay(tickets(), { ...valid, minimumCompletions: 0 })).toBeNull();
+	it("gives no forecast without valid configuration", () => {
+		// Each null below comes from the guard it names, not from the count
+		// check (BUG00003 review, finding 3).
+		const cards = forecastable();
+		expect(velocityPerDay(cards, { ...forecastOpts, completedProperty: "" })).toBeNull();
+		expect(velocityPerDay(cards, { ...forecastOpts, velocityWindowDays: Number.NaN })).toBeNull();
+		expect(velocityPerDay(cards, { ...forecastOpts, minimumCompletions: 1 })).toBeNull();
+		expect(velocityPerDay(cards, { ...forecastOpts, minimumCompletions: 2.5 })).toBeNull();
+		// A zero window still admits completions dated at or after `now`, and a
+		// date-only stamp written east of UTC is up to a day ahead of it.
 		expect(
-			velocityPerDay(tickets(), { ...valid, now: Date.parse("2026-12-01") })
+			velocityPerDay(cards, {
+				...forecastOpts,
+				velocityWindowDays: 0,
+				now: Date.parse("2026-08-17T23:59:00Z"),
+			})
 		).toBeNull();
+	});
+
+	it("gives no forecast when every completion predates the window", () => {
+		expect(
+			velocityPerDay(forecastable(), { ...forecastOpts, now: Date.parse("2026-12-01") })
+		).toBeNull();
+	});
+
+	it("reads hand-edited forecast numbers as whole numbers in range", () => {
+		// `data.json` is spread as stored; a `"4"` used to blank the forecast on
+		// every device while the settings tab showed 4 (BUG00003 review, finding 6).
+		const load = (stored: Record<string, unknown>) =>
+			normalizeMilestones({ ...DEFAULT_SHARED.milestones, ...stored } as MilestoneSettings);
+		const numbers = (m: MilestoneSettings) => [m.velocityWindowDays, m.velocityMinimumCompletions];
+
+		expect(numbers(load({ velocityWindowDays: "14", velocityMinimumCompletions: "5" }))).toEqual([14, 5]);
+		expect(numbers(load({ velocityWindowDays: 14.9, velocityMinimumCompletions: 4.5 }))).toEqual([14, 4]);
+		expect(numbers(load({ velocityWindowDays: 1, velocityMinimumCompletions: 2 }))).toEqual([1, 2]);
+		expect(numbers(load({ velocityWindowDays: 0.5, velocityMinimumCompletions: 1 }))).toEqual([28, 4]);
+		expect(numbers(load({ velocityWindowDays: null, velocityMinimumCompletions: "four" }))).toEqual([28, 4]);
+
+		const minimumCompletions = load({ velocityMinimumCompletions: "4" }).velocityMinimumCompletions;
+		expect(velocityPerDay(forecastable(), { ...forecastOpts, minimumCompletions })).not.toBeNull();
 	});
 
 	it("gives no forecast when post-baseline weight is not positive", () => {

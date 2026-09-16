@@ -53,7 +53,9 @@ The sections below describe both layers as the **settings UI** presents them. If
 - **Discussion property** — a thread URL rendered as a chat icon in the card title
 - **Required properties** — drives the ⚠ problems panel (typically `id, status, updated`)
 
-**Milestones** (the Release Plan tab): version property, planned versions, per-version tags, size property, completed property, velocity look-back window, release-notes folder.
+**Milestones** (the Release Plan tab): version property, planned versions, per-version tags, size property, completed property, velocity look-back window, minimum completions, release-notes folder.
+
+The forecast's velocity comes from the completions inside the look-back window. The earliest must be the only one on its UTC calendar date: it is the baseline and adds no weight. The sizes of all later completions are divided by the whole UTC days from the baseline's date through the last completion's, both ends counted — Monday to Thursday is 4 days, which is the *over N days* in the header tooltip. Gaps between completions stay in that span; days since the last completion do not. Fewer completions than *Minimum completions* (default `4`, at least `2`, since the baseline alone gives no rate) or a tie on the earliest date shows no forecast.
 
 **Meetings** and **Todos**: the meetings folder (root only), calendar filter and look-ahead; the todo folders, allowlisted section names, the assignee list and the fallback owner. Each tab appears once its folder is configured.
 
@@ -254,7 +256,7 @@ Where the stored shape differs from the settings UI:
 - **Columns are objects, not `value | Label | progress | WIP` strings.** `label` may be omitted (the `value` is then displayed), an omitted `wip` means no limit, and the UI's `-` progress becomes `"excluded": true` — *not* `"progress": "-"`.
 - **`chips.templates` and `chips.columnTemplates` are separate lists** — card chips vs. batch chips on a column header. Identical object shape (`label`, `tool`, `repo`, `prompt`); only the column prompts get `{{ids}}`, `{{status}}` and `{{count}}`.
 - **Empty means off, and hides the tab.** `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` turns the forecast off, `board.orderProperty: ""` disables manual ordering, and an empty `assigneeProperty`/`questionsProperty`/`testsProperty`/`findingsProperty`/`discussionProperty` drops that badge.
-- **Forecast velocity needs an observed interval.** `milestones.velocityMinimumCompletions` defaults to `4`. The first uniquely dated completion is the zero-weight baseline; later completions supply the measured weight. Too few completions or more than one completion on the earliest UTC date suppresses the forecast rather than guessing.
+- **The forecast numbers are read as whole numbers when the plugin loads.** `milestones.velocityWindowDays` and `milestones.velocityMinimumCompletions` may be stored as numbers or numeric strings; fractions are rounded down. A value that is not a number or is below its floor (`1` day, `2` completions) is replaced by the default (`28`, `4`), which is what the settings tab then shows.
 - **`milestones.tags` is keyed by normalized `major.minor`** (`"1.2": "Beta"`), while `plannedVersions` holds the canonical *write* form (`"v1.2.0"`) — dropping a card writes that exact string.
 - **Automation rules always carry all four keys.** A `set`-only rule keeps `"repo": ""` and `"command": ""`; an empty `when` means every status change.
 

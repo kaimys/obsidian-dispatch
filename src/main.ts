@@ -23,6 +23,7 @@ import {
 	LocalSettings,
 	SharedSettings,
 	mergeDeviceFile,
+	normalizeMilestones,
 } from "./settings";
 
 const LOCAL_SETTINGS_FILE = "local.json";
@@ -235,7 +236,7 @@ export default class DispatchPlugin extends Plugin {
 		};
 		this.shared = {
 			board: { ...DEFAULT_SHARED.board, ...data.board },
-			milestones: { ...DEFAULT_SHARED.milestones, ...data.milestones },
+			milestones: normalizeMilestones({ ...DEFAULT_SHARED.milestones, ...data.milestones }),
 			meetings: { ...DEFAULT_SHARED.meetings, ...data.meetings },
 			todos: { ...DEFAULT_SHARED.todos, ...data.todos },
 			chips: { ...DEFAULT_SHARED.chips, ...data.chips },

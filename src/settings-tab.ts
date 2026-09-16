@@ -3,8 +3,10 @@
  * eslint.config.mjs preserves these literals while still checking UI prose.
  */
 import { App, PluginSettingTab, Setting } from "obsidian";
+import { MIN_VELOCITY_COMPLETIONS } from "./cards";
 import { displayValue, formatChipLabel, parseChipLabel } from "./parse";
 import type DispatchPlugin from "./main";
+import { DEFAULT_SHARED, wholeNumberAtLeast } from "./settings";
 
 export class DispatchSettingTab extends PluginSettingTab {
 	plugin: DispatchPlugin;
@@ -333,15 +335,17 @@ export class DispatchSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Minimum completions")
 			.setDesc(
-				"Completed tickets required before a forecast is shown. The first uniquely dated completion establishes the baseline; later completions supply the measured weight."
+				`Completed tickets required before a forecast is shown, at least ${MIN_VELOCITY_COMPLETIONS}. The first uniquely dated completion establishes the baseline; later completions supply the measured weight.`
 			)
 			.addText((t) =>
 				t
 					.setValue(String(this.plugin.shared.milestones.velocityMinimumCompletions))
 					.onChange(async (v) => {
-						const n = Math.floor(Number(v.trim()));
-						this.plugin.shared.milestones.velocityMinimumCompletions =
-							Number.isFinite(n) && n > 0 ? n : 4;
+						this.plugin.shared.milestones.velocityMinimumCompletions = wholeNumberAtLeast(
+							v.trim(),
+							MIN_VELOCITY_COMPLETIONS,
+							DEFAULT_SHARED.milestones.velocityMinimumCompletions
+						);
 						await this.plugin.saveShared();
 					})
 			);
