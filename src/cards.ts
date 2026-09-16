@@ -53,6 +53,14 @@ export interface ReleaseNote<F extends FileRef = FileRef> {
 	initial: boolean;
 }
 
+export interface VelocityResult {
+	perDay: number;
+	/** Weighted completions after the zero-weight baseline. */
+	samples: number;
+	/** Inclusive UTC calendar-day span used as the divisor. */
+	spanDays: number;
+}
+
 /** The board/milestone settings the card builder reads. */
 export interface CardSettings {
 	statusProperty: string;
@@ -261,24 +269,54 @@ export function milestonePercent<F extends FileRef>(cards: CardData<F>[]): numbe
 	return Math.round((100 * done) / weight);
 }
 
-/**
- * Completed weight per day over the look-back window. Null when the feature is
- * off or nothing completed inside the window — the forecast never guesses.
- */
+const DAY_MS = 86_400_000;
+
+/** Completed weight per observed UTC day, or null when the evidence is insufficient. */
 export function velocityPerDay<F extends FileRef>(
 	cards: CardData<F>[],
-	opts: { completedProperty: string; velocityWindowDays: number; now?: number }
-): { perDay: number; samples: number } | null {
-	const { completedProperty, velocityWindowDays } = opts;
-	if (!completedProperty || velocityWindowDays <= 0) return null;
-	const cutoff = (opts.now ?? Date.now()) - velocityWindowDays * 86_400_000;
-	let weight = 0;
-	let samples = 0;
-	for (const card of cards) {
-		if (card.completedAt === undefined || card.completedAt < cutoff) continue;
-		weight += card.size;
-		samples++;
+	opts: {
+		completedProperty: string;
+		velocityWindowDays: number;
+		minimumCompletions: number;
+		now?: number;
 	}
-	if (samples === 0 || weight <= 0) return null;
-	return { perDay: weight / velocityWindowDays, samples };
+): VelocityResult | null {
+	const { completedProperty, minimumCompletions } = opts;
+	const velocityWindowDays = Math.floor(opts.velocityWindowDays);
+	if (
+		!completedProperty ||
+		!Number.isFinite(velocityWindowDays) ||
+		velocityWindowDays <= 0 ||
+		!Number.isInteger(minimumCompletions) ||
+		minimumCompletions <= 0
+	) {
+		return null;
+	}
+
+	const cutoff = (opts.now ?? Date.now()) - velocityWindowDays * DAY_MS;
+	const completed = cards
+		.flatMap((card) => {
+			const completedAt = card.completedAt;
+			if (
+				typeof completedAt !== "number" ||
+				!Number.isFinite(completedAt) ||
+				completedAt < cutoff
+			) {
+				return [];
+			}
+			return [{ card, day: Math.floor(completedAt / DAY_MS) }];
+		})
+		.sort((a, b) => a.day - b.day);
+	if (completed.length < minimumCompletions) return null;
+
+	const firstDay = completed[0]?.day;
+	const lastDay = completed[completed.length - 1]?.day;
+	if (firstDay === undefined || lastDay === undefined || completed[1]?.day === firstDay) return null;
+
+	const measured = completed.slice(1);
+	const weight = measured.reduce((sum, { card }) => sum + card.size, 0);
+	if (weight <= 0) return null;
+
+	const spanDays = Math.min(velocityWindowDays, lastDay - firstDay + 1);
+	return { perDay: weight / spanDays, samples: measured.length, spanDays };
 }

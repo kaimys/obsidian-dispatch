@@ -47,6 +47,8 @@ export interface MilestoneSettings {
 	completedProperty: string;
 	/** Look-back window (days) for the velocity calculation. */
 	velocityWindowDays: number;
+	/** Minimum admitted completions required before velocity can be calculated. */
+	velocityMinimumCompletions: number;
 	/**
 	 * Vault folder containing release notes with `version` and `date`
 	 * frontmatter. A version column whose initial (x.y.0) release note exists
@@ -349,6 +351,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 		sizeProperty: "size",
 		completedProperty: "",
 		velocityWindowDays: 28,
+		velocityMinimumCompletions: 4,
 		releaseNotesFolder: "",
 	},
 	meetings: {

@@ -213,6 +213,7 @@ Missing keys fall back to the defaults in `src/settings.ts`, but writing the ful
     "sizeProperty": "size",
     "completedProperty": "deployed",
     "velocityWindowDays": 28,
+    "velocityMinimumCompletions": 4,
     "releaseNotesFolder": "08_Delivery-and-QA/Releases"
   },
   "meetings": {
@@ -253,6 +254,7 @@ Where the stored shape differs from the settings UI:
 - **Columns are objects, not `value | Label | progress | WIP` strings.** `label` may be omitted (the `value` is then displayed), an omitted `wip` means no limit, and the UI's `-` progress becomes `"excluded": true` — *not* `"progress": "-"`.
 - **`chips.templates` and `chips.columnTemplates` are separate lists** — card chips vs. batch chips on a column header. Identical object shape (`label`, `tool`, `repo`, `prompt`); only the column prompts get `{{ids}}`, `{{status}}` and `{{count}}`.
 - **Empty means off, and hides the tab.** `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` turns the forecast off, `board.orderProperty: ""` disables manual ordering, and an empty `assigneeProperty`/`questionsProperty`/`testsProperty`/`findingsProperty`/`discussionProperty` drops that badge.
+- **Forecast velocity needs an observed interval.** `milestones.velocityMinimumCompletions` defaults to `4`. The first uniquely dated completion is the zero-weight baseline; later completions supply the measured weight. Too few completions or more than one completion on the earliest UTC date suppresses the forecast rather than guessing.
 - **`milestones.tags` is keyed by normalized `major.minor`** (`"1.2": "Beta"`), while `plannedVersions` holds the canonical *write* form (`"v1.2.0"`) — dropping a card writes that exact string.
 - **Automation rules always carry all four keys.** A `set`-only rule keeps `"repo": ""` and `"command": ""`; an empty `when` means every status change.
 

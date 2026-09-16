@@ -331,6 +331,22 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Minimum completions")
+			.setDesc(
+				"Completed tickets required before a forecast is shown. The first uniquely dated completion establishes the baseline; later completions supply the measured weight."
+			)
+			.addText((t) =>
+				t
+					.setValue(String(this.plugin.shared.milestones.velocityMinimumCompletions))
+					.onChange(async (v) => {
+						const n = Math.floor(Number(v.trim()));
+						this.plugin.shared.milestones.velocityMinimumCompletions =
+							Number.isFinite(n) && n > 0 ? n : 4;
+						await this.plugin.saveShared();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Version tags")
 			.setDesc(
 				"One per line: major.minor = tag (e.g. 1.1 = MVP). Also editable by clicking the tag in a column header."

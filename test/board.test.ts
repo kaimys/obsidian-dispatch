@@ -15,6 +15,7 @@ import {
 } from "../src/cards";
 import type { CardData } from "../src/cards";
 import { versionKey } from "../src/parse";
+import { DEFAULT_SHARED } from "../src/settings";
 import { CARD_SETTINGS, PROBLEM_SETTINGS, loadVault, note } from "./harness";
 
 function card(prefix: string): CardData<{ path: string; basename: string }> {
@@ -181,6 +182,12 @@ describe("release notes", () => {
 });
 
 describe("progress and forecast", () => {
+	const completed = (when: string, size = 1): CardData<{ path: string; basename: string }> => ({
+		...card("US00008"),
+		completedAt: Date.parse(when),
+		size,
+	});
+
 	it("weights completion by size across the release line", () => {
 		const line = tickets().filter((c) => versionKey(c.version) === "1.4");
 		// Σ(size × progress) / Σ(size) = 1100 / 18 ≈ 61 %
@@ -191,32 +198,130 @@ describe("progress and forecast", () => {
 		expect(milestonePercent([])).toBeNull();
 	});
 
-	it("measures velocity only from completions inside the window", () => {
-		const now = Date.parse("2026-08-20");
-		const v = velocityPerDay(tickets(), {
-			completedProperty: "deployed",
-			velocityWindowDays: 28,
-			now,
-		});
-		expect(v).not.toBeNull();
-		expect(v?.samples).toBe(1); // only US00008 carries a deployed date
-		expect(v?.perDay).toBeCloseTo(8 / 28);
-	});
-
-	it("gives no forecast when the window is empty", () => {
-		const now = Date.parse("2026-12-01"); // long after the only completion
-		expect(
-			velocityPerDay(tickets(), {
+	it("measures later weight across the observed span after a unique baseline", () => {
+		expect(DEFAULT_SHARED.milestones.velocityMinimumCompletions).toBe(4);
+		const v = velocityPerDay(
+			[
+				completed("2026-08-17T23:59:00Z", 99),
+				completed("2026-08-18T00:01:00Z", 1),
+				completed("2026-08-19T12:00:00Z", 2),
+				completed("2026-08-20T23:00:00Z", 3),
+			],
+			{
 				completedProperty: "deployed",
 				velocityWindowDays: 28,
-				now,
-			})
+				minimumCompletions: DEFAULT_SHARED.milestones.velocityMinimumCompletions,
+				now: Date.parse("2026-08-21T00:00:00Z"),
+			}
+		);
+		expect(v).toEqual({ perDay: 6 / 4, samples: 3, spanDays: 4 });
+	});
+
+	it("uses the configured minimum completion count", () => {
+		const cards = [
+			completed("2026-08-18", 8),
+			completed("2026-08-19", 2),
+			completed("2026-08-20", 4),
+		];
+		const opts = {
+			completedProperty: "deployed",
+			velocityWindowDays: 28,
+			now: Date.parse("2026-08-20"),
+		};
+		expect(velocityPerDay(cards, { ...opts, minimumCompletions: 4 })).toBeNull();
+		expect(velocityPerDay(cards, { ...opts, minimumCompletions: 3 })).toEqual({
+			perDay: 6 / 3,
+			samples: 2,
+			spanDays: 3,
+		});
+	});
+
+	it("gives no forecast when the earliest UTC date is tied", () => {
+		expect(
+			velocityPerDay(
+				[
+					completed("2026-08-17T01:00:00Z", 1),
+					completed("2026-08-17T23:00:00Z", 13),
+					completed("2026-08-18", 2),
+					completed("2026-08-19", 3),
+				],
+				{
+					completedProperty: "deployed",
+					velocityWindowDays: 28,
+					minimumCompletions: 4,
+					now: Date.parse("2026-08-20"),
+				}
+			)
 		).toBeNull();
 	});
 
-	it("gives no forecast when the feature is switched off", () => {
+	it("admits the exact cutoff but excludes older completions", () => {
+		const v = velocityPerDay(
+			[
+				completed("2026-08-25", 100),
+				completed("2026-08-26", 20),
+				completed("2026-08-27", 1),
+				completed("2026-08-28", 1),
+				completed("2026-08-29", 1),
+			],
+			{
+				completedProperty: "deployed",
+				velocityWindowDays: 3,
+				minimumCompletions: 4,
+				now: Date.parse("2026-08-29"),
+			}
+		);
+		expect(v).toEqual({ perDay: 1, samples: 3, spanDays: 3 });
+	});
+
+	it("counts internal gaps but ignores inactivity after the last completion", () => {
+		const cards = [
+			completed("2026-08-01", 50),
+			completed("2026-08-03", 1),
+			completed("2026-08-05", 2),
+			completed("2026-08-07", 4),
+		];
+		const calculate = (now: string) =>
+			velocityPerDay(cards, {
+				completedProperty: "deployed",
+				velocityWindowDays: 28,
+				minimumCompletions: 4,
+				now: Date.parse(now),
+			});
+		expect(calculate("2026-08-08")).toEqual({ perDay: 1, samples: 3, spanDays: 7 });
+		expect(calculate("2026-08-20")).toEqual({ perDay: 1, samples: 3, spanDays: 7 });
+	});
+
+	it("gives no forecast without valid configuration or admitted history", () => {
+		const valid = {
+			completedProperty: "deployed",
+			velocityWindowDays: 28,
+			minimumCompletions: 4,
+		};
+		expect(velocityPerDay(tickets(), { ...valid, completedProperty: "" })).toBeNull();
+		expect(velocityPerDay(tickets(), { ...valid, velocityWindowDays: 0 })).toBeNull();
+		expect(velocityPerDay(tickets(), { ...valid, minimumCompletions: 0 })).toBeNull();
 		expect(
-			velocityPerDay(tickets(), { completedProperty: "", velocityWindowDays: 28 })
+			velocityPerDay(tickets(), { ...valid, now: Date.parse("2026-12-01") })
+		).toBeNull();
+	});
+
+	it("gives no forecast when post-baseline weight is not positive", () => {
+		expect(
+			velocityPerDay(
+				[
+					completed("2026-08-17", 10),
+					completed("2026-08-18", 0),
+					completed("2026-08-19", 0),
+					completed("2026-08-20", 0),
+				],
+				{
+					completedProperty: "deployed",
+					velocityWindowDays: 28,
+					minimumCompletions: 4,
+					now: Date.parse("2026-08-20"),
+				}
+			)
 		).toBeNull();
 	});
 });

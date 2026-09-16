@@ -14,7 +14,7 @@ import {
 	sortByRank,
 	velocityPerDay,
 } from "./cards";
-import type { CardData, CardSettings, ReleaseNote } from "./cards";
+import type { CardData, CardSettings, ReleaseNote, VelocityResult } from "./cards";
 import type { FrontmatterPatch } from "./moves";
 import { frontmatterIn, frontmatterOf, updateFrontmatter } from "./vault";
 import {
@@ -583,9 +583,14 @@ export class BoardView extends ItemView {
 	 * board (not just one column). Null when the feature is off or no
 	 * completions fall inside the window.
 	 */
-	private velocityPerDay(allCards: Card[]): { perDay: number; samples: number } | null {
-		const { completedProperty, velocityWindowDays } = this.plugin.shared.milestones;
-		return velocityPerDay(allCards, { completedProperty, velocityWindowDays });
+	private velocityPerDay(allCards: Card[]): VelocityResult | null {
+		const { completedProperty, velocityWindowDays, velocityMinimumCompletions } =
+			this.plugin.shared.milestones;
+		return velocityPerDay(allCards, {
+			completedProperty,
+			velocityWindowDays,
+			minimumCompletions: velocityMinimumCompletions,
+		});
 	}
 
 	/**
@@ -597,7 +602,7 @@ export class BoardView extends ItemView {
 		col: MilestoneColumn,
 		colRemaining: number,
 		pipelineBefore: number,
-		velocity: { perDay: number; samples: number } | null
+		velocity: VelocityResult | null
 	): void {
 		if (!velocity || colRemaining <= 0) return;
 
@@ -609,14 +614,15 @@ export class BoardView extends ItemView {
 				eta.getDate()
 			).padStart(2, "0")}`;
 		};
-		const windowDays = this.plugin.shared.milestones.velocityWindowDays;
+		const sampleLabel = `${velocity.samples} completion${velocity.samples === 1 ? "" : "s"}`;
+		const spanLabel = `${velocity.spanDays} day${velocity.spanDays === 1 ? "" : "s"}`;
 		header.createDiv({
 			cls: "dispatch-forecast",
 			text: `≈ ${fmt(days)}`,
 			attr: {
 				title:
 					`Remaining weight ${colRemaining.toFixed(1)} + ${pipelineBefore.toFixed(1)} queued in earlier versions, ` +
-					`at ${(velocity.perDay * 7).toFixed(1)}/week (${velocity.samples} completions in the last ${windowDays} days). ` +
+					`at ${(velocity.perDay * 7).toFixed(1)}/week (${sampleLabel} over ${spanLabel}). ` +
 					`Optimistic ${fmt(days * 0.6)} · pessimistic ${fmt(days * 1.4)}.`,
 			},
 		});
