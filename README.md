@@ -40,10 +40,11 @@ and enable it — or go straight to the
 **2. Let an agent set it up.** An unconfigured board says so and offers to start
 [Claude Code](https://claude.com/claude-code) or Codex in your vault folder with the right
 prompt. The button names the agent when this device can launch exactly one — **Set up with
-Claude**, **Set up with Codex** — and reads **Set up with an agent** when it can launch both, in
-which case the confirmation dialog asks which. It shows you the exact command before running
-anything. With no launch command on the device yet, **Copy the prompt** hands the same prompt to
-an agent you already have open.
+Claude**, **Set up with Codex**. With both configured it reads **Set up with an agent**, and the
+confirmation dialog asks which one, showing you the exact command before anything runs. With
+*Confirm before running* off there is no dialog at all: the button names the agent it will start,
+and a click starts it. With no launch command on the device yet, **Copy the prompt** hands the
+same prompt to an agent you already have open.
 
 The skill behind that button lives in this repo's plugin marketplace:
 
