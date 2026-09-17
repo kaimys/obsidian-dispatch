@@ -54,6 +54,15 @@ export function toolChoices(
 }
 
 /**
+ * A tool's name as a button shows it — `codex` becomes `Codex`. One function,
+ * so the setup panel's button and the confirmation dialog it opens never spell
+ * the same agent two ways.
+ */
+export function toolDisplayName(tool: string): string {
+	return tool.charAt(0).toUpperCase() + tool.slice(1);
+}
+
+/**
  * The prompt template this tool wants for this chip, resolved in three steps.
  *
  * 1. An **explicit override** for this chip's intent, keyed by

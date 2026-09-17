@@ -8,18 +8,29 @@ Open *Settings → Community plugins → Browse* in Obsidian, search for **Dispa
 
 ### Guided setup
 
-Integrating Dispatch into a project — boards, device config, chips, tracker sync, agent hooks — is itself agent-guided. In [Claude Code](https://claude.com/claude-code):
+Integrating Dispatch into a project — boards, device config, chips, tracker sync, agent hooks — is itself agent-guided, in [Claude Code](https://claude.com/claude-code) or Codex. Install the setup skill into the agent you run.
+
+Claude Code:
 
 ```
 /plugin marketplace add kaimys/obsidian-dispatch
 /plugin install dispatch-setup
 ```
 
-Then say "set up Dispatch for this project" in your repo. The skill scans an existing vault (ticket folders, status vocabulary, frontmatter fill rates) and turns the interview into a confirmation of pre-filled suggestions — or scaffolds a [wiki structure](wiki-structure.md) if there isn't one yet, and proposes the [workflow skills](skills.md) for your code repo.
+Codex:
+
+```
+codex plugin marketplace add kaimys/obsidian-dispatch
+codex plugin add dispatch-setup@dispatch
+```
+
+Then say "set up Dispatch for this project" in your repo — or let the board start it. An unconfigured board offers a setup button for every agent this device has a [launch command](#tool-commands) for: **Set up with Claude** or **Set up with Codex** when there is one, **Set up with an agent** when there are several (the confirmation dialog asks which; with *Confirm before running* off, the button names the agent a click starts). With no launch command it is disabled, and **Copy the prompt** hands the same prompt to an agent you already have open. The prompt names both install routes, so an agent that does not have the skill yet tells you how to install it and to start a new session.
+
+The skill scans an existing vault (ticket folders, status vocabulary, frontmatter fill rates) and turns the interview into a confirmation of pre-filled suggestions — or scaffolds a [wiki structure](wiki-structure.md) if there isn't one yet, and proposes the [workflow skills](skills.md) for your code repo.
 
 The setup is complete only after its verification gate and one live chip have passed for every selected agent. In a multi-agent setup, the skill creates one neutral chip per workflow intent and keeps the agent-specific `/` or `$` prefix in the device-local tool configuration, so the same menu entry can launch either agent.
 
-No Claude Code? The skill is a plain markdown checklist: `plugins/dispatch-setup/skills/dispatch-setup/SKILL.md`.
+Neither agent? The skill is a plain markdown checklist: `plugins/dispatch-setup/skills/dispatch-setup/SKILL.md`.
 
 ## The two configuration layers
 

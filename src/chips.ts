@@ -8,6 +8,7 @@ import {
 	shellVars,
 	substitute,
 	toolChoices,
+	toolDisplayName,
 	writePromptFile,
 } from "./exec";
 import { displayValue } from "./parse";
@@ -150,12 +151,18 @@ export function launchEventChip(
  *
  * Not a settings-defined chip on purpose: this is the one launch that has to
  * work with no configuration at all. It names no repo alias, so the working
- * directory falls back to the vault folder, and it takes the default tool —
- * everything else (confirmation, the one-agent-per-tree gate, the run record)
- * is the ordinary chip path, so a setup run behaves like any other run.
+ * directory falls back to the vault folder — everything else (confirmation and
+ * its agent picker, the one-agent-per-tree gate, the run record) is the
+ * ordinary chip path, so a setup run behaves like any other run.
+ *
+ * `tool` is the agent the panel's button named, if it named one. It is pinned
+ * rather than left to the shared default because the button's label is the
+ * promise: "Set up with Codex" on a device whose default is still `claude` must
+ * start Codex, and with confirmations off nothing else would choose it. Empty
+ * leaves the choice to the confirmation dialog.
  */
-export function launchSetup(plugin: DispatchPlugin, prompt: string): void {
-	const spec: ChipTemplate = { label: "Set up Dispatch", intent: "setup", prompt };
+export function launchSetup(plugin: DispatchPlugin, prompt: string, tool = ""): void {
+	const spec: ChipTemplate = { label: "Set up Dispatch", intent: "setup", tool, prompt };
 	executeChip(plugin, spec, {}, "(setup)", "");
 }
 
@@ -414,7 +421,7 @@ class ConfirmModal extends Modal {
 		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
 		let primaryTaken = false;
 		for (const candidate of this.candidates) {
-			const name = candidate.tool.charAt(0).toUpperCase() + candidate.tool.slice(1);
+			const name = toolDisplayName(candidate.tool);
 			const button = row.createEl("button", { text: single ? "Run" : `Run with ${name}` });
 			if (candidate.problem) {
 				button.disabled = true;

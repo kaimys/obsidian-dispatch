@@ -37,10 +37,13 @@ New to the idea? Read [Overview](docs/overview.md), then [Wiki structure](docs/w
 and enable it — or go straight to the
 [directory listing](https://community.obsidian.md/plugins/dispatch).
 
-**2. Let an agent set it up.** An unconfigured board says so and offers a
-**Set up with claude** button, which starts [Claude Code](https://claude.com/claude-code) in
-your vault folder with the right prompt. It shows you the exact command before running
-anything.
+**2. Let an agent set it up.** An unconfigured board says so and offers to start
+[Claude Code](https://claude.com/claude-code) or Codex in your vault folder with the right
+prompt. The button names the agent when this device can launch exactly one — **Set up with
+Claude**, **Set up with Codex** — and reads **Set up with an agent** when it can launch both, in
+which case the confirmation dialog asks which. It shows you the exact command before running
+anything. With no launch command on the device yet, **Copy the prompt** hands the same prompt to
+an agent you already have open.
 
 The skill behind that button lives in this repo's plugin marketplace:
 
@@ -65,8 +68,9 @@ its bundled `skill-installer` takes a repository path:
 $skill-installer install kaimys/obsidian-dispatch plugins/dispatch-setup/skills/dispatch-setup
 ```
 
-The prompt carries those two lines itself, so the button works before you have installed the
-skill. The setup interviews you about your wiki, writes both configuration layers, scaffolds
+The prompt names both agents' install commands itself, so the button works before you have
+installed the skill: an agent that does not find it tells you how to install it, and to start a
+new session afterwards. The setup interviews you about your wiki, writes both configuration layers, scaffolds
 ticket templates and workflow commands, and verifies the result.
 
 See [Installation & configuration](docs/installation.md) for the tool command, the per-tool

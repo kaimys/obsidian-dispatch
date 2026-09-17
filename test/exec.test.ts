@@ -11,6 +11,7 @@ import {
 	shellVars,
 	substitute,
 	toolChoices,
+	toolDisplayName,
 } from "../src/exec";
 import type { ChipTemplate, ToolConfig } from "../src/settings";
 
@@ -109,6 +110,17 @@ describe("toolChoices", () => {
 		// A chip pinned to a tool this device does not have is not a dead chip:
 		// the tool is a default, not a constraint (ADR-0021).
 		expect(toolChoices(chip({ tool: "gemini" }), both, "claude")).toEqual(["claude", "codex"]);
+	});
+});
+
+describe("toolDisplayName", () => {
+	it("capitalises the tool id for a button, and leaves the rest as configured", () => {
+		// Shared by the confirmation dialog and the setup panel's button, so the
+		// two cannot spell one agent differently.
+		expect(toolDisplayName("codex")).toBe("Codex");
+		expect(toolDisplayName("claude")).toBe("Claude");
+		expect(toolDisplayName("openCode")).toBe("OpenCode");
+		expect(toolDisplayName("")).toBe("");
 	});
 });
 

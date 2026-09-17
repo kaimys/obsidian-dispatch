@@ -555,6 +555,10 @@
 	font-size: var(--font-ui-small);
 }
 
+.dispatch-setup-agent {
+	margin-bottom: var(--size-4-1);
+}
+
 .dispatch-setup-code {
 	margin: 0 0 var(--size-4-3) 0;
 	padding: var(--size-4-2) var(--size-4-3);

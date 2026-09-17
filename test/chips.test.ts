@@ -30,7 +30,7 @@ vi.mock("../src/exec", async (importOriginal) => ({
 	},
 }));
 
-const { launchChip } = await import("../src/chips");
+const { launchChip, launchSetup } = await import("../src/chips");
 
 const SETTINGS_PATH = "C:\\Users\\kai\\.dispatch\\Dispatch-Wiki-7ea0c874.json";
 
@@ -222,5 +222,35 @@ describe("choosing the agent at click time", () => {
 		const title = "Story - US00002 - Support Codex as a chip tool";
 		expect(readFileSync(claudeFile, "utf8")).toBe(`/refine ${title}`);
 		expect(readFileSync(codexFile, "utf8")).toBe(`$refine ${title}`);
+	});
+});
+
+describe("launching setup from the unconfigured board", () => {
+	beforeEach(() => {
+		launched.length = 0;
+	});
+
+	const launch = (
+		tools: Record<string, { command: string }>,
+		tool: string,
+		defaultTool = "claude"
+	) => {
+		const plugin = fakePlugin(tools, defaultTool);
+		launchSetup(plugin as unknown as Parameters<typeof launchSetup>[0], "Set up Dispatch.", tool);
+		return launched[launched.length - 1];
+	};
+
+	it("starts the agent the button named, even when the shared default is another", () => {
+		// "Set up with Codex" on a fresh board, whose default is still `claude`.
+		// With confirmations off nothing else would choose Codex (US00002).
+		const run = launch({ claude: { command: "" }, codex: { command: "codex {{prompt}}" } }, "codex");
+		expect(run.env?.DISPATCH_TOOL).toBe("codex");
+		expect(run.command).toBe('codex "Set up Dispatch."');
+	});
+
+	it("takes the shared default when the button named no agent", () => {
+		const both = { claude: { command: "claude {{prompt}}" }, codex: { command: "codex {{prompt}}" } };
+		expect(launch(both, "").env?.DISPATCH_TOOL).toBe("claude");
+		expect(launch(both, "", "codex").env?.DISPATCH_TOOL).toBe("codex");
 	});
 });
