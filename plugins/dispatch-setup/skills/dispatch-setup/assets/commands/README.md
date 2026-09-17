@@ -33,6 +33,8 @@ Every project-specific value is a `<<PLACEHOLDER>>` token. Replace all of them, 
 
 **If there is no tracker or no chat**, substitute `none`. Every workflow explicitly skips that integration's lookups, writes and missing-side preconditions while continuing wiki work. Questions go to the requester when chat is absent. A configured service being unavailable is a reported failure, not `none`.
 
+**If there is no project-native verification gate**, copy the setup skill's `assets/validate.mjs` to `scripts/dispatch/validate.mjs`, substitute `node scripts/dispatch/validate.mjs` for `<<GATES>>`, and run it before setup is considered complete. Never reference that command unless the file was actually copied.
+
 `<<WIKI>>` is the workflow's vault lookup, not a chip repository path. Prefer repo-relative lookup (including a git-ignored symlink). Absolute paths may temporarily remain in generated workflows until portable project setup is implemented (US00033 in Dispatch); they need adaptation on another machine. Never write them into notes, shared settings or chip repo fields. This repository continues using `wiki`.
 
 **Statuses describe transition roles, not every board column.** `refine` and `implementation-plan` leave the card in refinement. A human can authorize the ready queue or invoke development directly; a queue name is not permission. Example mappings:

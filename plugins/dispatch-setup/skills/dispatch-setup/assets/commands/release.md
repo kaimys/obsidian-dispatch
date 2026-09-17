@@ -10,7 +10,7 @@ Tracker: <<TRACKER>>. Chat: <<CHAT>>. If either is `none`, skip only that integr
 
 Releases one version. `<ARGS>` is the target version (e.g. `v1.4.0`); without it, use the next planned version from the Release Plan.
 
-**The step order is load-bearing.** Prove the candidate before touching production; refresh any mirror of a backend *before* promoting it; build production *after* the promotion, because that build talks to the promoted backend. Each reordering has bitten someone — if you change the order, write down why.
+**The project's recorded release order is load-bearing.** Follow its documented build, migration, promotion and publication sequence, preserving the reasons it gives. If setup found no release policy, stop before changing versions, production, tags or publications and ask the requester; never invent backend, mirror or deployment steps for a project that did not name them.
 
 ## Scope the release
 

@@ -51,6 +51,7 @@ The authoritative schema — every field, every default — is `src/settings.ts`
 - Which properties exist / should exist: `assignee`, `size`, `open_questions`, `open_tests`, `open_findings`, `discussion` (thread URL)? Required properties for the problems panel (typically `id, status, updated`)?
 - Meetings folder (optional third tab)?
 - Grep a few real ticket notes to validate every answer against reality — inconsistent value formats (e.g. `v1.2.0` vs `1.2.0`) are normal; Dispatch normalizes versions by major.minor, but statuses must match exactly.
+- Which commands prove the code repository is valid? Use its real build/lint/test commands for `<<GATES>>`. If this is a fresh repository with no gate, copy this skill's `assets/validate.mjs` to `scripts/dispatch/validate.mjs` and use `node scripts/dispatch/validate.mjs` — never name a gate file you did not create and run.
 - **Last step — propose workflow skills for the CODE repo (the glue).** Chips only carry `/command {{id}}` one-liners; the actual workflow logic must live **in the user's code repository** — not the wiki — so it versions with the code, travels through git to every teammate, and is reviewable like code. Scaffold the shipped catalog below and adapt its vocabulary to their lifecycle, each skill pre-wired to a chip:
 
 <!-- shipped-workflows:start -->
@@ -178,11 +179,11 @@ Write the **full** settings object — missing keys fall back to defaults, but a
   "chips": {
     "defaultTool": "claude",
     "templates": [
-      { "label": "Start refinement", "tool": "claude", "repo": "my-app", "prompt": "/refine {{id}}" },
-      { "label": "Code review", "tool": "claude", "repo": "my-app", "prompt": "/code-review {{id}}" }
+      { "label": "Start refinement", "intent": "refine", "repo": "my-app", "prompt": "/refine {{id}}" },
+      { "label": "Code review", "intent": "code-review", "repo": "my-app", "prompt": "/code-review {{id}}" }
     ],
     "columnTemplates": [
-      { "label": "Refine all tickets", "tool": "claude", "repo": "my-app", "prompt": "Work through these tickets sequentially with the full /refine workflow: {{ids}}." }
+      { "label": "Refine all tickets", "repo": "my-app", "prompt": "Work through these tickets sequentially with the full /refine workflow: {{ids}}." }
     ]
   }
 }
@@ -192,6 +193,7 @@ Mistakes that silently produce a broken board:
 
 - Columns are **objects**, not pipe strings. The UI's `-` progress becomes `"excluded": true` — *never* `"progress": "-"`. Omit `label` to display the raw value; omit `wip` for no limit.
 - `chips.templates` (card chips) and `chips.columnTemplates` (batch chips on the column header; prompts get `{{ids}}`, `{{status}}`, `{{count}}`) are **separate lists**.
+- With more than one selected agent, write **one template per intent**, omit `tool`, and give command chips a stable `intent`. Never clone a workflow into `(Claude)` and `(Codex)` rows: one row already opens the per-tool picker, and the device config below supplies each agent's invocation prefix. Apply the same rule to meeting/calendar command chips.
 - Empty means off: `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` disables the forecast, `board.orderProperty: ""` disables manual ordering, and an empty badge property drops that badge.
 - `milestones.tags` is keyed by normalized `major.minor` (`"1.2"`), `plannedVersions` by the canonical write form (`"v1.2.0"`) — a drop writes that exact string.
 - Every automation rule carries all four keys; a `set`-only rule keeps `"repo": ""` and `"command": ""`.
@@ -206,7 +208,14 @@ Per machine, never synced. Set it up on THIS machine and tell teammates to repea
 {
   "repos": { "my-app": "C:\\Users\\me\\Workspace\\my-app" },
   "tools": {
-    "claude": { "command": "start \"Dispatch\" /d {{cwd}} cmd /k claude {{prompt}}" }
+    "claude": {
+      "command": "start \"Dispatch Claude\" /d {{cwd}} cmd /k claude {{prompt}}",
+      "promptPrefix": "/"
+    },
+    "codex": {
+      "command": "start \"Dispatch Codex\" /d {{cwd}} cmd /k codex {{prompt}}",
+      "promptPrefix": "$"
+    }
   },
   "calendarUrl": "",
   "enableHooks": false,
@@ -214,8 +223,8 @@ Per machine, never synced. Set it up on THIS machine and tell teammates to repea
 }
 ```
 
-- `tools` maps a name to an **object** (`{"command": "…"}`), never to a bare string — the most common hand-editing mistake.
-- **Windows: use `start`, never `wt.exe`** (Windows Terminal parses `;` inside quoted args as a tab separator). macOS: `osascript -e 'tell app "Terminal" to do script "cd " & quoted form of {{cwd}} & " && claude " & quoted form of {{prompt}}'`.
+- `tools` maps a name to an **object** (`{"command": "…", "promptPrefix": "…"}`), never to a bare string — the most common hand-editing mistake. Keep only the agents the user selected. For the two-agent case, the prefixes are data, not prose: Claude `/`, Codex `$`.
+- **Windows: use `start`, never `wt.exe`** (Windows Terminal parses `;` inside quoted args as a tab separator). macOS: use one `osascript` command per agent, preserving that agent's CLI and the quoted `{{prompt}}`.
 - `repos` is the only place absolute paths may appear anywhere in Dispatch's config.
 - Keep `confirmBeforeRun: true`; `enableHooks` stays false until the automation command is trusted (it gates automation **commands** only — `set` assignments always apply).
 
@@ -231,7 +240,7 @@ If the user already runs Dispatch on another vault, sanity-check the algorithm b
 
 ## 4 · Chip templates + workflow commands
 
-- Define **virtual chip templates** in `data.json` — objects `{ "label": …, "tool": …, "repo": …, "prompt": … }` (the `label | tool | repo | prompt` form is the settings UI's input syntax, not the stored shape). Card prompts get `{{id}}`, `{{status}}`, `{{file}}`, `{{title}}`; column-header prompts get `{{ids}}`, `{{status}}`, `{{count}}`; meeting and calendar chips get `{{date}}` and `{{title}}`.
+- Define **virtual chip templates** in `data.json` — objects `{ "label": …, "intent": …, "repo": …, "prompt": … }`, with optional `tool` only for a genuinely tool-specific action (the `label | tool | repo | prompt` form is the settings UI's input syntax, not the stored shape). Card prompts get `{{id}}`, `{{status}}`, `{{file}}`, `{{title}}`; column-header prompts get `{{ids}}`, `{{status}}`, `{{count}}`; meeting and calendar chips get `{{date}}` and `{{title}}`.
 - Best practice: prompts are one-liners (`/refine {{id}}` for Claude, `$refine {{id}}` for Codex) whose step-by-step logic lives in the target repo's `dispatch/workflow/`, with a thin stub per agent. Scaffold them from **`assets/commands/`** in this skill rather than improvising — the shipped workflows above cover the ticket loop, the small-bug shortcut, releases and meetings, each a `<<PLACEHOLDER>>` search-and-replace away from working. **The prompt differs per agent only by its leading character**, so set the tool's prompt prefix in the device config (`codex = $`) rather than writing a prompt per chip. Their vault-side counterparts (ticket, bug, ADR, release-note and meeting templates) are in **`assets/templates/`**. Rationale and catalog: [`skills.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/skills.md), [`page-types.md`](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/page-types.md).
 - Chip labels must match what the commands are actually called — a chip firing `/refine` at a repo with no `refine.md` fails only at click time, with a confusing error.
 - Every `repo` alias used by a chip must exist in the device config, and the `tool` must be defined there too — otherwise the chip fails only at click time. Check both after writing the two files.
@@ -294,10 +303,11 @@ So board cards show launched → running ⇄ waiting → done and completed runs
 
 ## 8 · Smoke test
 
-**Verify headlessly first.** All of this is checkable before the user opens Obsidian, and a failure here would otherwise surface as an apparent plugin bug:
+**Verify headlessly first, and treat the result as a completion gate.** If the project uses the shipped validator, run `node scripts/dispatch/validate.mjs --device "<absolute device-config path>"`; without `--device` it checks the repository-only surface for later workflow gates. Do not report setup complete, and do not move on to the UI smoke test, while it or any equivalent check below is red or unrun:
 
 - every JSON file parses — `data.json`, `community-plugins.json`, the device config, and the hook config of each agent wired in step 7 (`.claude/settings.json`, `.codex/hooks.json`);
 - every chip `repo` alias resolves to a directory that exists on this device, and every `tool` a chip names is defined in the device config;
+- with multiple tools, every command chip has one stable intent, no explicit tool, no duplicate intent, and resolves through each selected tool's configured prefix (`/name` for Claude, `$name` for Codex);
 - for each note in the source folders: required properties present, the `status` value matches a configured column **exactly** (this is what the ⚠ panel flags), `version_target` present in `plannedVersions`, and each counter property (`open_questions`, `open_tests`, `open_findings`) either **empty** — nothing has counted it yet — or equal to the actual number of open items in its section; a `0` on a ticket whose section does not exist yet is the failure worth looking for, because it reads as a passed gate;
 - `milestones.completedProperty` is actually stamped by an automation rule, and matches the completion property in the ticket templates;
 - **no `<<PLACEHOLDER>>` survived** in the scaffolded workflow files or templates — `grep -r '<<' <workflow dir> <vault>/<templates>` must come back empty;
@@ -307,12 +317,14 @@ So board cards show launched → running ⇄ waiting → done and completed runs
 - **the invariants file and every chosen agent's pointer exist** (step 5) — `dispatch/invariants.md`, plus `CLAUDE.md` and/or `AGENTS.md`; and grepping a pointer file for a rule it should only be pointing at (the freeze, a gate counter) comes back empty;
 - **for Codex: hook trust has actually been granted** (step 7.5). Check `~/.codex/config.toml` for a `[hooks.state.…]` entry naming the repo's `.codex/hooks.json`. Its absence, with everything else correct, is exactly the state that looks like a broken plugin.
 
+Keep a checklist of these checks in the final report and mark each one pass/fail. A command not run is **incomplete**, never an implicit pass. The live smoke test below must then exercise every selected agent from the same generated command chip; needing to edit generated config first is a setup failure to record, not a successful setup.
+
 Then walk the user through the UI, verifying each:
 
 1. ↻ reload → Kanban shows the configured columns; ⚠ problems panel reviewed (fix malformed tickets now, not later).
 2. Drag a card one column → frontmatter updated + tracker moved (if step 6) + notice shown.
 3. Right-click a card → chip launches the agent in the right repo; badge lifecycle runs through; `## Dispatch runs` line appears on session exit, naming the agent that ran. **With more than one agent configured the chip asks which to run** — check that each button previews its own command, and run the cycle on each agent, not just the first.
-4. Milestones tab: versions grouped correctly, released columns link their notes, forecasts only on unreleased versions.
+4. Milestones tab: versions grouped correctly, released columns link their notes, forecasts only on unreleased versions. Test patch expansion only when at least two configured patches share a major/minor line; a one-patch line intentionally has no expand control.
 
 ## Known pitfalls (tell the user proactively when relevant)
 

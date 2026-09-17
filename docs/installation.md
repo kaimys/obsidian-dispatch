@@ -17,6 +17,8 @@ Integrating Dispatch into a project — boards, device config, chips, tracker sy
 
 Then say "set up Dispatch for this project" in your repo. The skill scans an existing vault (ticket folders, status vocabulary, frontmatter fill rates) and turns the interview into a confirmation of pre-filled suggestions — or scaffolds a [wiki structure](wiki-structure.md) if there isn't one yet, and proposes the [workflow skills](skills.md) for your code repo.
 
+The setup is complete only after its packaged validator and one live chip have passed for every selected agent. In a multi-agent setup, the skill creates one neutral chip per workflow intent and keeps the agent-specific `/` or `$` prefix in the device-local tool configuration, so the same menu entry can launch either agent.
+
 No Claude Code? The skill is a plain markdown checklist: `plugins/dispatch-setup/skills/dispatch-setup/SKILL.md`.
 
 ## The two configuration layers
@@ -107,7 +109,8 @@ With more than one tool configured, clicking a chip offers **one button per tool
 **Tool prompt prefix.** Agents invoke a workflow with different characters — Claude `/refine US42`, Codex `$refine US42`. Set the character once per tool rather than a prompt per chip:
 
 ```
-codex = $
+claude = /
+codex  = $
 ```
 
 A chip prompt that *starts* with `/` has that one character swapped for this tool. Prompts that are not commands — the column chips, which read "Work through these tickets…" — are never rewritten.
@@ -224,12 +227,12 @@ Missing keys fall back to the defaults in `src/settings.ts`, but writing the ful
     "participantsProperty": "participants",
     "actionsProperty": "open_actions",
     "templates": [
-      { "label": "Write meeting report", "tool": "claude", "repo": "my-app", "prompt": "/meeting report {{title}}" }
+      { "label": "Write meeting report", "intent": "meeting-report", "repo": "my-app", "prompt": "/meeting report {{title}}" }
     ],
     "calendarFilter": "",
     "calendarLookaheadDays": 14,
     "calendarChips": [
-      { "label": "Prepare agenda", "tool": "claude", "repo": "my-app", "prompt": "/meeting agenda {{date}} {{title}}" }
+      { "label": "Prepare agenda", "intent": "meeting-agenda", "repo": "my-app", "prompt": "/meeting agenda {{date}} {{title}}" }
     ]
   },
   "todos": {
@@ -241,11 +244,11 @@ Missing keys fall back to the defaults in `src/settings.ts`, but writing the ful
   "chips": {
     "defaultTool": "claude",
     "templates": [
-      { "label": "Start refinement", "tool": "claude", "repo": "my-app", "prompt": "/refine {{id}}" },
-      { "label": "Start development", "tool": "claude", "repo": "my-app", "prompt": "/develop {{id}}" }
+      { "label": "Start refinement", "intent": "refine", "repo": "my-app", "prompt": "/refine {{id}}" },
+      { "label": "Start development", "intent": "develop", "repo": "my-app", "prompt": "/develop {{id}}" }
     ],
     "columnTemplates": [
-      { "label": "Refine all tickets", "tool": "claude", "repo": "my-app", "prompt": "Work through these tickets sequentially with the full /refine workflow: {{ids}}." }
+      { "label": "Refine all tickets", "repo": "my-app", "prompt": "Work through these tickets sequentially with the full /refine workflow: {{ids}}." }
     ]
   }
 }
@@ -254,7 +257,7 @@ Missing keys fall back to the defaults in `src/settings.ts`, but writing the ful
 Where the stored shape differs from the settings UI:
 
 - **Columns are objects, not `value | Label | progress | WIP` strings.** `label` may be omitted (the `value` is then displayed), an omitted `wip` means no limit, and the UI's `-` progress becomes `"excluded": true` — *not* `"progress": "-"`.
-- **`chips.templates` and `chips.columnTemplates` are separate lists** — card chips vs. batch chips on a column header. Identical object shape (`label`, `tool`, `repo`, `prompt`); only the column prompts get `{{ids}}`, `{{status}}` and `{{count}}`.
+- **`chips.templates` and `chips.columnTemplates` are separate lists** — card chips vs. batch chips on a column header. Both use `label`, `repo` and `prompt`; command chips should also have a stable `intent`, while `tool` is optional and should be omitted when the same chip must offer every configured agent. Only column prompts get `{{ids}}`, `{{status}}` and `{{count}}`.
 - **Empty means off, and hides the tab.** `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` turns the forecast off, `board.orderProperty: ""` disables manual ordering, and an empty `assigneeProperty`/`questionsProperty`/`testsProperty`/`findingsProperty`/`discussionProperty` drops that badge.
 - **The forecast numbers are read as whole numbers when the plugin loads.** `milestones.velocityWindowDays` and `milestones.velocityMinimumCompletions` may be stored as numbers or numeric strings; fractions are rounded down. A value that is not a number or is below its floor (`1` day, `2` completions) is replaced by the default (`28`, `4`), which is what the settings tab then shows.
 - **`milestones.tags` is keyed by normalized `major.minor`** (`"1.2": "Beta"`), while `plannedVersions` holds the canonical *write* form (`"v1.2.0"`) — dropping a card writes that exact string.
@@ -268,9 +271,12 @@ Where the stored shape differs from the settings UI:
     "my-app": "C:\\Users\\me\\Workspace\\my-app"
   },
   "tools": {
-    "claude": { "command": "start \"Dispatch\" /d {{cwd}} cmd /k claude {{prompt}}" },
+    "claude": {
+      "command": "start \"Dispatch Claude\" /d {{cwd}} cmd /k claude {{prompt}}",
+      "promptPrefix": "/"
+    },
     "codex": {
-      "command": "start \"Dispatch\" /d {{cwd}} cmd /k codex {{prompt}}",
+      "command": "start \"Dispatch Codex\" /d {{cwd}} cmd /k codex {{prompt}}",
       "promptPrefix": "$",
       "prompts": { "refine": "$ticket-refine {{id}}" }
     }
@@ -281,7 +287,7 @@ Where the stored shape differs from the settings UI:
 }
 ```
 
-- **`tools` maps a name to an *object*, not to a string** — `{"claude": {"command": "…"}}`. A bare string is not a valid tool entry. `promptPrefix` and `prompts` are optional; a tool that omits both runs every chip's own prompt.
+- **`tools` maps a name to an *object*, not to a string** — `{"claude": {"command": "…"}}`. A bare string is not a valid tool entry. `promptPrefix` and `prompts` are optional in the schema; guided multi-agent setup writes an explicit prefix for each selected command-oriented agent so one neutral chip resolves correctly through every tool.
 - `repos` is the only place absolute paths may appear anywhere in Dispatch's configuration.
 - `enableHooks` gates automation **commands** on this machine; the `set` assignments of an automation rule always apply.
 
