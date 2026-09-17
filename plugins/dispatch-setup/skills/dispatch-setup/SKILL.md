@@ -310,7 +310,7 @@ So board cards show launched → running ⇄ waiting → done and completed runs
 - with multiple tools, every command chip has one stable intent, no explicit tool, no duplicate intent, and resolves through each selected tool's configured prefix (`/name` for Claude, `$name` for Codex);
 - for each note in the source folders: required properties present, the `status` value matches a configured column **exactly** (this is what the ⚠ panel flags), `version_target` present in `plannedVersions`, and each counter property (`open_questions`, `open_tests`, `open_findings`) either **empty** — nothing has counted it yet — or equal to the actual number of open items in its section; a `0` on a ticket whose section does not exist yet is the failure worth looking for, because it reads as a passed gate;
 - `milestones.completedProperty` is actually stamped by an automation rule, and matches the completion property in the ticket templates;
-- **no `<<PLACEHOLDER>>` survived** in the scaffolded workflow files or templates — `grep -r '<<' <workflow dir> <vault>/<templates>` must come back empty;
+- **no `<<PLACEHOLDER>>` survived** in the scaffolded workflow files or templates — `grep -rE '<<[A-Z][A-Z0-9_]*>>' <workflow dir> <vault>/<templates>` must come back empty;
 - every chip prompt names a command that exists in the repo;
 - **`.claude/settings.json` contains no absolute path** — the hook paths must still be the unexpanded project-directory variable (step 7.2). A drive letter or home directory in there is the single easiest way to commit one machine's layout to the whole team;
 - the run-state hook behaves (step 7.3);

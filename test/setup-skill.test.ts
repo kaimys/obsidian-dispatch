@@ -198,6 +198,22 @@ describe("dispatch-setup multi-agent contract", () => {
 		}
 	});
 
+	it("allows ordinary double-angle syntax while rejecting placeholder tokens", () => {
+		const f = fixture();
+		try {
+			write(join(f.repo, "CLAUDE.md"), "Example: git commit -F- <<'EOF'\n");
+			write(join(f.repo, "AGENTS.md"), "Bit shift: `x << 2`\n");
+
+			const result = run(f.repo, {
+				script: join(f.repo, "scripts", "dispatch", "validate.mjs"),
+			});
+			expect(result.status).toBe(0);
+			expect(result.output).toContain("Dispatch setup valid (project only)");
+		} finally {
+			rmSync(f.root, { recursive: true, force: true });
+		}
+	});
+
 	it("keeps the no-argument gate project-only even when a chip exports device settings", () => {
 		const f = fixture();
 		try {
@@ -236,6 +252,21 @@ describe("dispatch-setup multi-agent contract", () => {
 		} finally {
 			rmSync(f.root, { recursive: true, force: true });
 		}
+	});
+
+	it("can be imported when the process entry argument is not a file", () => {
+		const result = spawnSync(
+			process.execPath,
+			[
+				"--input-type=module",
+				"-e",
+				`await import(${JSON.stringify(pathToFileURL(validator).href)})`,
+				"not-a-file",
+			],
+			{ cwd: resolve("."), encoding: "utf8" }
+		);
+		expect(result.status).toBe(0);
+		expect(result.stdout + result.stderr).toBe("");
 	});
 
 	it("matches product prompt resolution and validates the resolved override stub", async () => {

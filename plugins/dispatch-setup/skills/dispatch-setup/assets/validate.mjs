@@ -36,7 +36,9 @@ function requirePath(path, errors) {
 
 function validatePlaceholders(paths, errors) {
 	for (const path of paths) {
-		if (readFileSync(path, "utf8").includes("<<")) errors.push(`unresolved placeholder in ${path}`);
+		if (/<<[A-Z][A-Z0-9_]*>>/.test(readFileSync(path, "utf8"))) {
+			errors.push(`unresolved placeholder in ${path}`);
+		}
 	}
 }
 
@@ -187,9 +189,16 @@ function option(name) {
 	return process.argv[index + 1];
 }
 
-const isMain =
-	process.argv[1] &&
-	realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+function sameFile(first, second) {
+	if (!first || !existsSync(first)) return false;
+	try {
+		return realpathSync(first) === realpathSync(second);
+	} catch {
+		return false;
+	}
+}
+
+const isMain = sameFile(process.argv[1], fileURLToPath(import.meta.url));
 if (isMain) {
 	try {
 		const device = option("--device");
