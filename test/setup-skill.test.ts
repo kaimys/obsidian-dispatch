@@ -4,16 +4,28 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
+import { resolvePrompt } from "../src/exec";
+import type { ChipTemplate, ToolConfig } from "../src/settings";
 
 const setup = resolve("plugins/dispatch-setup/skills/dispatch-setup");
 const validator = join(setup, "assets", "validate.mjs");
 const read = (path: string) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
+
+function example(sectionStart: string, sectionEnd: string): Record<string, unknown> {
+	const skill = read(join(setup, "SKILL.md"));
+	const section = skill.slice(skill.indexOf(sectionStart), skill.indexOf(sectionEnd));
+	const block = /```json\n([\s\S]*?)\n```/.exec(section)?.[1];
+	if (!block) throw new Error(`No JSON example in ${sectionStart}`);
+	return JSON.parse(block) as Record<string, unknown>;
+}
 
 function write(path: string, contents: string): void {
 	mkdirSync(resolve(path, ".."), { recursive: true });
@@ -30,7 +42,7 @@ function fixture(): {
 } {
 	const root = mkdtempSync(join(tmpdir(), "dispatch-setup-validator-"));
 	const repo = join(root, "repo");
-	const vault = join(root, "vault");
+	const vault = join(repo, "wiki");
 	const device = join(root, "device.json");
 	const shared = {
 		chips: {
@@ -39,21 +51,19 @@ function fixture(): {
 				{
 					label: "Start refinement",
 					intent: "refine",
-					repo: "app",
+					repo: "my-app",
 					prompt: "/refine {{id}}",
 				},
 			],
 		},
 		meetings: { templates: [], calendarChips: [] },
 	};
-	const local = {
-		repos: { app: repo, wiki: vault },
-		tools: {
-			claude: { command: "claude {{prompt}}", promptPrefix: "/" },
-			codex: { command: "codex {{prompt}}", promptPrefix: "$" },
-		},
-		confirmBeforeRun: true,
+	const local = example("## 3 ·", "## 4 ·") as {
+		repos: Record<string, string>;
+		tools: Record<string, ToolConfig>;
+		confirmBeforeRun: boolean;
 	};
+	local.repos["my-app"] = repo;
 
 	write(join(repo, "dispatch", "invariants.md"), "# Invariants\n");
 	write(join(repo, "dispatch", "workflow", "refine.md"), "# Refine\nnode scripts/dispatch/validate.mjs\n");
@@ -71,16 +81,23 @@ function fixture(): {
 	return { root, repo, vault, device, shared, local };
 }
 
-function run(repo: string, device: string): { status: number | null; output: string } {
-	const result = spawnSync(process.execPath, [validator, "--device", device], {
+function run(
+	repo: string,
+	options: { device?: string; vault?: string; script?: string; env?: NodeJS.ProcessEnv } = {}
+): { status: number | null; output: string } {
+	const args = [options.script ?? validator];
+	if (options.device) args.push("--device", options.device);
+	if (options.vault) args.push("--vault", options.vault);
+	const result = spawnSync(process.execPath, args, {
 		cwd: repo,
 		encoding: "utf8",
+		env: { ...process.env, ...options.env },
 	});
 	return { status: result.status, output: result.stdout + result.stderr };
 }
 
 describe("dispatch-setup multi-agent contract", () => {
-	it("shows one neutral shared chip and explicit prefixes for both agents", () => {
+	it("resolves the skill's neutral-chip examples for both agents", () => {
 		const skill = read(join(setup, "SKILL.md"));
 		const shared = skill.slice(skill.indexOf("## 2 ·"), skill.indexOf("## 3 ·"));
 		const local = skill.slice(skill.indexOf("## 3 ·"), skill.indexOf("## 4 ·"));
@@ -89,6 +106,17 @@ describe("dispatch-setup multi-agent contract", () => {
 		expect(local).toContain('"promptPrefix": "/"');
 		expect(local).toContain('"promptPrefix": "$"');
 		expect(skill).toContain("A command not run is **incomplete**");
+
+		const sharedConfig = example("## 2 ·", "## 3 ·") as {
+			chips: { templates: ChipTemplate[] };
+		};
+		const localConfig = example("## 3 ·", "## 4 ·") as {
+			tools: Record<string, ToolConfig>;
+		};
+		const chip = sharedConfig.chips.templates.find((item) => item.intent === "refine");
+		expect(chip).toBeDefined();
+		expect(resolvePrompt(chip!, "claude", localConfig.tools)).toBe("/refine {{id}}");
+		expect(resolvePrompt(chip!, "codex", localConfig.tools)).toBe("$refine {{id}}");
 	});
 
 	it("packages a portable validator and no assumed backend release sequence", () => {
@@ -101,7 +129,7 @@ describe("dispatch-setup multi-agent contract", () => {
 	it("accepts a complete two-agent scaffold", () => {
 		const f = fixture();
 		try {
-			const result = run(f.repo, f.device);
+			const result = run(f.repo, { device: f.device, vault: f.vault });
 			expect(result.output).toContain("Dispatch setup valid (project + device)");
 			expect(result.status).toBe(0);
 		} finally {
@@ -122,7 +150,7 @@ describe("dispatch-setup multi-agent contract", () => {
 				label: "refine (Codex)",
 				intent: "refine",
 				tool: "codex",
-				repo: "app",
+				repo: "my-app",
 				prompt: "$refine {{id}}",
 			});
 			write(
@@ -131,7 +159,13 @@ describe("dispatch-setup multi-agent contract", () => {
 			);
 			rmSync(join(f.repo, "scripts", "dispatch", "validate.mjs"));
 
-			const result = run(f.repo, f.device);
+			write(join(f.repo, "dispatch", "workflow", "refine.md"), "# Refine\n");
+			write(
+				join(f.repo, "dispatch", "invariants.md"),
+				"# Invariants\nnode scripts/dispatch/validate.mjs\n"
+			);
+
+			const result = run(f.repo, { device: f.device, vault: f.vault });
 			expect(result.status).toBe(1);
 			expect(result.output).toContain('tool codex needs promptPrefix "$"');
 			expect(result.output).toContain("multi-agent command chip refine (Codex) must omit tool");
@@ -153,12 +187,84 @@ describe("dispatch-setup multi-agent contract", () => {
 				"Read <<WORKFLOW>>\n"
 			);
 
-			const result = run(f.repo, f.device);
+			const result = run(f.repo, { device: f.device, vault: f.vault });
 			expect(result.status).toBe(1);
 			expect(result.output).toContain("multi-agent setup needs confirmBeforeRun true");
 			expect(result.output).toContain(
 				"unresolved placeholder in " + join(f.repo, ".codex", "skills", "refine", "SKILL.md")
 			);
+		} finally {
+			rmSync(f.root, { recursive: true, force: true });
+		}
+	});
+
+	it("keeps the no-argument gate project-only even when a chip exports device settings", () => {
+		const f = fixture();
+		try {
+			const local = f.local as {
+				tools: { claude: { promptPrefix: string } };
+				confirmBeforeRun: boolean;
+			};
+			local.tools.claude.promptPrefix = "wrong";
+			local.confirmBeforeRun = false;
+			write(f.device, JSON.stringify(local));
+
+			const result = run(f.repo, {
+				script: join(f.repo, "scripts", "dispatch", "validate.mjs"),
+				env: { DISPATCH_LOCAL_SETTINGS: f.device },
+			});
+			expect(result.status).toBe(0);
+			expect(result.output).toContain("Dispatch setup valid (project only)");
+		} finally {
+			rmSync(f.root, { recursive: true, force: true });
+		}
+	});
+
+	it("runs through a linked repository path instead of exiting silently", () => {
+		const f = fixture();
+		try {
+			const linkedRepo = join(f.root, "repo-link");
+			symlinkSync(f.repo, linkedRepo, process.platform === "win32" ? "junction" : "dir");
+			rmSync(join(f.repo, "dispatch", "invariants.md"));
+
+			const result = run(linkedRepo, {
+				script: join(linkedRepo, "scripts", "dispatch", "validate.mjs"),
+			});
+			expect(result.status).toBe(1);
+			expect(result.output).toContain("Dispatch setup validation failed");
+			expect(result.output).toContain("invariants.md");
+		} finally {
+			rmSync(f.root, { recursive: true, force: true });
+		}
+	});
+
+	it("matches product prompt resolution and validates the resolved override stub", async () => {
+		const f = fixture();
+		try {
+			const module = (await import(pathToFileURL(validator).href)) as {
+				resolveToolPrompt: (
+					chip: ChipTemplate,
+					tool: string,
+					tools: Record<string, ToolConfig>
+				) => string;
+			};
+			const chip = (f.shared as { chips: { templates: ChipTemplate[] } }).chips.templates[0];
+			const local = f.local as { tools: Record<string, ToolConfig> };
+			local.tools.codex.prompts = { refine: "$ticket-refine {{id}}" };
+			write(f.device, JSON.stringify(local));
+			rmSync(join(f.repo, ".codex", "skills", "refine"), { recursive: true, force: true });
+			write(
+				join(f.repo, ".codex", "skills", "ticket-refine", "SKILL.md"),
+				"Read dispatch/workflow/refine.md\n"
+			);
+
+			for (const tool of Object.keys(local.tools)) {
+				expect(module.resolveToolPrompt(chip, tool, local.tools)).toBe(
+					resolvePrompt(chip, tool, local.tools)
+				);
+			}
+			const result = run(f.repo, { device: f.device, vault: f.vault });
+			expect(result.status).toBe(0);
 		} finally {
 			rmSync(f.root, { recursive: true, force: true });
 		}

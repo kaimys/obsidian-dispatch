@@ -10,7 +10,7 @@ Tracker: <<TRACKER>>. Chat: <<CHAT>>. If either is `none`, skip only that integr
 
 Releases one version. `<ARGS>` is the target version (e.g. `v1.4.0`); without it, use the next planned version from the Release Plan.
 
-**The project's recorded release order is load-bearing.** Follow its documented build, migration, promotion and publication sequence, preserving the reasons it gives. If setup found no release policy, stop before changing versions, production, tags or publications and ask the requester; never invent backend, mirror or deployment steps for a project that did not name them.
+**The project's recorded release order is load-bearing.** Follow its documented build, migration, promotion and publication sequence, preserving the reasons it gives. If the project has no recorded release policy, stop before changing versions, production, tags or publications and ask the requester; never invent backend, mirror or deployment steps for a project that did not name them.
 
 ## Scope the release
 
