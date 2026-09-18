@@ -5,7 +5,7 @@
 | | |
 | --- | --- |
 | **Obsidian** | Desktop, 1.7.2 or newer. Chips and automations spawn local processes, so there is no mobile version. |
-| **A coding agent CLI** | On your PATH — [Claude Code](https://claude.com/claude-code), Codex, or whichever one you point a [tool command](#tool-commands) at. The boards render without one; the chips have nothing to launch. |
+| **A coding agent CLI** | On your PATH — [Claude Code](https://claude.com/claude-code), [Codex](https://learn.chatgpt.com/docs/codex/cli), or whichever one you point a [tool command](#tool-commands) at. The boards render without one; the chips have nothing to launch. |
 | **Node.js 18 or newer** | On your PATH, for the [run lifecycle](#run-lifecycle) hooks and any [automation](#automations) you wire up. The plugin itself never shells out to it — it runs inside Obsidian. |
 
 Node is the only thing Dispatch asks of your repository, and it asks for the runtime alone: the scripts it ships are dependency-free ESM, so there is no `package.json`, no lockfile, no `node_modules` and no build step. Adopting Dispatch does not turn a Python or Rust repository into a JavaScript one.
