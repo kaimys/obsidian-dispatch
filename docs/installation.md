@@ -1,6 +1,18 @@
 # Installation & configuration
 
-Desktop only — chips and automations spawn local processes.
+## Requirements
+
+| | |
+| --- | --- |
+| **Obsidian** | Desktop, 1.7.2 or newer. Chips and automations spawn local processes, so there is no mobile version. |
+| **A coding agent CLI** | On your PATH — [Claude Code](https://claude.com/claude-code), Codex, or whichever one you point a [tool command](#tool-commands) at. The boards render without one; the chips have nothing to launch. |
+| **Node.js 18 or newer** | On your PATH, for the [run lifecycle](#run-lifecycle) hooks and any [automation](#automations) you wire up. The plugin itself never shells out to it — it runs inside Obsidian. |
+
+Node is the only thing Dispatch asks of your repository, and it asks for the runtime alone: the scripts it ships are dependency-free ESM, so there is no `package.json`, no lockfile, no `node_modules` and no build step. Adopting Dispatch does not turn a Python or Rust repository into a JavaScript one.
+
+The 18 floor comes from the optional [Meet transcript import](#the-google-block--optional-meet-transcript-import), which uses the global `fetch`. `run-state.mjs` and a typical automation script use nothing newer than the built-in `fs` and `child_process` modules and run on far older versions — one floor for all of them is simpler to state than three.
+
+Anything past this is your project's choice rather than Dispatch's. This repository's own tracker sync shells out to `gh`; a project tracking work in Asana or Jira writes a different script with a different dependency, and Dispatch neither ships nor configures it.
 
 ## Install
 

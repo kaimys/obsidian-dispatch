@@ -31,6 +31,22 @@ Under the hood, two primitives: **boards** (kanban views driven by note properti
 
 New to the idea? Read [Overview](docs/overview.md), then [Wiki structure](docs/wiki-structure.md).
 
+## Requirements
+
+- **Obsidian on desktop**, 1.7.2 or newer. Chips and automations spawn local processes, so there
+  is no mobile version.
+- **A coding agent CLI** on your PATH — [Claude Code CLI](https://claude.com/claude-code), [Codex](https://learn.chatgpt.com/docs/codex/cli), or whichever one you point a tool command at. Without one the boards still render; the chips have
+  nothing to launch.
+- **[Node.js](https://nodejs.org) 18 or newer**, on your PATH. The run-lifecycle hooks that put
+  run badges on cards and the run log back into the note are small Node scripts, as are board
+  automations. The board itself does not need it.
+
+Node is the only thing Dispatch asks of your repository, and it asks for the runtime alone: the
+scripts are dependency-free ESM, so there is no `package.json`, no lockfile, no `node_modules` and
+no build step — a Python or Rust repository does not become a JavaScript project by adopting
+Dispatch. Anything beyond that is your project's own choice rather than Dispatch's; this
+repository's tracker sync happens to call `gh`, another project's would call something else.
+
 ## Quick start
 
 **1. Install.** Open *Settings → Community plugins → Browse*, search for **Dispatch**, install
