@@ -28,6 +28,6 @@ Runs refinement for one ticket. `<ARGS>` is the ticket id.
 
 ## Close
 
-11. **Refinement ends when the user says so**, not when the questions run out. Then acceptance criteria are final and testable, `open_questions: 0`, and `version_target:` is set. Leave the ticket in `<<S_REFINEMENT>>`; do not move it merely because you answered the questions. The human may explicitly authorize a move to the optional `<<S_READY_DEV>>` queue, or invoke development directly. **`size:` is not a gate** — set it when known; a missing value means weight 1.
+11. **Refinement ends when the user says so**, not when the questions run out. Then acceptance criteria are final and testable, `open_questions: 0`, and `version_target:` is set. If refinement opened no question at all, record an explicit "none, because …" in `## Open questions` before writing that `0` — the counter claims a count was taken, and on such a ticket nothing else in the spec says one was. Leave the ticket in `<<S_REFINEMENT>>`; do not move it merely because you answered the questions. The human may explicitly authorize a move to the optional `<<S_READY_DEV>>` queue, or invoke development directly. **`size:` is not a gate** — set it when known; a missing value means weight 1.
 12. If the ticket is non-trivial, suggest `/implementation-plan <ARGS>` before development.
 13. **Stop instead of guessing** when a question needs a product decision, has no owner, or touches something safety- or legally-critical. Leave the status where a human will see it and say what you're waiting on.

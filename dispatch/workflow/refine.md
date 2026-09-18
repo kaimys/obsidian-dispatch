@@ -24,6 +24,6 @@ Runs refinement for one ticket. `<ARGS>` is the ticket id.
 
 ## Close
 
-11. **Refinement ends when the user says so**, not when the questions run out. Then: acceptance criteria final and testable, `open_questions: 0`, `version_target:` set. The ticket stays in `Refinement` — `open_questions: 0` is what marks it buildable, and `/develop` is what moves it. **`size:` is not a gate** — it is a numeric weight for progress and the velocity forecast, and a missing value already means 1. Set it when it is known; never hold a refined ticket for it.
+11. **Refinement ends when the user says so**, not when the questions run out. Then: acceptance criteria final and testable, `open_questions: 0`, `version_target:` set. If refinement opened no question at all, record an explicit "none, because …" in `## Open questions` before writing that `0` — the counter claims a count was taken, and on such a ticket nothing else in the spec says one was. The ticket stays in `Refinement` — `open_questions: 0` is what marks it buildable, and `/develop` is what moves it. **`size:` is not a gate** — it is a numeric weight for progress and the velocity forecast, and a missing value already means 1. Set it when it is known; never hold a refined ticket for it.
 12. If the ticket is non-trivial, suggest `/implementation-plan <ARGS>` before development.
 13. **Stop instead of guessing** when a question needs a product decision, has no owner, or touches something safety- or legally-critical. Leave the status where a human will see it and say what you're waiting on.

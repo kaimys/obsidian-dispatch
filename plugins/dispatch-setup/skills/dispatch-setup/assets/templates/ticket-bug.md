@@ -8,7 +8,7 @@ version_target:
 size:
 assignee:
 owner:
-open_questions: 0
+open_questions:
 open_tests:
 open_findings:
 discussion:
@@ -58,7 +58,8 @@ frozen:
 
 ## Open questions
 
-<!-- GUIDE: `- [ ]` per question; keep `open_questions:` equal to the unanswered count. -->
+<!-- GUIDE: `- [ ]` per question; keep `open_questions:` equal to the unanswered count. Leave it
+     empty until you have counted: a 0 needs a stated reason here, such as "none, because …". -->
 
 ## Acceptance criteria
 

@@ -8,7 +8,7 @@ version_target:
 size:
 assignee:
 owner:
-open_questions: 0
+open_questions:
 open_tests:
 open_findings:
 discussion:
@@ -27,6 +27,7 @@ frozen:
   assignee        @-badge on the card.
   owner           the accountable person for this page — a person, never a team.
   open_questions  unanswered items in ## Open questions. The `? N` badge — 0 is the gate out of refinement.
+                  Empty until someone has counted; 0 only where that section records the count — including a stated "none, because …".
   open_tests      unticked items in ## Test plan. The `✓ N` badge — 0 is the gate out of review.
                   Empty until the test plan is written: empty is no statement, 0 claims every item is ticked.
   open_findings   blocking findings in the latest ## Code review. The `⚠ N` badge — 0 is the gate into review.
@@ -69,7 +70,8 @@ frozen:
 
 <!-- GUIDE: `- [ ]` per question. Record each answer inline with who decided and when —
      the answer is the durable artifact, the thread is not. Keep `open_questions:` equal
-     to the number still unanswered. -->
+     to the number still unanswered, and leave it empty until you have counted: a 0 needs
+     a stated reason here, such as "none, because …". -->
 
 ## Acceptance criteria
 

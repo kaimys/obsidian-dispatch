@@ -89,6 +89,15 @@ describe("shipped workflow inventory", () => {
 			...inventory.map((f) => join(commands, f)), ...markdownFiles("dispatch/workflow").map((f) => join("dispatch/workflow", f))];
 		for (const path of paths) expect(read(path), path).not.toMatch(/[/\$]promote\b/);
 	});
+
+	// A gated 0 is an earned count, so the rule has to travel with every instruction that writes one.
+	it("keeps the earned-zero rule beside every instruction that writes open_questions", () => {
+		const writers = [
+			...["create-ticket.md", "fix-bug.md", "update-ticket.md", "refine.md"].map((f) => join(commands, f)),
+			...["create-ticket.md", "update-ticket.md", "refine.md"].map((f) => join("dispatch/workflow", f)),
+		];
+		for (const path of writers) expect(read(path), path).toMatch(/none, because/);
+	});
 });
 
 interface SetupFixture {
@@ -123,6 +132,7 @@ describe("starter substitution contract", () => {
 				const fm = frontmatter(rendered.get(join(templates, file))!);
 				expect(fm.status).toBe(fixture.values.S_NEW);
 				expect(fm).toHaveProperty(fixture.milestones.completedProperty, null);
+				expect(fm.open_questions).toBeNull();
 				expect(fm.open_tests).toBeNull();
 				expect(fm.open_findings).toBeNull();
 			}

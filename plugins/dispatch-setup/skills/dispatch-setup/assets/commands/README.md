@@ -93,7 +93,7 @@ Invariants every command inherits — the [freeze rule](https://github.com/kaimy
 
 - **`<!-- GUIDE: … -->`** in a template is scaffolding — strip it from any section you fill, leave it on sections you don't.
 - **`%% … %%`** in a ticket is a *human's* inline comment — feedback for `/update-ticket` to fold in and then delete. Never use it for machine scaffolding, or the two become indistinguishable.
-- **Counters are gates.** `open_questions: 0` leaves refinement; `open_findings: 0` *enters* review (the code review runs before the freeze); `open_tests: 0` leaves it. All three are frontmatter, so the gate is a badge on the card rather than a memory. A counter describes the current build: the latest writer overwrites, unset is not 0, and a command that invalidates a count clears it rather than writing 0.
+- **Counters are gates.** `open_questions: 0` leaves refinement; `open_findings: 0` *enters* review (the code review runs before the freeze); `open_tests: 0` leaves it. All three are frontmatter, so the gate is a badge on the card rather than a memory. A counter describes the current build: the latest writer overwrites, unset is not 0, and a command that invalidates a count clears it rather than writing 0. A `0` is a recorded count, never a default — the section it counts has to show the count, including an explicit "none, because …".
 - **A command that can't proceed stops and says why**, with the status left where a human will see it. Plowing through an ambiguous ticket produces work someone has to unpick.
 
 ## Updating an existing setup

@@ -32,9 +32,11 @@ integration is an error, not `none`. With no chat, ask the requester directly.
    requester/source and team directory. Fill symptom, reproduction, environment,
    known root cause or what is unknown, scope, criteria, source links and actual
    questions; start in `<<S_NEW>>`. Set `open_questions: <number of questions you
-   drafted>` — whatever the template seeds, leaving it in place claims a decided
-   ticket and passes the development precondition on undecided questions. Leave
-   `open_tests` and `open_findings` empty.
+   drafted>` — a defaulted or carried-over value claims a decided ticket and passes
+   the development precondition on undecided questions. Drafting none is still a
+   count, but only if you say so: record an explicit "none, because …" in
+   `## Open questions` and then write `0`; with no such line leave `open_questions`
+   empty as well. Leave `open_tests` and `open_findings` empty.
    Set the target version when established by the project/report; do not guess it.
    Create the matching tracker task when configured and store its reference.
    Register the note in the wiki's index/log. Retain source evidence and remove
