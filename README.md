@@ -1,3 +1,6 @@
+[![CI](https://github.com/kaimys/obsidian-dispatch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kaimys/obsidian-dispatch/actions/workflows/ci.yml?query=branch%3Amain)
+[![Release](https://github.com/kaimys/obsidian-dispatch/actions/workflows/release.yml/badge.svg)](https://github.com/kaimys/obsidian-dispatch/actions/workflows/release.yml)
+
 ![Dispatch](docs/assets/Dispatch-Logo-OCR.png)
 
 *"Obsidian is the IDE; the LLM is the programmer; the wiki is the codebase."*\
