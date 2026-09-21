@@ -1,3 +1,4 @@
+[![Obsidian](https://img.shields.io/badge/Obsidian-1.7.2+-purple?logo=obsidian)](https://community.obsidian.md/plugins/dispatch)
 [![CI](https://github.com/kaimys/obsidian-dispatch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kaimys/obsidian-dispatch/actions/workflows/ci.yml?query=branch%3Amain)
 [![Release](https://github.com/kaimys/obsidian-dispatch/actions/workflows/release.yml/badge.svg)](https://github.com/kaimys/obsidian-dispatch/actions/workflows/release.yml)
 
