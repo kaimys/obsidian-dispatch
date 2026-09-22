@@ -200,9 +200,10 @@ describe("progress and forecast", () => {
 	});
 
 	it("gives a card excluded from progress no weight at all", () => {
-		// The mechanism the archival columns ride on (US00040's `Released`,
-		// and `Rejected` before it): an excluded card must neither pull the
-		// bar down nor push it up, however large and however far along it is.
+		// What `excluded` means, and why `Released` deliberately is not it
+		// (US00040): an excluded card leaves the denominator as well as the
+		// numerator, so on a card at 100 % it is subtractive. Right for
+		// `Rejected` — not part of the version — and wrong for a shipped one.
 		const line = tickets().filter((c) => versionKey(c.version) === "1.4");
 		const archived = { ...card("US00008"), size: 99, progress: 100, excludedFromProgress: true };
 		expect(milestonePercent([...line, archived])).toBe(milestonePercent(line));

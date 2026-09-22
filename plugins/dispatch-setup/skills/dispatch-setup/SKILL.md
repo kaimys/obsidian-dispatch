@@ -137,7 +137,7 @@ Write the **full** settings object — missing keys fall back to defaults, but a
       { "value": "Refinement", "progress": 30, "wip": 4 },
       { "value": "Development", "progress": 70, "wip": 3 },
       { "value": "Done", "progress": 100 },
-      { "value": "Released", "excluded": true },
+      { "value": "Released", "progress": 100 },
       { "value": "Rejected", "excluded": true }
     ],
     "titleProperty": "id",

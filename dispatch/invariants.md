@@ -77,9 +77,15 @@ Obsidian writes a plugin's `data.json` beside its `main.js`, so two vaults linke
 checkout silently share one board's configuration ([[ADR-0026]]).
 
 - **Tickets** `wiki/05_Requirements/Tickets` — columns
-  `Backlog → Refinement → In progress → Review → Done → Released`, plus `Rejected`. `Released` and
-  `Rejected` are both excluded from progress; `Done` keeps `progress: 100` and the `completed:`
-  stamp, so the forecast measures throughput rather than release cadence. **`Done` and `Released`
+  `Backlog → Refinement → In progress → Review → Done → Released`, plus `Rejected` (excluded from
+  progress). **`Done` and `Released` both carry `progress: 100`, and only `Done` stamps
+  `completed:`** — so the forecast measures throughput rather than release cadence. `Released` is
+  *not* excluded, and the distinction is load-bearing: `excluded` means *not part of this version*
+  (`Rejected`), which drops the card from the progress bar's denominator as well as its numerator.
+  On a finished card that is subtractive — shipping a ticket would make its line read *less*
+  complete. It buys nothing in exchange, because a card at `progress: 100` already contributes zero
+  remaining weight to the release estimate (`src/board.ts:546`), which is the only thing the
+  exclusion was ever wanted for. **`Done` and `Released`
   are not the same claim**: `Done` is the human's drag once a test plan is signed off, `Released`
   is what `/release` writes once a version carrying the ticket has actually shipped.
   Templates in `wiki/00_Start-Here/Templates`.

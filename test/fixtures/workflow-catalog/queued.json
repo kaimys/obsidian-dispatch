@@ -56,7 +56,7 @@
       },
       {
         "value": "Shipped",
-        "progress": 0
+        "progress": 100
       },
       {
         "value": "Rejected",
