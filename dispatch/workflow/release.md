@@ -25,13 +25,27 @@ Releases one version. `<ARGS>` is the target version (e.g. `v1.4.0`); without it
 
 ## Cut it
 
-6. Bump the version in the project's manifest(s), consistently — one source of truth, everything else derived. **In this repo that is more than one file, and they must stay in step**: `manifest.json` + `versions.json` (the plugin, via `npm version`), and — when the setup skill changed — `plugins/dispatch-setup/.claude-plugin/plugin.json` *and* `plugins/dispatch-setup/.codex-plugin/plugin.json`, which are two manifests for one plugin and must never disagree. Check the pair before tagging: a Codex user installing `dispatch-setup@dispatch` gets the version the `.codex-plugin` manifest states, whatever the Claude one says.
+6. **Bump the version — on the branch being released, before it merges.** That is `develop` for a minor or major, the fix branch for a patch (see *Patch release*). Use `npm version <patch|minor|major> --no-git-tag-version` and commit the result yourself (`chore(release): <version>`): the tag belongs on `main`'s tip *after* the merge (step 9), and `npm version`'s own tag would land it on the branch that produced the bump — the wrong commit the moment that merge is not a fast-forward. Keep the project's manifest(s) consistent — one source of truth, everything else derived. **In this repo that is more than one file, and they must stay in step**: `manifest.json` + `versions.json` (the plugin, via `npm version`), and — when the setup skill changed — `plugins/dispatch-setup/.claude-plugin/plugin.json` *and* `plugins/dispatch-setup/.codex-plugin/plugin.json`, which are two manifests for one plugin and must never disagree. Check the pair before tagging: a Codex user installing `dispatch-setup@dispatch` gets the version the `.codex-plugin` manifest states, whatever the Claude one says.
 7. **Write the release note** `wiki/08_Delivery_and QA/Releases/<version>.md` from `wiki/00_Start-Here/Templates/release-note.md`: `version:` and `date:` frontmatter exactly as the template shows — **the Release Plan tab parses these**, and a malformed one silently drops the release from the board. Contents: what shipped as **links to the tickets** (they carry the detail — don't restate it), build metadata, and what deliberately did not make it.
 8. **Write the `## GitHub release body` section** into the same note — mandatory, and the only part written for people outside the team. Everything else in the note links into the vault; **the vault is git-ignored**, so a `[[wikilink]]` or a `wiki/…` path pasted into GitHub is dead text or a 404. Inside a ```` fenced block (so it copies verbatim), translate every reference to an absolute GitHub URL: a ticket becomes its `discussion:` issue (`https://github.com/kaimys/obsidian-dispatch/issues/<n>`), a past release becomes `…/releases/tag/<version>`, a commit becomes `…/commit/<sha>`, a repo doc becomes `…/blob/<tag>/docs/<file>.md` — and an **ADR becomes prose**, because ADRs are not published. Write full URLs rather than bare `#5`. End with `**Full changelog:** …/compare/<previous>...<this>`. Never paste the internal note into GitHub instead.
-9. Build, tag and publish per the project's process.
+9. **Merge into `main`, then tag it.** A person runs this — no bot, no auto-merge, no protected-branch rule:
+
+   ```bash
+   git checkout main && git pull --ff-only
+   git merge --no-ff develop && git push
+   git tag <version> && git push origin <version>
+   ```
+
+   **The order is the load-bearing part.** `.github/workflows/release.yml` triggers on *any* tag push with no branch filter, and builds the draft from the tagged tree — so a tag cut before the merge builds something that is not what `main` will hold, and the release artifacts describe a tree nobody can check out at that tag. `main` is the branch someone can install; it moves here and nowhere else.
+10. Merge `main` back into `develop` whenever step 9 produced a commit `develop` does not already have (a `--no-ff` merge commit, or a patch released off `main` since). Skip it and the next ticket branches from a base that is behind the release it just shipped.
+11. Build and publish per the project's process — the tag push has already drafted the GitHub release (ADR-0018).
+
+## Patch release
+
+A patch never routes through `develop`. It branches a fix branch **directly from `main`**, follows the same *Prove it* and *Cut it* steps (the bump happens on that fix branch), and merges **directly back into `main`**, skipping step 9's `develop` merge; `main`'s new tip is then tagged exactly as above. `develop` needs no freeze for the duration — it is not touched at all. What it does need is step 10: merge `main` into `develop` once the patch has landed, or the fix is missing from the next minor version.
 
 ## Land it
 
-10. **Promote the shipped tickets:** status → `Done`, and **stamp `completed: <today>` yourself** on each one. Dispatch's automations run on a board *drag*; frontmatter you write directly does not trigger them, so a promotion done here leaves `completed:` empty and the velocity forecast starves. Close the matching GitHub issue too (`gh issue close --reason completed`, or let the next drag do it). Anything deferred gets its `version_target` moved forward — not silently dropped.
-11. Announce in none with a link to the release note.
-12. Report: version, ticket count, anything deferred and why. Hand the user the `## GitHub release body` block to paste, with the link to the draft — publishing stays manual (ADR-0018).
+12. **Promote the shipped tickets:** status → `Released`, not `Done`. `Done` is the human's manual drag when a test plan is signed off, and it is what stamps `completed:` and feeds the velocity forecast — so do **not** stamp `completed:` here; a ticket reaching a release without it never went through that drag, which is a board problem to raise, not a date to invent. What this step must replicate is the other half a drag would fire: `Released` is the status that closes the tracker issue, so close it yourself (`gh issue close --reason completed`, or let the next drag do it) — frontmatter an agent writes triggers no automation. Anything deferred gets its `version_target` moved forward — not silently dropped.
+13. Announce in none with a link to the release note.
+14. Report: version, ticket count, anything deferred and why. Hand the user the `## GitHub release body` block to paste, with the link to the draft — publishing stays manual (ADR-0018).

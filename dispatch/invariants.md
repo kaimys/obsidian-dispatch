@@ -77,7 +77,11 @@ Obsidian writes a plugin's `data.json` beside its `main.js`, so two vaults linke
 checkout silently share one board's configuration ([[ADR-0026]]).
 
 - **Tickets** `wiki/05_Requirements/Tickets` — columns
-  `Backlog → Refinement → In progress → Review → Done`, plus `Rejected` (excluded from progress).
+  `Backlog → Refinement → In progress → Review → Done → Released`, plus `Rejected`. `Released` and
+  `Rejected` are both excluded from progress; `Done` keeps `progress: 100` and the `completed:`
+  stamp, so the forecast measures throughput rather than release cadence. **`Done` and `Released`
+  are not the same claim**: `Done` is the human's drag once a test plan is signed off, `Released`
+  is what `/release` writes once a version carrying the ticket has actually shipped.
   Templates in `wiki/00_Start-Here/Templates`.
 - **Ticket ids** are 5 digits behind a prefix matching `type:` — `US` story, `BUG` bug,
   `SEC` security — and **each prefix numbers independently** (`SEC00001` exists while `US` is
@@ -93,8 +97,9 @@ checkout silently share one board's configuration ([[ADR-0026]]).
   `plugins/dispatch-setup/skills/dispatch-setup/assets/commands/` is a *different artifact* — the
   seed a fresh project is scaffolded from — and is deliberately not governed by this rule.
 - **Tracker** GitHub Issues. A ticket links to its issue through `discussion:`;
-  `scripts/dispatch/move-ticket.mjs` reads that property on drag. Only `Done`/`Rejected` have a
-  GitHub counterpart (close/close-not-planned) — the rest just mean "open". The same script
+  `scripts/dispatch/move-ticket.mjs` reads that property on drag. Only `Released`/`Rejected` have a
+  GitHub counterpart (close/close-not-planned) — the rest, `Done` included, just mean "open",
+  because closed on GitHub means shipped. The same script
   mirrors `version_target` onto the issue as a **GitHub milestone** of the same name, creating
   it on first use: per patch version (not per major.minor line, so one board column can span
   several milestones), never with a due date, and an empty `version_target` skips the step
@@ -105,8 +110,11 @@ checkout silently share one board's configuration ([[ADR-0026]]).
 ### Workflow invariants
 
 - **Board automations fire on a board drag, not on frontmatter an agent writes.** A command that
-  sets `status: Done` itself must also stamp `completed:` and update the GitHub issue, or the
-  velocity forecast and the tracker silently drift.
+  writes a status directly must replicate what that destination's drag would have fired — and only
+  that piece: `Done` stamps `completed:` (the velocity forecast starves without it), `Released`
+  updates the GitHub issue (the tracker drifts without it). Replicating the wrong half is its own
+  bug: `completed:` invented at release time dates the forecast from the release rather than from
+  the work.
 - **The ticket freeze.** Once a ticket leaves `In progress`, its contract zone (goal/symptom,
   acceptance criteria, open questions, scope, implementation plan) is read-only; stamp `frozen:`.
   New information goes to the record zone as a dated entry; a wrong frozen statement gets an
@@ -147,10 +155,20 @@ checkout silently share one board's configuration ([[ADR-0026]]).
 
 ## Releasing
 
-Bump with `npm version patch|minor|major` (updates manifest.json + versions.json
-via version-bump.mjs), push the tag — `.github/workflows/release.yml` builds and
-drafts a GitHub release with `main.js`, `manifest.json`, `styles.css`. Publishing
-the draft stays manual (ADR-0018).
+**Two long-lived branches.** `develop` carries everything for the next minor version and is what
+`/develop` cuts from and merges back into; `main` only moves when a version ships, so it is always
+the code someone can install. `main` stays GitHub's default branch. A **patch** bypasses `develop`
+entirely — its fix branch is cut from `main` and merges back into `main`, so `develop` never needs
+freezing — and `main` is merged back into `develop` afterwards, or the fix is missing from the next
+minor version.
+
+Bump on the branch being released, **before** it merges (`npm version patch|minor|major
+--no-git-tag-version` updates manifest.json + versions.json via version-bump.mjs; commit it
+yourself). Merge into `main`, then tag `main`'s new tip and push the tag — in that order:
+`.github/workflows/release.yml` triggers on any tag push with no branch filter and builds the draft
+from the tagged tree, so a tag cut before the merge describes a tree `main` never held. It drafts a
+GitHub release with `main.js`, `manifest.json`, `styles.css`. Publishing the draft stays manual
+(ADR-0018).
 
 - **Every release note carries a `## GitHub release body` section**, fenced so it copies
   verbatim. The wiki is git-ignored, so that block may contain **no `[[wikilink]]` and no
