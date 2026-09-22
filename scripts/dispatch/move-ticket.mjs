@@ -15,9 +15,15 @@
  * Mapping. GitHub issues have no columns, only state, so only the two ends of
  * the pipeline have a tracker counterpart:
  *
- *   Done      -> close (completed)
+ *   Released  -> close (completed)
  *   Rejected  -> close (not planned)
  *   anything  -> reopen if the issue is closed, otherwise nothing to do
+ *   (incl. Done)
+ *
+ * `Done` deliberately falls through to "still open". On this board `Done` means
+ * the test plan is signed off, `Released` means a version carrying the ticket
+ * actually shipped — and "done" on GitHub means the latter. `Done` keeps the
+ * `completed:` stamp and the progress weight; only `Released` closes the issue.
  *
  * A ticket is linked to its issue through the `discussion:` frontmatter
  * property (the board's discussionProperty) holding the issue URL. A ticket
@@ -213,7 +219,7 @@ function detail(err) {
 
 /** What the destination column means on GitHub. Null = no counterpart. */
 function plan(to) {
-	if (to === "Done") {
+	if (to === "Released") {
 		return {
 			state: "CLOSED",
 			done: "closed as completed",
@@ -227,7 +233,7 @@ function plan(to) {
 			argv: ["issue", "close", "--reason", "not planned"],
 		};
 	}
-	// Backlog / Refinement / In progress / Review all mean "still open".
+	// Backlog / Refinement / In progress / Review / Done all mean "still open".
 	return { state: "OPEN", done: "reopened", argv: ["issue", "reopen"] };
 }
 

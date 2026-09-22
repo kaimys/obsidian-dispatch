@@ -199,6 +199,16 @@ describe("progress and forecast", () => {
 		expect(milestonePercent([])).toBeNull();
 	});
 
+	it("gives a card excluded from progress no weight at all", () => {
+		// The mechanism the archival columns ride on (US00040's `Released`,
+		// and `Rejected` before it): an excluded card must neither pull the
+		// bar down nor push it up, however large and however far along it is.
+		const line = tickets().filter((c) => versionKey(c.version) === "1.4");
+		const archived = { ...card("US00008"), size: 99, progress: 100, excludedFromProgress: true };
+		expect(milestonePercent([...line, archived])).toBe(milestonePercent(line));
+		expect(milestonePercent([archived])).toBeNull();
+	});
+
 	/**
 	 * Four completions that forecast under the default policy. The fail-closed
 	 * cases change one input of this set, so their null can only come from the
