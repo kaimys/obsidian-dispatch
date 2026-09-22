@@ -66,7 +66,7 @@ The authoritative schema — every field, every default — is `src/settings.ts`
 | `code-review.md` | `id` | ticket, diff, current build, tests | dated findings in the ticket; open_findings | Independent session; blocking findings prevent test-plan |
 | `test-plan.md` | `id` | code-complete ticket, green gates, clean review | manual checks; open_tests; frozen contract | Enters review after verified preconditions; human completes remaining checks |
 | `fix-bug.md` | `report` | report, duplicates, affected code | bug ticket, small fix, actual verification and completion record | Explicit shortcut only; stops when full workflow or a human check is needed |
-| `release.md` | `version` | version scope, verified tickets, project release policy | release note, version/build; completed tickets + tracker | Explicit release request and readiness gates; publishing follows project policy |
+| `release.md` | `version` | version scope, verified tickets, project release policy | release note, version/build; released tickets + tracker | Explicit release request and readiness gates; publishing follows project policy |
 | `meeting.md` | `agenda or report` | board, or transcript and discussion | meeting note; decisions folded into tickets | Agenda before; report requires transcript; no invented decisions |
 
 <!-- shipped-workflows:end -->
@@ -137,6 +137,7 @@ Write the **full** settings object — missing keys fall back to defaults, but a
       { "value": "Refinement", "progress": 30, "wip": 4 },
       { "value": "Development", "progress": 70, "wip": 3 },
       { "value": "Done", "progress": 100 },
+      { "value": "Released", "excluded": true },
       { "value": "Rejected", "excluded": true }
     ],
     "titleProperty": "id",

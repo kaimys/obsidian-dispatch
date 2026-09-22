@@ -1,5 +1,5 @@
 ---
-description: Ship a version — test pass, bump, release note generated from the board, tag, complete the shipped tickets, announce.
+description: Ship a version — test pass, bump, release note generated from the board, tag, promote the shipped tickets, announce.
 argument-hint: [version]
 ---
 
@@ -35,6 +35,6 @@ Releases one version. `<ARGS>` is the target version (e.g. `v1.4.0`); without it
 
 ## Land it
 
-9. **Complete the shipped tickets:** write status → `<<S_DONE>>` and stamp `<<P_COMPLETED>>: <today>` yourself, then mirror the tracker. Preserve the original completion date on tickets already completed by `/fix-bug`. Board automations fire on a drag, never on frontmatter an agent writes. A tracker failure is a reported partial synchronization failure; retain the record and retry that operation on the existing issue, not a new ticket. Anything deferred gets its `version_target` moved forward — not silently dropped.
+9. **Promote the shipped tickets:** write status → `<<S_RELEASED>>`, then mirror the tracker. Do **not** stamp `<<P_COMPLETED>>` here and never overwrite one already there — completion belongs to `<<S_DONE>>`, which the team reaches on its own (including via `/fix-bug`), and a date invented at release time dates the forecast from the release rather than from the work. Board automations fire on a drag, never on frontmatter an agent writes, so whatever the `<<S_RELEASED>>` drag would have mirrored is this step's job to do by hand. A tracker failure is a reported partial synchronization failure; retain the record and retry that operation on the existing issue, not a new ticket. Anything deferred gets its `version_target` moved forward — not silently dropped.
 10. Announce in <<CHAT>> with a link to the release note.
 11. Report: version, ticket count, anything deferred and why.

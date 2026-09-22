@@ -11,6 +11,7 @@
     "S_REFINEMENT": "Refinement",
     "S_REVIEW": "Review",
     "S_DONE": "Done",
+    "S_RELEASED": "Shipped",
     "WIKI": "C:\\Team Vaults\\Demo $& vault",
     "TRACKER": "the fixture issue store through node tracker.mjs",
     "CHAT": "the fixture discussion store",
@@ -52,6 +53,10 @@
       {
         "value": "Done",
         "progress": 100
+      },
+      {
+        "value": "Shipped",
+        "progress": 0
       },
       {
         "value": "Rejected",

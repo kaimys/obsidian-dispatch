@@ -29,6 +29,7 @@ Every project-specific value is a `<<PLACEHOLDER>>` token. Replace all of them, 
 | `<<S_DEV>>` | being implemented | `Development` |
 | `<<S_REVIEW>>` | code-complete, awaiting manual review | `Ready for Review` |
 | `<<S_DONE>>` | completion status, also used by the small-bug shortcut | `Done` |
+| `<<S_RELEASED>>` | shipped in a release — archival, excluded from progress, and the only status `/release` promotes to | `Released` |
 | `<<P_COMPLETED>>` | completion-date property; must match `milestones.completedProperty` and the drag automation | `completed` |
 
 **If there is no tracker or no chat**, substitute `none`. Every workflow explicitly skips that integration's lookups, writes and missing-side preconditions while continuing wiki work. Questions go to the requester when chat is absent. A configured service being unavailable is a reported failure, not `none`.
@@ -47,8 +48,9 @@ Every project-specific value is a `<<PLACEHOLDER>>` token. Replace all of them, 
 | `<<S_DEV>>` | In progress | Development |
 | `<<S_REVIEW>>` | Review | Review |
 | `<<S_DONE>>` | Done | Done |
+| `<<S_RELEASED>>` | Released | Shipped |
 
-The queued board can additionally contain `Awaiting build` and `Ready for delivery`, entered by the team's humans or automations. No extra workflow token is needed; configure their order, progress and actors in the board. Do not describe a delivery queue as completed just to reuse `S_DONE`.
+The queued board can additionally contain `Awaiting build` and `Ready for delivery`, entered by the team's humans or automations. No extra workflow token is needed; configure their order, progress and actors in the board. Do not describe a delivery queue as completed just to reuse `S_DONE`. `<<S_DONE>>` and `<<S_RELEASED>>` are two claims, not one: completion is the team's, a release is the product's. Keep the completion automation and the progress weight on `<<S_DONE>>`, so the forecast measures throughput rather than release cadence, and exclude `<<S_RELEASED>>` from progress. If the project genuinely ships on completion, map both tokens to the same column and say so — do not drop the distinction silently.
 
 ### Never substitute a person
 
@@ -76,7 +78,7 @@ A name hardcoded in prose merely goes stale when someone joins or leaves. A name
 | `code-review.md` | `id` | ticket, diff, current build, tests | dated findings in the ticket; open_findings | Independent session; blocking findings prevent test-plan |
 | `test-plan.md` | `id` | code-complete ticket, green gates, clean review | manual checks; open_tests; frozen contract | Enters review after verified preconditions; human completes remaining checks |
 | `fix-bug.md` | `report` | report, duplicates, affected code | bug ticket, small fix, actual verification and completion record | Explicit shortcut only; stops when full workflow or a human check is needed |
-| `release.md` | `version` | version scope, verified tickets, project release policy | release note, version/build; completed tickets + tracker | Explicit release request and readiness gates; publishing follows project policy |
+| `release.md` | `version` | version scope, verified tickets, project release policy | release note, version/build; released tickets + tracker | Explicit release request and readiness gates; publishing follows project policy |
 | `meeting.md` | `agenda or report` | board, or transcript and discussion | meeting note; decisions folded into tickets | Agenda before; report requires transcript; no invented decisions |
 
 <!-- shipped-workflows:end -->
