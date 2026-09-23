@@ -34,6 +34,7 @@ The same cards, grouped by **target version** instead of status. Dragging a card
 
 - **Version columns are keyed by `major.minor`**, so `v1.2.0`, `1.2.0` and `1.2.1` all land in the same `1.2` column. Inconsistent formatting in your notes doesn't split a milestone.
 - **Planned versions are always shown**, even when empty — that's how you plan a release before any ticket is assigned to it. Non-version planned values ("Icebox") become special columns on the left.
+- **A drop writes one convention.** Dropping a card on a version line writes that line's highest known patch as `vMAJOR.MINOR.PATCH` — `v1.2.3` if any card or planned entry already targets it, `v1.2.0` if none names a patch — whether the column was planned or appeared from the cards. A card dropped back on its own line keeps whatever it had.
 - **An (archive) column** on the far left collects cards excluded from progress (Rejected) and completed work with no version, keeping *(no version)* a clean pool of unscheduled open work.
 - **Each version carries a progress bar**: `Σ(size × status progress) / Σ(size)`. Status progress is a number you assign per column (e.g. Development = 55, Done = 100, Rejected = excluded); size is a numeric property, defaulting to 1 when missing.
 - **Each version can carry a tag** — "MVP", "Closed Beta" — edited by clicking the chip in the header.
