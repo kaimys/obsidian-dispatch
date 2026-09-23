@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { buildCard } from "../src/cards";
 import type { CardData, FileRef } from "../src/cards";
+import { buildLineColumns, buildPatchColumns } from "../src/milestones";
 import { RANK_GAP, planStatusDrop, planVersionDrop, ruleSetsFor } from "../src/moves";
 import { CARD_SETTINGS, loadVault } from "./harness";
 
@@ -207,5 +208,36 @@ describe("planVersionDrop", () => {
 		// a write where none is needed.
 		const patch = planVersionDrop(c("v1.4.1"), { key: "1.4.1", writeValue: "v1.4.1" }, VERSION);
 		expect(patch?.set).toEqual({ version_target: "v1.4.1" });
+	});
+
+	describe("onto columns built from the board (ADR-0036)", () => {
+		const board = ["0.4", "v0.4.2", "V0.4.1", "v0.3.0"];
+		const column = (key: string) => {
+			const col = buildLineColumns(["v0.4.0"], board, ["v0.4.0", ...board]).find((k) => k.key === key);
+			if (!col) throw new Error(`no column ${key}`);
+			return col;
+		};
+
+		it("writes a discovered-and-planned line's highest patch for a card from another line", () => {
+			expect(planVersionDrop(c("v0.3.0"), column("0.4"), VERSION)?.set).toEqual({
+				version_target: "v0.4.2",
+			});
+		});
+
+		it("leaves an older or noncanonical value alone when dropped back on its own line", () => {
+			expect(planVersionDrop(c("V0.4.1"), column("0.4"), VERSION)).toBeNull();
+			expect(planVersionDrop(c("0.4"), column("0.4"), VERSION)).toBeNull();
+		});
+
+		it("writes an explicit older patch when dropped on that expanded patch column", () => {
+			const [bare, older] = buildPatchColumns(column("0.4"), ["0.4", "0.4.1", "0.4.2"]);
+			expect(planVersionDrop(c("v0.3.0"), older, VERSION)?.set).toEqual({ version_target: "v0.4.1" });
+			expect(planVersionDrop(c("v0.3.0"), bare, VERSION)?.set).toEqual({ version_target: "v0.4.0" });
+		});
+
+		it("unsets the property when a versioned card goes to (no version)", () => {
+			const patch = planVersionDrop(c("v0.4.2"), { key: "", writeValue: "" }, VERSION);
+			expect(patch?.unset).toEqual([VERSION]);
+		});
 	});
 });
