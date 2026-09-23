@@ -61,7 +61,7 @@ Scripts Dispatch ships — currently the Meet transcript import — keep their s
 
 ### The Dispatch folder in your repository
 
-Everything Dispatch adds to a code repository sits in one folder, `dispatch/`: the workflow files (`workflow/`), the repo-side scripts (`scripts/`), the shared project invariants (`invariants.md`), project-level settings (`settings.yaml`, which holds your tracker repository) and `wiki`, a git-ignored link to the vault. It is committed and shared like the rest of the repository, so it never holds an absolute path, a secret or device state; those stay in `~/.dispatch/`. The page templates stay in the vault, where Obsidian's Templates plugin can read them.
+Everything Dispatch adds to a code repository sits in one folder, `dispatch/`: the workflow files (`workflow/`), the repo-side scripts (`scripts/`), the shared project invariants (`invariants.md`) and `wiki`, a git-ignored link to the vault. The folder also has room for project-level settings in `settings.yaml`; this repository keeps its tracker repository there, but the setup skill does not create the file yet and still writes the tracker into each workflow. It is committed and shared like the rest of the repository, so it never holds an absolute path, a secret or device state; those stay in `~/.dispatch/`. The page templates stay in the vault, where Obsidian's Templates plugin can read them.
 
 **Set up before v0.3.0?** Your project keeps its older layout (`scripts/dispatch/`, a root `wiki` link), and it keeps working after a plugin update: the plugin reads no path from your repository. Re-running the setup skill migrates it.
 
