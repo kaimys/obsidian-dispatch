@@ -18,8 +18,11 @@
  * and a root `wiki/` lookup in the same files, to `dispatch/wiki/`; and an
  * automation command in the vault's `data.json` that names an old path, leaving
  * every other byte of that file alone. A root `wiki` is removed only when it is
- * a link, never a real folder. It refuses, changing nothing, when a file exists
- * at both its old and new path with different contents.
+ * a link, never a real folder, and only once `dispatch/wiki` exists or is about
+ * to — a project is never left with neither. Without --vault, the vault is taken
+ * from the old root link; with neither, the migration warns that the link must
+ * be created by hand. It refuses, changing nothing, when a file exists at both
+ * its old and new path with different contents.
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -90,6 +93,17 @@ export function rewrite(text, { vault = "", rootWiki = false } = {}) {
 	return out;
 }
 
+/**
+ * Whether `path` lies outside `root`. Compares resolved prefixes rather than
+ * `path.relative`, which returns a bare `D:\…` for a vault on another drive.
+ */
+export function isOutside(root, path) {
+	const fold = (p) => (process.platform === "win32" ? resolve(p).toLowerCase() : resolve(p));
+	const base = fold(root);
+	const target = fold(path);
+	return target !== base && !target.startsWith(base.endsWith(sep) ? base : base + sep);
+}
+
 function sameContents(a, b) {
 	return readFileSync(a).equals(readFileSync(b));
 }
@@ -97,9 +111,10 @@ function sameContents(a, b) {
 /** Every action the migration would take, and every conflict that forbids it. */
 export function planMigration(repoRoot, vaultRoot = "") {
 	const root = resolve(repoRoot);
-	const vault = vaultRoot ? resolve(vaultRoot) : "";
+	let vault = vaultRoot ? resolve(vaultRoot) : "";
 	const actions = [];
 	const conflicts = [];
+	const warnings = [];
 
 	const moves = [];
 	const oldScripts = join(root, OLD_SCRIPTS);
@@ -126,7 +141,9 @@ export function planMigration(repoRoot, vaultRoot = "") {
 	const rootWikiPath = join(root, "wiki");
 	const rootWikiIsLink = isLink(rootWikiPath);
 	const rootWiki = rootWikiIsLink || !existsSync(rootWikiPath);
-	const vaultOutside = vault && relative(root, vault).startsWith("..");
+	// Without --vault, the old root link already says where the vault is.
+	if (!vault && rootWikiIsLink && existsSync(rootWikiPath)) vault = realpathSync(rootWikiPath);
+	const vaultOutside = Boolean(vault) && isOutside(root, vault);
 	for (const path of textFiles(root)) {
 		const text = readFileSync(path, "utf8");
 		const next = rewrite(text, { vault: vaultOutside ? vault : "", rootWiki });
@@ -134,11 +151,21 @@ export function planMigration(repoRoot, vaultRoot = "") {
 	}
 
 	const link = join(root, LINK);
-	if (vaultOutside && !existsSync(link) && !isLink(link)) actions.push({ kind: "link", path: link, target: vault });
+	const linkResolves = existsSync(link);
+	const linkPlanned = vaultOutside && !linkResolves && !isLink(link);
+	if (linkPlanned) actions.push({ kind: "link", path: link, target: vault });
 	const gitignore = join(root, ".gitignore");
 	const ignored = existsSync(gitignore) ? readFileSync(gitignore, "utf8").split(/\r?\n/) : [];
 	if (vaultOutside && !ignored.includes("/dispatch/wiki")) actions.push({ kind: "ignore", path: gitignore });
-	if (rootWikiIsLink) actions.push({ kind: "unlink", path: rootWikiPath });
+	// The old link goes only once the new one is certain: a project is never left with neither.
+	if (rootWikiIsLink && (linkPlanned || linkResolves)) actions.push({ kind: "unlink", path: rootWikiPath });
+	if (!linkPlanned && !linkResolves) {
+		warnings.push(
+			vault && !vaultOutside
+				? `the vault ${vault} is inside the repository, so no dispatch/wiki link is created`
+				: "no dispatch/wiki link can be created: pass --vault <path> so the workflows can reach the vault"
+		);
+	}
 
 	if (vault) {
 		const dataPath = join(vault, ".obsidian", "plugins", "dispatch", "data.json");
@@ -160,7 +187,7 @@ export function planMigration(repoRoot, vaultRoot = "") {
 		}
 	}
 
-	return { root, actions, conflicts };
+	return { root, actions, conflicts, warnings };
 }
 
 export function describeAction(action, root) {
@@ -264,6 +291,7 @@ export function main(args = process.argv.slice(2)) {
 		process.stdout.write("Refusing to migrate: resolve the conflicts above first. Nothing was changed.\n");
 		return 1;
 	}
+	for (const warning of plan.warnings) process.stdout.write(`warning: ${warning}\n`);
 	if (plan.actions.length === 0) {
 		process.stdout.write("Already on the dispatch/ layout: nothing to migrate.\n");
 		return 0;

@@ -26,7 +26,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { planMigration } from "../plugins/dispatch-setup/skills/dispatch-setup/assets/migrate-layout.mjs";
+import { isOutside, planMigration } from "../plugins/dispatch-setup/skills/dispatch-setup/assets/migrate-layout.mjs";
 
 const assets = resolve("plugins/dispatch-setup/skills/dispatch-setup/assets");
 const migrator = join(assets, "migrate-layout.mjs");
@@ -100,8 +100,10 @@ function snapshot(dir: string): Record<string, string> {
 	return out;
 }
 
+/** Runs the migration; `vault: ""` leaves `--vault` out, as its usage allows. */
 function migrate(f: { repo: string; vault: string }, ...extra: string[]): { status: number | null; output: string } {
-	const result = spawnSync(process.execPath, [migrator, "--repo", f.repo, "--vault", f.vault, ...extra], {
+	const vault = f.vault ? ["--vault", f.vault] : [];
+	const result = spawnSync(process.execPath, [migrator, "--repo", f.repo, ...vault, ...extra], {
 		encoding: "utf8",
 	});
 	return { status: result.status, output: result.stdout + result.stderr };
@@ -201,5 +203,51 @@ describe("migrate-layout — US00033", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	/**
+	 * Review finding 1 (2026-09-23): without --vault the root link was removed and
+	 * no dispatch/wiki created, leaving the project with no way to its vault.
+	 */
+	it("takes the vault from the root link when --vault is left out", () => {
+		const f = fixture();
+		try {
+			const result = migrate({ repo: f.repo, vault: "" }, "--apply");
+			expect(result.status).toBe(0);
+			expect(result.output).not.toContain("warning:");
+			expect(realpathSync(join(f.repo, "dispatch", "wiki"))).toBe(realpathSync(f.vault));
+			expect(existsSync(join(f.repo, "wiki"))).toBe(false);
+			expect(readFileSync(join(f.vault, ".obsidian", "plugins", "dispatch", "data.json"), "utf8")).toContain(
+				"node dispatch/scripts/move-ticket.mjs"
+			);
+			expect(readFileSync(join(f.repo, "dispatch", "workflow", "refine.md"), "utf8")).not.toContain(f.vault);
+		} finally {
+			rmSync(f.root, { recursive: true, force: true });
+		}
+	});
+
+	it("keeps any link it cannot replace, and says the vault link is missing", () => {
+		const root = mkdtempSync(join(tmpdir(), "migrate-layout-novault-"));
+		try {
+			const repo = join(root, "repo");
+			write(join(repo, "scripts", "dispatch", "run-state.mjs"), "// hook\n");
+			write(join(repo, "dispatch", "workflow", "refine.md"), "grep `wiki/05_Requirements`\n");
+			const plan = planMigration(repo) as { actions: Array<{ kind: string }>; warnings: string[] };
+			expect(plan.actions.map((action) => action.kind)).not.toContain("unlink");
+			expect(plan.warnings).toEqual([
+				"no dispatch/wiki link can be created: pass --vault <path> so the workflows can reach the vault",
+			]);
+			const result = migrate({ repo, vault: "" });
+			expect(result.output).toContain("warning: no dispatch/wiki link can be created");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it.runIf(process.platform === "win32")("treats a vault on another drive as outside the repository", () => {
+		expect(isOutside("C:\\repo", "D:\\Vault")).toBe(true);
+		expect(isOutside("C:\\repo", "C:\\repo-vault")).toBe(true);
+		expect(isOutside("C:\\repo", "C:\\repo\\wiki")).toBe(false);
+		expect(isOutside("C:\\Repo", "c:\\repo")).toBe(false);
 	});
 });
