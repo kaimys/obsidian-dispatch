@@ -4,18 +4,18 @@
  *
  * Usage
  * -----
- *   node scripts/dispatch/meet-fetch.mjs --auth
+ *   node dispatch/scripts/meet-fetch.mjs --auth
  *       One-time consent. Opens a loopback OAuth flow and stores the refresh
  *       token in the vault's device file. Every later run is non-interactive.
  *
- *   node scripts/dispatch/meet-fetch.mjs --title "<meeting title>" \
+ *   node dispatch/scripts/meet-fetch.mjs --title "<meeting title>" \
  *        --date YYYY-MM-DD --dir <folder>
  *       Finds the meeting's document by date + title, renders it as Markdown
  *       and writes it into <folder>. Prints one line per outcome. `--date` may
  *       carry a time (`YYYY-MM-DD HH:MM`) to separate two runs of the same
  *       meeting on one day.
  *
- *   node scripts/dispatch/meet-fetch.mjs --list [--date YYYY-MM-DD]
+ *   node dispatch/scripts/meet-fetch.mjs --list [--date YYYY-MM-DD]
  *       Show what the calendar feed holds — each event's date, start time,
  *       title, and the document attached to it. Use it when a fetch reports no
  *       match. Needs no Google credentials.
@@ -599,7 +599,7 @@ async function tokenRequest(params) {
  * does not run — which is how a dead token became a dead end on 2026-09-02.
  */
 function authCommand(path) {
-	return `node scripts/dispatch/meet-fetch.mjs --config "${path}" --auth`;
+	return `node dispatch/scripts/meet-fetch.mjs --config "${path}" --auth`;
 }
 
 /** An access token from the stored refresh token. The normal path. */

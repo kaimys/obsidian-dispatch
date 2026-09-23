@@ -6,7 +6,7 @@
 					{
 						"type": "command",
 						"command": "node",
-						"args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "running"]
+						"args": ["${CLAUDE_PROJECT_DIR}/dispatch/scripts/run-state.mjs", "running"]
 					}
 				]
 			}
@@ -17,7 +17,7 @@
 					{
 						"type": "command",
 						"command": "node",
-						"args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "running"]
+						"args": ["${CLAUDE_PROJECT_DIR}/dispatch/scripts/run-state.mjs", "running"]
 					}
 				]
 			}
@@ -28,7 +28,7 @@
 					{
 						"type": "command",
 						"command": "node",
-						"args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "waiting"]
+						"args": ["${CLAUDE_PROJECT_DIR}/dispatch/scripts/run-state.mjs", "waiting"]
 					}
 				]
 			}
@@ -39,7 +39,7 @@
 					{
 						"type": "command",
 						"command": "node",
-						"args": ["${CLAUDE_PROJECT_DIR}/scripts/dispatch/run-state.mjs", "done"]
+						"args": ["${CLAUDE_PROJECT_DIR}/dispatch/scripts/run-state.mjs", "done"]
 					}
 				]
 			}

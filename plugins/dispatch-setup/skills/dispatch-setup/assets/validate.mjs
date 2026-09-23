@@ -2,7 +2,7 @@
 /**
  * Portable validation gate for a repository scaffolded by dispatch-setup.
  *
- * Copy to scripts/dispatch/validate.mjs. With no arguments it verifies the
+ * Copy to dispatch/scripts/validate.mjs. With no arguments it verifies the
  * committed project surface. During setup pass both --device <path> and
  * --vault <path> to verify the device and vault configuration too.
  */
@@ -79,14 +79,19 @@ export function validateSetup(repoRoot, deviceFile = "", vaultRoot = "") {
 	const projectMarkdown = [invariants, ...workflowFiles, ...pointers, ...agentFiles].filter(existsSync);
 
 	requirePath(invariants, errors);
-	requirePath(join(root, "scripts", "dispatch", "run-state.mjs"), errors);
+	const runState = join(root, "dispatch", "scripts", "run-state.mjs");
+	if (!existsSync(runState) && existsSync(join(root, "scripts", "dispatch", "run-state.mjs"))) {
+		errors.push(`old layout (scripts/dispatch/) in ${root} — re-run dispatch-setup to migrate it`);
+	} else {
+		requirePath(runState, errors);
+	}
 	validatePlaceholders(projectMarkdown, errors);
 
 	for (const path of [join(root, ".claude", "settings.json"), join(root, ".codex", "hooks.json")]) {
 		if (existsSync(path)) readJson(path, errors);
 	}
-	const gate = join(root, "scripts", "dispatch", "validate.mjs");
-	if (projectMarkdown.some((path) => readFileSync(path, "utf8").includes("node scripts/dispatch/validate.mjs"))) {
+	const gate = join(root, "dispatch", "scripts", "validate.mjs");
+	if (projectMarkdown.some((path) => readFileSync(path, "utf8").includes("node dispatch/scripts/validate.mjs"))) {
 		requirePath(gate, errors);
 	}
 

@@ -1,3 +1,6 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
 	buildReport,
@@ -15,9 +18,10 @@ import {
 	parseMarkdownPaths,
 	parseUnresolved,
 	parseUnresolvedSources,
+	readInputs,
 	templateProperties,
 	validateVaultPaths,
-} from "../scripts/dispatch/lint-vault.mjs";
+} from "../dispatch/scripts/lint-vault.mjs";
 
 const propertyReference = `
 ## Page types and their properties
@@ -246,11 +250,20 @@ describe("vault lint orchestration", () => {
 	});
 
 	it("requires the vault and validates output format", () => {
-		expect(parseArgs(["--vault", "Dispatch-Wiki"])).toEqual({ vault: "Dispatch-Wiki", wiki: "wiki", format: "text" });
+		expect(parseArgs(["--vault", "Dispatch-Wiki"])).toEqual({ vault: "Dispatch-Wiki", wiki: "dispatch/wiki", format: "text" });
 		expect(parseArgs(["--vault", "Other", "--wiki", "vault", "--format", "json"])).toEqual({
 			vault: "Other", wiki: "vault", format: "json",
 		});
 		expect(() => parseArgs([])).toThrow("Usage");
 		expect(() => parseArgs(["--vault", "X", "--format", "xml"])).toThrow("text or json");
+	});
+});
+
+describe("the vault link — US00033", () => {
+	it("names the missing link instead of a missing rulebook", () => {
+		const wiki = join(mkdtempSync(join(tmpdir(), "lint-vault-")), "dispatch", "wiki");
+		expect(() => readInputs(wiki, "Dispatch-Wiki")).toThrow(
+			`vault link ${wiki} not found — create it (see dispatch/invariants.md)`
+		);
 	});
 });

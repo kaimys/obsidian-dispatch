@@ -14,7 +14,7 @@ local.json
 .DS_Store
 Thumbs.db
 
-# the wiki, symlinked in — the vault itself lives outside this repo
-wiki
+# the wiki, linked in as dispatch/wiki — the vault itself lives outside this repo
+/dispatch/wiki
 # device-local Codex preferences (sandbox/approval policy) — never shared
 .codex/config.toml

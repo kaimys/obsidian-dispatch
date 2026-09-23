@@ -27,7 +27,7 @@ import {
 	scanFetched,
 	splitWhen,
 	titlesMatch,
-} from "../scripts/dispatch/meet-fetch.mjs";
+} from "../dispatch/scripts/meet-fetch.mjs";
 
 const DRIVE_NAME = "Einführung in Dispatch - 2026/09/01 14:28 CEST - Notes by Gemini";
 const DISK_NAME = "Einführung in Dispatch - 2026_09_01 14_28 CEST - Notes by Gemini";

@@ -30,6 +30,13 @@ The authoritative schema — every field, every default — is `src/settings.ts`
    Requires Restricted mode to be off; that switch is the user's to flip, never flip it for them silently.
 2. Locate the **project repo(s)** the user's tickets refer to, their **issue tracker** (Asana/Jira/Linear/none), and their **agent CLI** (Claude Code, Codex, other).
 3. Desktop only: chips and automations spawn local processes — confirm the user runs Obsidian on desktop.
+4. **Check the repo's layout before writing anything into it.** Everything Dispatch adds to a repository lives in one folder, `dispatch/` — `workflow/`, `scripts/`, `invariants.md`, `settings.yaml` and the git-ignored vault link `wiki` — so a repository either visibly has a setup or does not. A project set up by an older version of this skill has its scripts in `scripts/dispatch/` (and a tracker script at `scripts/move-ticket.mjs`), and may reach its vault through an absolute path or a root `wiki` link. **Never scaffold the new layout beside the old one**: two copies of `run-state.mjs` drift, and the hooks keep calling the old one. Instead, run this skill's migration without applying anything:
+
+   ```bash
+   node <this skill>/assets/migrate-layout.mjs --repo "<repo>" --vault "<vault>"
+   ```
+
+   It prints every move and rewrite it would make, and nothing when the repository is already on the new layout. **Show the user that list and ask once.** On a yes, run it again with `--apply`, then the validator (step 8). On a no, leave the repository untouched, and say that the project keeps working on its old layout: the plugin reads no path from it. If the migration rewrote `.codex/hooks.json`, the Codex hooks are un-trusted from that moment (step 7.5).
 
 ## 1 · Interview (keep it short, confirm with examples from their vault)
 
@@ -51,7 +58,7 @@ The authoritative schema — every field, every default — is `src/settings.ts`
 - Which properties exist / should exist: `assignee`, `size`, `open_questions`, `open_tests`, `open_findings`, `discussion` (thread URL)? Required properties for the problems panel (typically `id, status, updated`)?
 - Meetings folder (optional third tab)?
 - Grep a few real ticket notes to validate every answer against reality — inconsistent value formats (e.g. `v1.2.0` vs `1.2.0`) are normal; Dispatch normalizes versions by major.minor, but statuses must match exactly.
-- Which commands prove the code repository is valid? Use its real build/lint/test commands for `<<GATES>>`. If this is a fresh repository with no gate, copy this skill's `assets/validate.mjs` to `scripts/dispatch/validate.mjs` and use `node scripts/dispatch/validate.mjs` — never name a gate file you did not create and run.
+- Which commands prove the code repository is valid? Use its real build/lint/test commands for `<<GATES>>`. If this is a fresh repository with no gate, copy this skill's `assets/validate.mjs` to `dispatch/scripts/validate.mjs` and use `node dispatch/scripts/validate.mjs` — never name a gate file you did not create and run.
 - **Last step — propose workflow skills for the CODE repo (the glue).** Chips only carry `/command {{id}}` one-liners; the actual workflow logic must live **in the user's code repository** — not the wiki — so it versions with the code, travels through git to every teammate, and is reviewable like code. Scaffold the shipped catalog below and adapt its vocabulary to their lifecycle, each skill pre-wired to a chip:
 
 <!-- shipped-workflows:start -->
@@ -70,6 +77,8 @@ The authoritative schema — every field, every default — is `src/settings.ts`
 | `meeting.md` | `agenda or report` | board, or transcript and discussion | meeting note; decisions folded into tickets | Agenda before; report requires transcript; no invented decisions |
 
 <!-- shipped-workflows:end -->
+
+**Link the vault first.** Workflows reach the vault through `dispatch/wiki`, a git-ignored link from the repository root to the vault: `New-Item -ItemType Junction -Path dispatch\wiki -Target "<vault>"` on Windows, `ln -s "<vault>" dispatch/wiki` elsewhere, and `/dispatch/wiki` in `.gitignore`. Substitute `dispatch/wiki` for `<<WIKI>>` — never the vault's absolute path, which would tie every workflow to this machine. Each teammate creates the link once in their own checkout.
 
 **Scaffold from `assets/commands/`**, not from memory. Read its README for the adaptation contract and complete placeholder vocabulary, including `P_COMPLETED`. Copy each body into `dispatch/workflow/<name>.md` and substitute the values. Retain its description for stub metadata. `<ARGS>` is a runtime argument, not an installation token; the agent stub supplies it explicitly. No canonical body relies on Claude expanding `$ARGUMENTS`.
 
@@ -275,16 +284,16 @@ Write these, adapted to their vocabulary:
 
 Add an automation rule in `data.json` so drags push to the tracker:
 ```json
-{ "when": [], "set": {}, "repo": "<alias>", "command": "node scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
+{ "when": [], "set": {}, "repo": "<alias>", "command": "node dispatch/scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
 ```
-Scaffold `scripts/move-ticket.mjs` in their repo: map status → tracker column/section ID, find the task by the ticket-ID naming convention, move it via the tracker's API (token from env/.env — never hardcode), print ONE line (it becomes the Obsidian notice). Statuses without a tracker column: print a skip message, exit 0. **Windows: never `process.exit()` after async work** (libuv teardown race → false failures) — set `process.exitCode` and return. A `--dry-run` flag makes it testable. Add a `set` rule for completion stamping too: `{ "when": ["Done"], "set": { "done": "{{date}}" } }` — it feeds the milestone velocity forecast (completedProperty).
+Scaffold `dispatch/scripts/move-ticket.mjs` in their repo: map status → tracker column/section ID, find the task by the ticket-ID naming convention, move it via the tracker's API (token from env/.env — never hardcode), print ONE line (it becomes the Obsidian notice). Statuses without a tracker column: print a skip message, exit 0. **Windows: never `process.exit()` after async work** (libuv teardown race → false failures) — set `process.exitCode` and return. A `--dry-run` flag makes it testable. Add a `set` rule for completion stamping too: `{ "when": ["Done"], "set": { "done": "{{date}}" } }` — it feeds the milestone velocity forecast (completedProperty).
 Decide with the user which side is the **source of truth** (recommend: the vault; tracker follows) and write that down in their project docs. Then enable *automation commands on this device*.
 
 ## 7 · Run-lifecycle hooks
 
 So board cards show launched → running ⇄ waiting → done and completed runs log back into the note. **Wire this for every agent the user runs** (step 1's interview) — one script serves them all:
 
-1. **Copy the reference implementation that ships with this skill** — `assets/run-state.mjs` in this skill's own directory — into the target repo as `scripts/dispatch/run-state.mjs`. It is dependency-free, fully synchronous and needs no edits. (What it does: appends `{id, state, ts}` to `$DISPATCH_RUNS_FILE`; on `done` also appends a run-log line plus an excerpt of the agent's final message — read from the `transcript_path` in the hook's **stdin JSON**, not from an env var — to `$DISPATCH_NOTE` under `## Dispatch runs`, newest first; silent no-op when `DISPATCH_RUN_ID` is unset, so normal sessions are undisturbed. Contract: [`installation.md` → Run lifecycle](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/installation.md#run-lifecycle).)
+1. **Copy the reference implementation that ships with this skill** — `assets/run-state.mjs` in this skill's own directory — into the target repo as `dispatch/scripts/run-state.mjs`. It is dependency-free, fully synchronous and needs no edits. (What it does: appends `{id, state, ts}` to `$DISPATCH_RUNS_FILE`; on `done` also appends a run-log line plus an excerpt of the agent's final message — read from the `transcript_path` in the hook's **stdin JSON**, not from an env var — to `$DISPATCH_NOTE` under `## Dispatch runs`, newest first; silent no-op when `DISPATCH_RUN_ID` is unset, so normal sessions are undisturbed. Contract: [`installation.md` → Run lifecycle](https://github.com/kaimys/obsidian-dispatch/blob/main/docs/installation.md#run-lifecycle).)
 2. Wire the four events for each agent, in the **target repo**, by **copying** the matching asset from this skill's directory and merging it into any existing file (never overwrite one). Both map `SessionStart` and `UserPromptSubmit` → `running`, `Stop` → `waiting`, `SessionEnd` → `done`.
 
    | Agent | Target file | Asset to copy |
@@ -304,7 +313,7 @@ So board cards show launched → running ⇄ waiting → done and completed runs
 
 ## 8 · Smoke test
 
-**Verify headlessly first, and treat the result as a completion gate.** If the project uses the shipped validator, run `node scripts/dispatch/validate.mjs --device "<absolute device-config path>" --vault "<absolute vault path>"`; setup already knows both paths from step 0 and must pass the vault explicitly rather than inventing a chip-repository alias for it. With neither option it checks only the repository surface for later workflow gates; ambient `DISPATCH_LOCAL_SETTINGS` from a chip launch does not change that result. Do not report setup complete, and do not move on to the UI smoke test, while it or any equivalent check below is red or unrun:
+**Verify headlessly first, and treat the result as a completion gate.** If the project uses the shipped validator, run `node dispatch/scripts/validate.mjs --device "<absolute device-config path>" --vault "<absolute vault path>"`; setup already knows both paths from step 0 and must pass the vault explicitly rather than inventing a chip-repository alias for it. With neither option it checks only the repository surface for later workflow gates; ambient `DISPATCH_LOCAL_SETTINGS` from a chip launch does not change that result. Do not report setup complete, and do not move on to the UI smoke test, while it or any equivalent check below is red or unrun:
 
 - every JSON file parses — `data.json`, `community-plugins.json`, the device config, and the hook config of each agent wired in step 7 (`.claude/settings.json`, `.codex/hooks.json`);
 - every chip `repo` alias resolves to a directory that exists on this device, and every `tool` a chip names is defined in the device config;

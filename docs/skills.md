@@ -73,12 +73,13 @@ column on your board. A solo board can use the same value for refinement and the
 optional ready queue. A queued-delivery board can add human/automation-only columns
 without inventing workflow tokens or granting a skill permission to advance there.
 
-For vault lookup, prefer a repo-relative path, including a git-ignored symlink to an
-external vault. Setup temporarily permits an absolute vault path in generated
-workflow files; it will need adaptation on another machine until portable project
-setup is implemented. This allowance never applies to notes, shared settings, or
-chip repository fields, which still use aliases. It does not move the device config
-into the repository or vault.
+Workflows reach the vault through `dispatch/wiki`, a git-ignored link from the
+repository to the vault, and never through an absolute path, which would tie every
+workflow to one machine. The same holds for notes, shared settings and chip
+repository fields, which use aliases. The device config stays in `~/.dispatch/`,
+in neither the repository nor the vault.
+
+**Set up before v0.3.0?** Your project may still carry an absolute vault path or its scripts in `scripts/dispatch/`, and it keeps working after a plugin update: the plugin reads no path from your repository. Re-running the setup skill migrates it.
 
 ## Small-bug shortcut
 

@@ -12,7 +12,7 @@ Every project-specific value is a `<<PLACEHOLDER>>` token. Replace all of them, 
 
 | Placeholder | Is | Example |
 | --- | --- | --- |
-| `<<WIKI>>` | vault root, as reachable **from the repo root** | `wiki` (relative path or git-ignored symlink), or a temporary absolute vault path |
+| `<<WIKI>>` | vault root, as reachable **from the repo root** | `dispatch/wiki` (a git-ignored link to the vault) |
 | `<<TICKETS>>` | ticket folder, vault-relative | `05_Requirements/Tickets` |
 | `<<TEMPLATES>>` | template folder, vault-relative | `00_Start-Here/Templates` |
 | `<<RELEASES>>` | release-notes folder | `08_Delivery-and-QA/Releases` |
@@ -34,9 +34,9 @@ Every project-specific value is a `<<PLACEHOLDER>>` token. Replace all of them, 
 
 **If there is no tracker or no chat**, substitute `none`. Every workflow explicitly skips that integration's lookups, writes and missing-side preconditions while continuing wiki work. Questions go to the requester when chat is absent. A configured service being unavailable is a reported failure, not `none`.
 
-**If there is no project-native verification gate**, copy the setup skill's `assets/validate.mjs` to `scripts/dispatch/validate.mjs` and substitute `node scripts/dispatch/validate.mjs` for `<<GATES>>`. That no-argument command is deliberately repository-only. During initial setup, run it once with `--device "<absolute device-config path>" --vault "<absolute vault path>"` to check all three surfaces. Never reference the command unless the file was actually copied and both forms were run successfully.
+**If there is no project-native verification gate**, copy the setup skill's `assets/validate.mjs` to `dispatch/scripts/validate.mjs` and substitute `node dispatch/scripts/validate.mjs` for `<<GATES>>`. That no-argument command is deliberately repository-only. During initial setup, run it once with `--device "<absolute device-config path>" --vault "<absolute vault path>"` to check all three surfaces. Never reference the command unless the file was actually copied and both forms were run successfully.
 
-`<<WIKI>>` is the workflow's vault lookup, not a chip repository path. Prefer repo-relative lookup (including a git-ignored symlink). Absolute paths may temporarily remain in generated workflows until portable project setup is implemented (US00033 in Dispatch); they need adaptation on another machine. Never write them into notes, shared settings or chip repo fields. This repository continues using `wiki`.
+`<<WIKI>>` is the workflow's vault lookup, not a chip repository path. It is always `dispatch/wiki`, a git-ignored link from the repository to the vault, and never an absolute path, which would tie every workflow to one machine. Never write a vault path into notes, shared settings or chip repo fields. A project scaffolded before the `dispatch/` layout may carry an absolute path or a root `wiki` here; re-running `dispatch-setup` migrates it.
 
 **Statuses describe transition roles, not every board column.** `refine` and `implementation-plan` leave the card in refinement. A human can authorize the ready queue or invoke development directly; a queue name is not permission. Example mappings:
 
