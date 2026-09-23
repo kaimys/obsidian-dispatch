@@ -59,6 +59,12 @@ Because the device layer lives outside the vault (Windows: `%USERPROFILE%\.dispa
 
 Scripts Dispatch ships — currently the Meet transcript import — keep their settings in that same per-vault file rather than one of their own, under a `google` key. A script the *project* chooses, such as a tracker sync, is configured by the project and Dispatch never writes it.
 
+### The Dispatch folder in your repository
+
+Everything Dispatch adds to a code repository sits in one folder, `dispatch/`: the workflow files (`workflow/`), the repo-side scripts (`scripts/`), the shared project invariants (`invariants.md`), project-level settings (`settings.yaml`, which holds your tracker repository) and `wiki`, a git-ignored link to the vault. It is committed and shared like the rest of the repository, so it never holds an absolute path, a secret or device state; those stay in `~/.dispatch/`. The page templates stay in the vault, where Obsidian's Templates plugin can read them.
+
+**Set up before v0.3.0?** Your project keeps its older layout (`scripts/dispatch/`, a root `wiki` link), and it keeps working after a plugin update: the plugin reads no path from your repository. Re-running the setup skill migrates it.
+
 The sections below describe both layers as the **settings UI** presents them. If you (or an agent) write the files directly, read [The config files on disk](#the-config-files-on-disk) — the stored JSON does not have the same shape as the UI's compact input forms.
 
 ## Board settings
@@ -163,7 +169,7 @@ Variables: `{{cwd}}`, `{{prompt}}`, `{{promptFile}}` (the prompt written to a te
 
 When a chip launches a tool, Dispatch records the run in a machine-local file (`~/.dispatch/runs/…jsonl`) and passes `DISPATCH_RUN_ID`, `DISPATCH_RUNS_FILE`, `DISPATCH_NOTE`, `DISPATCH_LABEL` and `DISPATCH_STARTED` into the process.
 
-Lifecycle hooks in the target repo — `SessionStart`/`UserPromptSubmit`/`Stop`/`SessionEnd` calling a small script — append records back. A ready-to-copy implementation ships with the setup plugin: [`plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs`](https://github.com/kaimys/obsidian-dispatch/blob/main/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs) — drop it into the target repo (e.g. `scripts/dispatch/run-state.mjs`) and wire the four events for each agent you run:
+Lifecycle hooks in the target repo — `SessionStart`/`UserPromptSubmit`/`Stop`/`SessionEnd` calling a small script — append records back. A ready-to-copy implementation ships with the setup plugin: [`plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs`](https://github.com/kaimys/obsidian-dispatch/blob/main/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs) — drop it into the target repo as `dispatch/scripts/run-state.mjs` and wire the four events for each agent you run:
 
 | Agent | Where the hooks are wired |
 | --- | --- |
@@ -189,7 +195,7 @@ Rules evaluated when a card **enters a column** (settings → Automations, JSON)
   { "when": ["Deployed"], "set": { "deployed": "{{date}}" }, "repo": "", "command": "" },
   { "when": [], "set": {},
     "repo": "my-project",
-    "command": "node scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
+    "command": "node dispatch/scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
 ]
 ```
 
@@ -231,7 +237,7 @@ Missing keys fall back to the defaults in `src/settings.ts`, but writing the ful
     "requiredProperties": ["id", "status", "updated"],
     "automations": [
       { "when": ["Deployed"], "set": { "deployed": "{{date}}" }, "repo": "", "command": "" },
-      { "when": [], "set": {}, "repo": "my-app", "command": "node scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
+      { "when": [], "set": {}, "repo": "my-app", "command": "node dispatch/scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
     ]
   },
   "milestones": {
@@ -330,7 +336,7 @@ const filename = `${vaultName}-${hash.toString(16)}.json`;
 >
 > What this section adds is skipping that download. It costs a Google Cloud project of your own, an OAuth consent screen on **a domain you have verified in Search Console**, and a published app — perhaps twenty minutes if you have done it before, and an afternoon if you have not. That is worth it if you run recurring meetings, or are setting Dispatch up for a team who should not each be exporting documents by hand. For one meeting a fortnight, download the file.
 
-`scripts/dispatch/meet-fetch.mjs` imports a Google Meet meeting's Gemini document into the vault. It is a **Dispatch-scope** script — Dispatch ships it and it does the same thing for everyone — so its settings are ordinary device settings and live in the same per-vault file as everything else above, under a `google` key. (A script the *project* chooses, like a tracker sync, is configured by the project instead; that split is the whole of ADR-0027.)
+`dispatch/scripts/meet-fetch.mjs` imports a Google Meet meeting's Gemini document into the vault. It is a **Dispatch-scope** script — Dispatch ships it and it does the same thing for everyone — so its settings are ordinary device settings and live in the same per-vault file as everything else above, under a `google` key. (A script the *project* chooses, like a tracker sync, is configured by the project instead; that split is the whole of ADR-0027.)
 
 It also **ships in this repository rather than in the plugin bundle**, so the import is available to people working from a clone. Installing Dispatch from the community directory does not put the script on your machine.
 
@@ -370,7 +376,7 @@ The script reads `calendarUrl` from the same file: the calendar feed carries eac
 Then, once per machine:
 
 ```bash
-node scripts/dispatch/meet-fetch.mjs --auth
+node dispatch/scripts/meet-fetch.mjs --auth
 ```
 
 An **"unverified app"** screen is expected — *Advanced → Go to … (unsafe)*. That is the consequence of step 4, not a fault. The refresh token is written back into the same device file, under `google`, and every later run is non-interactive. Re-run `--auth` if the script ever reports the token as no longer valid; Google revokes them on a password change.
@@ -394,7 +400,7 @@ Caveat: commands run through your system shell. On Windows (`cmd.exe`), `%VAR%` 
 - **Executes local processes** — but only commands *you* configure on *your* device. Note content can never introduce a command; the confirmation dialog is on by default.
 - **Reads/writes outside the vault** — device settings at `~/.dispatch/<vault>-<hash>.json` and run records at `~/.dispatch/runs/…jsonl`, deliberately outside the vault so machine paths never sync.
 - **One network request type** — if (and only if) you configure a calendar ICS URL, the plugin fetches that feed read-only (cached 15 min) for the Meetings tab. Nothing else leaves your machine; no telemetry. Commands you configure act under your own credentials.
-- **The plugin makes no Google requests.** `scripts/dispatch/meet-fetch.mjs` does, when you run it — read-only, with credentials you supply. It ships in this repository, not in the plugin bundle; the plugin stores its settings and never uses them. See the [privacy policy](https://eightnine.de/dispatch/privacy.html) for what those scopes cover.
+- **The plugin makes no Google requests.** `dispatch/scripts/meet-fetch.mjs` does, when you run it — read-only, with credentials you supply. It ships in this repository, not in the plugin bundle; the plugin stores its settings and never uses them. See the [privacy policy](https://eightnine.de/dispatch/privacy.html) for what those scopes cover.
 
 ## Building from source
 
