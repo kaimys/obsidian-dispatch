@@ -3,6 +3,7 @@
  * Read-only vault lint through Obsidian's CLI (US00034).
  *
  * Usage:
+ *   npm run lint:vault
  *   node scripts/dispatch/lint-vault.mjs --vault Dispatch-Wiki
  *   node scripts/dispatch/lint-vault.mjs --vault Dispatch-Wiki --format json
  *
@@ -62,9 +63,13 @@ function normalizedVaultPath(path) {
 	return String(path || "").trim().replaceAll("\\", "/").replace(/^\.\//, "");
 }
 
-export function validateVaultPaths(paths, label, inputs) {
+function wikiFileSet(inputs) {
 	if (!Array.isArray(inputs.wikiFiles)) throw new Error("Vault lint inputs do not include the wiki file list");
-	const existing = new Set(inputs.wikiFiles.map((path) => normalizedVaultPath(path)));
+	return new Set(inputs.wikiFiles.map((path) => normalizedVaultPath(path)));
+}
+
+export function validateVaultPaths(paths, label, inputs) {
+	const existing = wikiFileSet(inputs);
 	return paths.map((path) => normalizedVaultPath(path)).filter(Boolean).map((path) => {
 		const absolute = /^(?:[a-z]:|\/)/i.test(path);
 		const traversal = path.split("/").some((part) => part === "." || part === "..");
@@ -76,6 +81,42 @@ export function validateVaultPaths(paths, label, inputs) {
 		}
 		return path;
 	});
+}
+
+export function parseUnresolvedSources(value, inputs) {
+	const existing = wikiFileSet(inputs);
+	let arrayPaths = null;
+	if (Array.isArray(value)) {
+		arrayPaths = value.map((path) => normalizedVaultPath(path)).filter(Boolean);
+		if (arrayPaths.every((path) => existing.has(path))) return arrayPaths;
+	}
+
+	const joined = normalizedVaultPath(arrayPaths ? arrayPaths.join(", ") : value);
+	if (!joined) return [];
+	const pieces = joined.split(", ");
+	const memo = new Map();
+	const partition = (start) => {
+		if (start === pieces.length) return [];
+		if (memo.has(start)) return memo.get(start);
+		for (let end = start + 1; end <= pieces.length; end += 1) {
+			const candidate = pieces.slice(start, end).join(", ");
+			if (!existing.has(candidate)) continue;
+			const rest = partition(end);
+			if (rest) {
+				const result = [candidate, ...rest];
+				memo.set(start, result);
+				return result;
+			}
+		}
+		memo.set(start, null);
+		return null;
+	};
+	const paths = partition(0);
+	if (paths) return paths;
+	throw new Error(
+		`Obsidian CLI unresolved sources "${joined}" could not be matched to files in ${inputs.vault}. ` +
+		"The vault may have changed during the run; rerun the lint.",
+	);
 }
 
 export function parseFrontmatter(text) {
@@ -143,10 +184,7 @@ export function buildReport(raw, inputs) {
 	const unresolved = parseUnresolved(raw.unresolved).map((item) => ({
 		link: String(item.link || ""),
 		count: Number(item.count || 0),
-		sources: Array.isArray(item.sources) ? item.sources.map(String) : [String(item.sources || "")].filter(Boolean),
-	})).map((item) => ({
-		...item,
-		sources: validateVaultPaths(item.sources, "unresolved source", inputs),
+		sources: parseUnresolvedSources(item.sources, inputs),
 	})).sort((a, b) => a.link.localeCompare(b.link));
 	const inUse = parseJson(raw.properties, "properties").map((item) => ({
 		name: String(item.name || ""),

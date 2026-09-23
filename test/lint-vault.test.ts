@@ -14,6 +14,7 @@ import {
 	parseJson,
 	parseMarkdownPaths,
 	parseUnresolved,
+	parseUnresolvedSources,
 	templateProperties,
 	validateVaultPaths,
 } from "../scripts/dispatch/lint-vault.mjs";
@@ -35,8 +36,10 @@ deadend_paths:
   - 00_Start-Here/Home.md
 ---`;
 
+const commaSource = "Articles/Understanding Kiro, spec-kit, and Tessl.md";
+
 const raw = {
-	unresolved: JSON.stringify([{ link: "Missing", count: "2", sources: "A.md" }]),
+	unresolved: JSON.stringify([{ link: "Missing", count: "2", sources: "A.md, B.md" }]),
 	orphans: "image.png\r\nB.md\r\nA.md\r\nB.md\r\n",
 	deadends: "01_Sources/Leaf.md\nNeeds a link.md\n00_Start-Here/Home.md\n",
 	properties: JSON.stringify([
@@ -51,7 +54,7 @@ const inputs = {
 	propertyReference,
 	rulebook,
 	templates: ["---\nopen_tests:\nowner:\n---\n"],
-	wikiFiles: ["A.md", "B.md", "image.png", "01_Sources/Leaf.md", "Needs a link.md", "00_Start-Here/Home.md"],
+	wikiFiles: ["A.md", "B.md", commaSource, "image.png", "01_Sources/Leaf.md", "Needs a link.md", "00_Start-Here/Home.md"],
 };
 
 describe("vault lint parsing", () => {
@@ -71,6 +74,12 @@ describe("vault lint parsing", () => {
 	it("accepts the CLI's non-JSON clean unresolved response", () => {
 		expect(parseUnresolved("No unresolved links found.\n")).toEqual([]);
 		expect(parseUnresolved("[]")).toEqual([]);
+	});
+
+	it("splits the CLI's joined unresolved sources against known wiki files", () => {
+		expect(parseUnresolvedSources("A.md, B.md", inputs)).toEqual(["A.md", "B.md"]);
+		expect(parseUnresolvedSources(commaSource, inputs)).toEqual([commaSource]);
+		expect(parseUnresolvedSources(`A.md, ${commaSource}`, inputs)).toEqual(["A.md", commaSource]);
 	});
 
 	it("keeps unique Markdown paths and ignores assets", () => {
@@ -99,7 +108,7 @@ describe("vault lint parsing", () => {
 
 	it("normalizes all finding categories into a stable report", () => {
 		const report = buildReport(raw, inputs);
-		expect(report.unresolved).toEqual([{ link: "Missing", count: 2, sources: ["A.md"] }]);
+		expect(report.unresolved).toEqual([{ link: "Missing", count: 2, sources: ["A.md", "B.md"] }]);
 		expect(report.orphans).toEqual(["A.md", "B.md"]);
 		expect(report.deadends).toEqual({
 			findings: ["Needs a link.md"],
@@ -212,6 +221,24 @@ describe("vault lint orchestration", () => {
 		});
 		expect(main(["--vault", "Dispatch-Wiki"], { runner: errorRunner, inputs })).toBe(2);
 		expect(stderr).toHaveBeenLastCalledWith(expect.stringContaining('Command "deadends" not found'));
+		stdout.mockRestore();
+		stderr.mockRestore();
+	});
+
+	it("reports unmatched unresolved sources without blaming vault focus", () => {
+		const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+		const unresolved = JSON.stringify([{ link: "Missing", count: "2", sources: "A.md, Unknown.md" }]);
+		const runner = (_cli: string, args: string[]) => ({
+			status: 0,
+			stdout: args[0] === "vault" ? "Dispatch-Wiki\n" : args[0] === "unresolved" ? unresolved :
+				args[0] === "properties" ? "[]" : "",
+			stderr: "",
+		});
+		expect(main(["--vault", "Dispatch-Wiki"], { runner, inputs })).toBe(2);
+		const message = String(stderr.mock.calls.at(-1)?.[0]);
+		expect(message).toContain("could not be matched to files");
+		expect(message).not.toContain("focus");
 		stdout.mockRestore();
 		stderr.mockRestore();
 	});
