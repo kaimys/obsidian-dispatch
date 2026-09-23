@@ -4,13 +4,14 @@
  *
  * Wired from the vault's `data.json` as an automation command:
  *
- *   node scripts/dispatch/move-ticket.mjs {{file}} {{from}} {{to}}
+ *   node dispatch/scripts/move-ticket.mjs {{file}} {{from}} {{to}}
  *
  * Dispatch runs it with cwd = the repo root and `{{file}}` = the note's
- * VAULT-relative path. The vault is reached through `wiki`, a git-ignored,
- * repo-relative symlink to wherever it actually lives (ADR-0029) — the note
- * is resolved against VAULT_DIR below, which names that link rather than a
- * location. Get that wrong and every run silently reports "note not found".
+ * VAULT-relative path. The vault is reached through `dispatch/wiki`, a
+ * git-ignored, repo-relative symlink to wherever it actually lives (ADR-0029)
+ * — the note is resolved against VAULT_DIR below, which names that link
+ * rather than a location. When the link is missing the script says so, rather
+ * than reporting every note as "note not found".
  *
  * Mapping. GitHub issues have no columns, only state, so only the two ends of
  * the pipeline have a tracker counterpart:
@@ -62,14 +63,14 @@
  * Zero dependencies, fully synchronous (so there is no libuv teardown race on
  * Windows), and it never calls process.exit() — it sets process.exitCode.
  *
- * Usage: node scripts/dispatch/move-ticket.mjs <note> <from> <to> [--dry-run]
+ * Usage: node dispatch/scripts/move-ticket.mjs <note> <from> <to> [--dry-run]
  */
 import { execFileSync } from "child_process";
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 
 /** Vault root, relative to the repo root. */
-const VAULT_DIR = "wiki";
+const VAULT_DIR = "dispatch/wiki";
 
 /**
  * Frontmatter property holding the target version — the board's
@@ -92,7 +93,12 @@ function main() {
 
 	const file = resolveNote(notePath);
 	if (!file) {
-		say(`move-ticket: note not found: ${notePath}`, 1);
+		say(
+			existsSync(VAULT_DIR)
+				? `move-ticket: note not found: ${notePath}`
+				: `move-ticket: vault link ${VAULT_DIR} not found — create it (see dispatch/invariants.md)`,
+			1,
+		);
 		return;
 	}
 

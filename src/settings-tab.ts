@@ -453,7 +453,7 @@ export class DispatchSettingTab extends PluginSettingTab {
 		containerEl.createEl("p", {
 			cls: "setting-item-description",
 			text:
-				'Rules evaluated when a card enters a column, as a JSON array. Rule shape: {"when": ["Deployed"], "set": {"deployed": "{{date}}"}, "repo": "my-project", "command": "node scripts/move-ticket.mjs {{file}} {{from}} {{to}}"}. ' +
+				'Rules evaluated when a card enters a column, as a JSON array. Rule shape: {"when": ["Deployed"], "set": {"deployed": "{{date}}"}, "repo": "my-project", "command": "node dispatch/scripts/move-ticket.mjs {{file}} {{from}} {{to}}"}. ' +
 				"Empty \"when\" = every status change. \"set\" writes frontmatter atomically with the status ({{date}}, {{datetime}}, {{from}}, {{to}}). " +
 				"Commands run in the repo alias and only on devices that enable automations under “This device”.",
 		});

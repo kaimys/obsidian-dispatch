@@ -4,8 +4,8 @@
  *
  * Usage:
  *   npm run lint:vault
- *   node scripts/dispatch/lint-vault.mjs --vault Dispatch-Wiki
- *   node scripts/dispatch/lint-vault.mjs --vault Dispatch-Wiki --format json
+ *   node dispatch/scripts/lint-vault.mjs --vault Dispatch-Wiki
+ *   node dispatch/scripts/lint-vault.mjs --vault Dispatch-Wiki --format json
  *
  * Obsidian must already be running with the named vault as the active window.
  * Obsidian 1.13.7 on Windows ignores `vault=<name>`, so the script supplies it
@@ -18,7 +18,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 
-const DEFAULT_WIKI = "wiki";
+const DEFAULT_WIKI = "dispatch/wiki";
 const RULEBOOK = join("02_Product", "Reports", "_definitions", "Vault lint.md");
 const PROPERTY_REFERENCE = join("07_Engineering", "Frontmatter Properties.md");
 const TEMPLATE_DIR = join("00_Start-Here", "Templates");
@@ -289,6 +289,7 @@ function listWikiFiles(root, directory = root) {
 
 export function readInputs(wiki, vault) {
 	const root = resolve(wiki);
+	if (!existsSync(root)) throw new Error(`vault link ${wiki} not found — create it (see dispatch/invariants.md)`);
 	const propertyPath = join(root, PROPERTY_REFERENCE);
 	const rulebookPath = join(root, RULEBOOK);
 	const templatePath = join(root, TEMPLATE_DIR);

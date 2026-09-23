@@ -1,5 +1,5 @@
 /**
- * Guards US00024 (AC5, AC7): the wiki is reached through the `wiki` symlink,
+ * Guards US00024 (AC5, AC7): the wiki is reached through the `dispatch/wiki` link,
  * never a hardcoded `docs/` location. A regression here is silent at runtime
  * — `move-ticket.mjs` just prints "note not found" and exits 1, and a stray
  * `docs/wiki/…` in a workflow command resolves to nothing after the move.
@@ -14,7 +14,7 @@
  * `settings-tab.test.ts`'s approach for a repo-layout invariant that has no
  * Obsidian API to exercise.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -26,12 +26,18 @@ function body(text: string): string {
 	return m ? m[1] : text;
 }
 
-describe("scripts/dispatch/move-ticket.mjs", () => {
-	const source = readFileSync(`${repoRoot}/scripts/dispatch/move-ticket.mjs`, "utf8");
+describe("dispatch/scripts/ — US00033", () => {
+	const moveTicket = readFileSync(`${repoRoot}/dispatch/scripts/move-ticket.mjs`, "utf8");
+	const lintVault = readFileSync(`${repoRoot}/dispatch/scripts/lint-vault.mjs`, "utf8");
 
-	it("names the wiki through the symlink, not a literal docs/ location", () => {
-		expect(source).not.toMatch(/"docs"/);
-		expect(source).toContain('const VAULT_DIR = "wiki"');
+	it("names the wiki through the dispatch/wiki link, not a literal docs/ location", () => {
+		expect(moveTicket).not.toMatch(/"docs"/);
+		expect(moveTicket).toContain('const VAULT_DIR = "dispatch/wiki"');
+		expect(lintVault).toContain('const DEFAULT_WIKI = "dispatch/wiki"');
+	});
+
+	it("leaves no scripts/ folder behind — the move carries no shims", () => {
+		expect(existsSync(`${repoRoot}/scripts`)).toBe(false);
 	});
 });
 
@@ -98,7 +104,7 @@ describe("the per-agent stubs — ADR-0020", () => {
 });
 
 /**
- * N1: `scripts/dispatch/run-state.mjs` and the copy `dispatch-setup` installs
+ * N1: `dispatch/scripts/run-state.mjs` and the copy `dispatch-setup` installs
  * into a fresh project are the same program with different headers. They drifted
  * once already — the repo copy learned Codex's payload and the shipped one did
  * not, so every new user got a run log with no excerpt and no agent name. The
@@ -113,7 +119,7 @@ describe("the run-state hook ships as one program", () => {
 	}
 
 	it("keeps the packaged copy identical to the repo script", () => {
-		const repo = readFileSync(`${repoRoot}/scripts/dispatch/run-state.mjs`, "utf8");
+		const repo = readFileSync(`${repoRoot}/dispatch/scripts/run-state.mjs`, "utf8");
 		const asset = readFileSync(
 			`${repoRoot}/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs`,
 			"utf8"

@@ -16,7 +16,7 @@ const literalDescriptions = [
 const exactPattern = (text) => `^${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
 
 export default [
-	{ ignores: ["main.js", "node_modules/**", "docs/**", "wiki/**", "test/**", "*.config.*", "plugins/**"] },
+	{ ignores: ["main.js", "node_modules/**", "docs/**", "dispatch/wiki/**", "test/**", "*.config.*", "plugins/**"] },
 	...obsidianmd.configs.recommended,
 	{
 		files: ["**/*.ts"],
@@ -44,12 +44,12 @@ export default [
 		},
 	},
 	{
-		// `scripts/` is Node, not plugin code — it is never bundled and never runs
+		// `dispatch/scripts/` is Node, not plugin code — it is never bundled and never runs
 		// inside Obsidian, so `requestUrl` (an Obsidian API) does not exist there
 		// and `fetch` is the correct call. The recommended ruleset assumes every
 		// file is plugin code; this is the same mismatch that makes these scripts
 		// write through `process.stdout` instead of `console`.
-		files: ["scripts/**/*.mjs"],
+		files: ["dispatch/scripts/**/*.mjs"],
 		rules: { "no-restricted-globals": "off" },
 	},
 ];
