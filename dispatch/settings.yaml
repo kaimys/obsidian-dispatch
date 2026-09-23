@@ -1,0 +1,4 @@
+# Project-level Dispatch settings: committed and shared by the team.
+# Never an absolute path or a secret; those stay device-local, in ~/.dispatch/.
+tracker:
+  repository: kaimys/obsidian-dispatch

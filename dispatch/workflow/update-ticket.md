@@ -8,7 +8,7 @@ Brings one spec up to date with feedback that landed since its `updated:` date. 
 
 ## Resolve
 
-1. Find the spec (grep `id: <ARGS>` in `wiki/05_Requirements/Tickets`) and the task in the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI. Stop and report if either is missing.
+1. Find the spec (grep `id: <ARGS>` in `wiki/05_Requirements/Tickets`) and the task in the GitHub Issues of the tracker repository (`tracker.repository` in `dispatch/settings.yaml`), via the GitHub MCP or the `gh` CLI. Stop and report if either is missing.
 2. Note the current `updated:` date — it is the cutoff for everything below.
 3. **Check `frozen:`.** On a frozen ticket, feedback goes into the record zone as a dated entry; the contract zone stays as built. A wrong frozen statement gets an annotation beneath it (`> ⚠️ Correction <date>: …`), never a rewrite.
 
@@ -16,7 +16,7 @@ Brings one spec up to date with feedback that landed since its `updated:` date. 
 
 4. **Inline comments in the note** — `%% … %%` blocks, callouts or blockquotes carrying a remark, `**Name:**` annotations. These are a human's feedback. (Do not confuse them with `<!-- GUIDE: … -->` scaffolding, which is not feedback.)
 5. **The thread** named in `discussion:` (none) — replies newer than the cutoff. If `discussion:` is empty but a thread exists, set it now.
-6. **Tracker comments** on the task (the GitHub Issues of `kaimys/obsidian-dispatch`, via the GitHub MCP or the `gh` CLI).
+6. **Tracker comments** on the task (the GitHub Issues of the tracker repository (`tracker.repository` in `dispatch/settings.yaml`), via the GitHub MCP or the `gh` CLI).
 7. **Code drift** — `git log --since=<cutoff>` for the files the spec names, plus the wiki pages it links. Something that moved under the ticket's feet is feedback too, and it's the kind nobody posts.
 
 ## Reconcile
