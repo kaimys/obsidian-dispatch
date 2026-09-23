@@ -9,6 +9,7 @@
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "eslint .",
 		"lint:review": "eslint src -c eslint.review.mjs",
+		"lint:vault": "node scripts/dispatch/lint-vault.mjs --vault Dispatch-Wiki",
 		"install:wiki": "node -e \"for (const f of ['main.js','manifest.json','styles.css']) require('fs').copyFileSync(f, 'wiki/.obsidian/plugins/dispatch/' + f)\"",
 		"deploy": "npm run build && npm run install:wiki",
 		"test": "vitest run",
