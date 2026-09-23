@@ -75,8 +75,8 @@ export function validateVaultPaths(paths, label, inputs) {
 		const traversal = path.split("/").some((part) => part === "." || part === "..");
 		if (absolute || traversal || !existing.has(path)) {
 			throw new Error(
-				`Obsidian CLI returned ${label} path "${path}" outside ${inputs.vault}. ` +
-				`The CLI serves the active vault window; focus ${inputs.vault} and rerun.`,
+				`Obsidian CLI returned ${label} path "${path}", which is not in the ${inputs.vault} file snapshot. ` +
+				`The active vault may have changed, or the file may have been created after the snapshot; rerun the lint.`,
 			);
 		}
 		return path;
@@ -127,7 +127,15 @@ export function parseFrontmatter(text) {
 }
 
 export function documentedProperties(text) {
-	const section = String(text || "").split("## Page types and their properties")[1]?.split("## Enumerations")[0] || "";
+	const source = String(text || "");
+	const startHeading = "## Page types and their properties";
+	const endHeading = "## Enumerations";
+	const start = source.indexOf(startHeading);
+	const end = source.indexOf(endHeading, start + startHeading.length);
+	if (start === -1 || end === -1) {
+		throw new Error(`Frontmatter property reference must contain "${startHeading}" followed by "${endHeading}"`);
+	}
+	const section = source.slice(start + startHeading.length, end);
 	const names = new Set();
 	for (const line of section.split(/\r?\n/)) {
 		if (!line.startsWith("|")) continue;

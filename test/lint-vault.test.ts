@@ -87,12 +87,14 @@ describe("vault lint parsing", () => {
 		expect(validateVaultPaths(["a.md", "image.png"], "test", {
 			vault: "Dispatch-Wiki", wikiFiles: ["a.md", "image.png"],
 		})).toEqual(["a.md", "image.png"]);
-		expect(() => validateVaultPaths(["Other.md"], "test", inputs)).toThrow("active vault window");
+		expect(() => validateVaultPaths(["Other.md"], "test", inputs)).toThrow("file may have been created after the snapshot");
 	});
 
 	it("reads frontmatter, schema tables and template keys", () => {
 		expect(parseFrontmatter(rulebook)).toMatchObject({ deadend_prefixes: ["01_Sources/"] });
 		expect([...documentedProperties(propertyReference)]).toEqual(["id", "derived_from", "maintained_by"]);
+		expect(() => documentedProperties(propertyReference.replace("## Enumerations", "## Values"))).toThrow("must contain");
+		expect(() => documentedProperties(propertyReference.replace("## Page types and their properties", "## Properties"))).toThrow("must contain");
 		expect([...templateProperties(inputs.templates)]).toEqual(["open_tests", "owner"]);
 	});
 
@@ -211,7 +213,7 @@ describe("vault lint orchestration", () => {
 			stderr: "",
 		});
 		expect(main(["--vault", "Dispatch-Wiki"], { runner, inputs })).toBe(2);
-		expect(stderr).toHaveBeenLastCalledWith(expect.stringContaining("outside Dispatch-Wiki"));
+		expect(stderr).toHaveBeenLastCalledWith(expect.stringContaining("not in the Dispatch-Wiki file snapshot"));
 
 		const errorRunner = (_cli: string, args: string[]) => ({
 			status: 0,
