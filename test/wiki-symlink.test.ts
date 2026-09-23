@@ -41,6 +41,48 @@ describe("dispatch/scripts/ — US00033", () => {
 	});
 });
 
+/** Every file under `dir` whose name ends in one of `extensions`. */
+function filesUnder(dir: string, extensions: string[]): string[] {
+	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+		const path = `${dir}/${entry.name}`;
+		if (entry.isDirectory()) return filesUnder(path, extensions);
+		return extensions.some((ext) => entry.name.endsWith(ext)) ? [path] : [];
+	});
+}
+
+/**
+ * US00033 criteria 7 and 12. Nothing that ships or instructs names the old
+ * layout: a stale path in a workflow makes an agent improvise (ADR-0020's
+ * failure mode), and anything under `src/` reaches every user in `main.js` on
+ * a plugin update — which must work whatever layout the user's repo is on.
+ */
+describe("no old-layout path survives — US00033", () => {
+	const stale = [
+		{ what: "scripts/dispatch/", pattern: /scripts\/dispatch\// },
+		{ what: "scripts/move-ticket", pattern: /(?<![\w/.-])scripts\/move-ticket/ },
+		{ what: "a repo-root wiki/ path", pattern: /(?<![\w/.-])wiki\// },
+	];
+	const files = [
+		...filesUnder(`${repoRoot}/dispatch/workflow`, [".md"]),
+		...filesUnder(`${repoRoot}/src`, [".ts"]),
+		...filesUnder(`${repoRoot}/.claude/commands`, [".md"]),
+		...filesUnder(`${repoRoot}/.codex/skills`, [".md"]),
+		...["dispatch/invariants.md", "CLAUDE.md", "AGENTS.md", "package.json"].map((f) => `${repoRoot}/${f}`),
+		...[".claude/settings.json", ".codex/hooks.json"].map((f) => `${repoRoot}/${f}`),
+	];
+
+	it("finds the files it sweeps", () => {
+		expect(files.length).toBeGreaterThan(40);
+	});
+
+	it.each(stale)("no file names $what", ({ what, pattern }) => {
+		for (const file of files) {
+			const text = readFileSync(file, "utf8");
+			expect(pattern.test(text), `${file.slice(repoRoot.length)} names ${what}`).toBe(false);
+		}
+	});
+});
+
 const workflowDir = `${repoRoot}/dispatch/workflow`;
 const workflows = readdirSync(workflowDir)
 	.filter((f) => f.endsWith(".md"))

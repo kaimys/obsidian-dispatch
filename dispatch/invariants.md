@@ -57,26 +57,49 @@ npm test        # vitest
   outside `src/node.ts` means the boundary was bypassed. The assertions skip real type-checking, so
   `test/node.test.ts` compares the boundary's behaviour against the real modules.
 
+## The Dispatch folder
+
+`dispatch/` holds this project's **shared** Dispatch setup, and nothing else ([[ADR-0035]]). It
+is named without a dot so it is never mistaken for the device-local `~/.dispatch/`.
+
+- `workflow/` — one canonical file per workflow ([[ADR-0020]]).
+- `wiki` — the git-ignored, repo-relative link to the vault ([[ADR-0029]]).
+- `scripts/` — the repo-side scripts: `move-ticket`, `run-state`, `meet-fetch`, `lint-vault`
+  ([[ADR-0027]] decides who configures each).
+- `invariants.md` — this file.
+- `settings.yaml` — **project-level settings**: committed, read by agents, true for the project
+  whoever checks it out. Today it holds only `tracker.repository`. The vault's `data.json` stays
+  the board's configuration, and `~/.dispatch/` stays the device's.
+
+**Never in it:** device-local configuration and run state (they stay in `~/.dispatch/`), secrets,
+absolute paths, and the `dispatch-setup` plugin, which a project installs rather than vendors.
+**The page templates stay in the vault**, because Obsidian's Templates core plugin can only read
+a folder inside it. **The ADRs join the folder** when US00032 moves them into the repo.
+
+A checkout without the `dispatch/wiki` link cannot reach the vault. Create it once per checkout
+and worktree, since git does not carry it: `New-Item -ItemType Junction -Path dispatch\wiki
+-Target <vault>` on Windows, `ln -s <vault> dispatch/wiki` elsewhere.
+
 ## The project wiki
 
 The repo dogfoods its own plugin. `docs/` holds only the plugin's published documentation
 (`overview.md`, `installation.md`, `page-types.md`, `skills.md`, `wiki-structure.md`, `assets/`).
 The project's tickets, ADRs and release notes live in their own Obsidian vault, `Dispatch-Wiki`,
-synced via Google Drive and reached from this repo through `wiki` — a git-ignored, repo-relative
-symlink ([[ADR-0029]]; `git ls-files wiki` is empty). `wiki/` holds `00_Start-Here/`,
-`05_Requirements/`, `07_Engineering/`, `.obsidian/` etc. directly, no nested `wiki/` level inside
-it.
+synced via Google Drive and reached from this repo through `dispatch/wiki` — a git-ignored,
+repo-relative symlink ([[ADR-0029]]; `git ls-files dispatch/wiki` is empty). `dispatch/wiki/`
+holds `00_Start-Here/`, `05_Requirements/`, `07_Engineering/`, `.obsidian/` etc. directly, with
+no extra folder level in between.
 
-Board config: `wiki/.obsidian/plugins/dispatch/data.json`; this machine's paths and tool
+Board config: `dispatch/wiki/.obsidian/plugins/dispatch/data.json`; this machine's paths and tool
 commands: `~/.dispatch/<vault name>-<hash>.json` (`src/main.ts:186` derives the exact name — see
 that file rather than hardcoding it here, since it is machine- and vault-specific). The plugin
-files in `wiki/.obsidian/plugins/dispatch/` are a **copy**, not a symlink — run `npm run deploy`
+files in `dispatch/wiki/.obsidian/plugins/dispatch/` are a **copy**, not a symlink — run `npm run deploy`
 (build + copy; `npm run install:wiki` copies an existing build alone) to test a change on this
 board. A symlink there would share one `data.json` with whatever other vault it also pointed at:
 Obsidian writes a plugin's `data.json` beside its `main.js`, so two vaults linked to the same
 checkout silently share one board's configuration ([[ADR-0026]]).
 
-- **Tickets** `wiki/05_Requirements/Tickets` — columns
+- **Tickets** `dispatch/wiki/05_Requirements/Tickets` — columns
   `Backlog → Refinement → In progress → Review → Done → Released`, plus `Rejected` (excluded from
   progress). **`Done` and `Released` both carry `progress: 100`, and only `Done` stamps
   `completed:`** — so the forecast measures throughput rather than release cadence. `Released` is
@@ -88,7 +111,7 @@ checkout silently share one board's configuration ([[ADR-0026]]).
   exclusion was ever wanted for. **`Done` and `Released`
   are not the same claim**: `Done` is the human's drag once a test plan is signed off, `Released`
   is what `/release` writes once a version carrying the ticket has actually shipped.
-  Templates in `wiki/00_Start-Here/Templates`.
+  Templates in `dispatch/wiki/00_Start-Here/Templates`.
 - **Ticket ids** are 5 digits behind a prefix matching `type:` — `US` story, `BUG` bug,
   `SEC` security — and **each prefix numbers independently** (`SEC00001` exists while `US` is
   in the teens). Nothing parses the shape: the board renders `id` through `titleProperty` and
@@ -103,7 +126,7 @@ checkout silently share one board's configuration ([[ADR-0026]]).
   `plugins/dispatch-setup/skills/dispatch-setup/assets/commands/` is a *different artifact* — the
   seed a fresh project is scaffolded from — and is deliberately not governed by this rule.
 - **Tracker** GitHub Issues. A ticket links to its issue through `discussion:`;
-  `scripts/dispatch/move-ticket.mjs` reads that property on drag. Only `Released`/`Rejected` have a
+  `dispatch/scripts/move-ticket.mjs` reads that property on drag. Only `Released`/`Rejected` have a
   GitHub counterpart (close/close-not-planned) — the rest, `Done` included, just mean "open",
   because closed on GitHub means shipped. The same script
   mirrors `version_target` onto the issue as a **GitHub milestone** of the same name, creating
@@ -136,11 +159,15 @@ checkout silently share one board's configuration ([[ADR-0026]]).
   count, including an explicit "none, because …". Where nothing has counted the property stays
   empty — empty is no statement, `0` is a claim that the gate is already met.
 - **Small-bug shortcut (ADR-0030).** An explicitly invoked `/fix-bug` may omit the separate review session only for a known, small-blast-radius fix. It must create the durable ticket first, verify the reproduction and mechanical gates, record actual results, count remaining checks, freeze the finalized contract and stamp completion plus the tracker mirror. No outstanding questions or manual checks may remain. An omitted review leaves `open_findings` empty, never a fabricated `0`. Scope growth or a failed check stops before Done. Ordinary development and `/test-plan` keep their review gate; the shortcut does not invoke `/test-plan` with that gate unmet.
-- **Starter portability (ADR-0029).** This repo continues to use its git-ignored `wiki` symlink. Consuming projects may temporarily retain an absolute vault lookup in scaffolded workflows until US00033; notes, shared settings and chip repo fields remain path-free.
-- **Ownership.** Every page carries `owner:`, a person resolving to `wiki/00_Start-Here/Team/`,
+- **Portable vault lookup (ADR-0029).** A repository reaches its vault only through the
+  git-ignored `dispatch/wiki` link, never an absolute path. That includes a project scaffolded by
+  `dispatch-setup`: re-running setup on an older scaffold migrates it, and replaces an absolute
+  vault path in its workflows with the link. Notes, shared settings and chip repo fields stay
+  path-free.
+- **Ownership.** Every page carries `owner:`, a person resolving to `dispatch/wiki/00_Start-Here/Team/`,
   never a team. A derived page also carries `derived_from:` and `maintained_by:`, and a command
   that creates one must register its refresh — if no recurring job owns it, it may not create it.
-- **Precedence.** ADRs in `wiki/07_Engineering/Decisions` outrank ticket prose; ticket prose
+- **Precedence.** ADRs in `dispatch/wiki/07_Engineering/Decisions` outrank ticket prose; ticket prose
   outranks a stale wiki page; the code outranks any claim about the code. On a wiki ↔ GitHub
   disagreement the **wiki wins** — the issue is a mirror, not the source of truth.
 - **`accepted` and `proposed` ADRs both bind planning; only `superseded` may be ignored.** A
@@ -178,6 +205,6 @@ GitHub release with `main.js`, `manifest.json`, `styles.css`. Publishing the dra
 
 - **Every release note carries a `## GitHub release body` section**, fenced so it copies
   verbatim. The wiki is git-ignored, so that block may contain **no `[[wikilink]]` and no
-  `wiki/…` path** — both are dead on GitHub. Tickets are referenced by their
+  `dispatch/wiki/…` path** — both are dead on GitHub. Tickets are referenced by their
   `discussion:` issue URL, past releases by `…/releases/tag/<version>`, and ADRs are stated
   in prose rather than linked, because ADRs are not published. Written by `/release` step 8.

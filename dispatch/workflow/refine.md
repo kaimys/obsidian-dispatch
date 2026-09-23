@@ -8,7 +8,7 @@ Runs refinement for one ticket. `<ARGS>` is the ticket id.
 
 ## Resolve
 
-1. Find the spec: grep `id: <ARGS>` in `wiki/05_Requirements/Tickets`. Find the matching task in the GitHub Issues of the tracker repository (`tracker.repository` in `dispatch/settings.yaml`), via the GitHub MCP or the `gh` CLI. If either side is missing, stop and report it — don't refine a one-sided ticket.
+1. Find the spec: grep `id: <ARGS>` in `dispatch/wiki/05_Requirements/Tickets`. Find the matching task in the GitHub Issues of the tracker repository (`tracker.repository` in `dispatch/settings.yaml`), via the GitHub MCP or the `gh` CLI. If either side is missing, stop and report it — don't refine a one-sided ticket.
 2. Name the session `<ARGS> <short name>` so the terminal is identifiable.
 3. **Check `frozen:`.** If set, the contract zone is closed: do not reopen it. Either append to the record zone or propose a follow-up ticket, and say which you did.
 
