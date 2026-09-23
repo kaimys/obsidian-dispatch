@@ -6,9 +6,10 @@
  *   node scripts/dispatch/lint-vault.mjs --vault Dispatch-Wiki
  *   node scripts/dispatch/lint-vault.mjs --vault Dispatch-Wiki --format json
  *
- * Obsidian must already be running. The script always supplies `vault=<name>`;
- * it never relies on whichever vault window happens to be active. It reports
- * findings and writes nothing. The lint-vault workflow owns remediation.
+ * Obsidian must already be running with the named vault as the active window.
+ * Obsidian 1.13.7 on Windows ignores `vault=<name>`, so the script supplies it
+ * but verifies the answering vault around every data call. It reports findings
+ * and writes nothing. The lint-vault workflow owns remediation.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -27,7 +28,6 @@ export function commandSpecs(vault) {
 	if (!String(vault || "").trim()) throw new Error("--vault <name> is required");
 	const target = `vault=${String(vault).trim()}`;
 	return [
-		{ key: "vault", args: ["vault", "info=name", target] },
 		{ key: "unresolved", args: ["unresolved", "verbose", "format=json", target] },
 		{ key: "orphans", args: ["orphans", target] },
 		{ key: "deadends", args: ["deadends", target] },
@@ -56,6 +56,26 @@ export function parseMarkdownPaths(text) {
 		.map((line) => line.trim())
 		.filter((line) => /\.md$/i.test(line)))]
 		.sort((a, b) => a.localeCompare(b));
+}
+
+function normalizedVaultPath(path) {
+	return String(path || "").trim().replaceAll("\\", "/").replace(/^\.\//, "");
+}
+
+export function validateVaultPaths(paths, label, inputs) {
+	if (!Array.isArray(inputs.wikiFiles)) throw new Error("Vault lint inputs do not include the wiki file list");
+	const existing = new Set(inputs.wikiFiles.map((path) => normalizedVaultPath(path)));
+	return paths.map((path) => normalizedVaultPath(path)).filter(Boolean).map((path) => {
+		const absolute = /^(?:[a-z]:|\/)/i.test(path);
+		const traversal = path.split("/").some((part) => part === "." || part === "..");
+		if (absolute || traversal || !existing.has(path)) {
+			throw new Error(
+				`Obsidian CLI returned ${label} path "${path}" outside ${inputs.vault}. ` +
+				`The CLI serves the active vault window; focus ${inputs.vault} and rerun.`,
+			);
+		}
+		return path;
+	});
 }
 
 export function parseFrontmatter(text) {
@@ -124,6 +144,9 @@ export function buildReport(raw, inputs) {
 		link: String(item.link || ""),
 		count: Number(item.count || 0),
 		sources: Array.isArray(item.sources) ? item.sources.map(String) : [String(item.sources || "")].filter(Boolean),
+	})).map((item) => ({
+		...item,
+		sources: validateVaultPaths(item.sources, "unresolved source", inputs),
 	})).sort((a, b) => a.link.localeCompare(b.link));
 	const inUse = parseJson(raw.properties, "properties").map((item) => ({
 		name: String(item.name || ""),
@@ -135,11 +158,13 @@ export function buildReport(raw, inputs) {
 		...item,
 		suggestion: closestProperty(item.name, declared),
 	}));
-	const deadends = classifyDeadends(parseMarkdownPaths(raw.deadends), parseFrontmatter(inputs.rulebook));
+	const orphanPaths = validateVaultPaths(String(raw.orphans || "").split(/\r?\n/), "orphan", inputs);
+	const deadendPaths = validateVaultPaths(String(raw.deadends || "").split(/\r?\n/), "dead-end", inputs);
+	const deadends = classifyDeadends(parseMarkdownPaths(deadendPaths.join("\n")), parseFrontmatter(inputs.rulebook));
 	return {
 		vault: inputs.vault,
 		unresolved,
-		orphans: parseMarkdownPaths(raw.orphans),
+		orphans: parseMarkdownPaths(orphanPaths.join("\n")),
 		deadends,
 		properties: { inUse, undeclared },
 	};
@@ -175,17 +200,45 @@ function runCommand(cli, args, runner) {
 		const detail = String(result.stderr || result.stdout || "unknown CLI failure").trim();
 		throw new Error(`Obsidian CLI failed (${args[0]}): ${detail}`);
 	}
-	return String(result.stdout || "");
+	const stdout = String(result.stdout || "");
+	if (/^\s*Error:/i.test(stdout)) {
+		throw new Error(`Obsidian CLI failed (${args[0]}): ${stdout.trim()}`);
+	}
+	return stdout;
+}
+
+function assertActiveVault(actual, expected) {
+	const name = String(actual || "").trim();
+	if (name !== expected.trim()) {
+		throw new Error(
+			`Obsidian CLI serves the active vault window${name ? ` "${name}"` : ""}, not "${expected.trim()}". ` +
+			`Focus ${expected.trim()} and rerun.`,
+		);
+	}
 }
 
 export function collectRaw(vault, options = {}) {
 	const runner = options.runner || spawnSync;
 	const cli = options.cli || "obsidian";
-	const raw = Object.fromEntries(commandSpecs(vault).map(({ key, args }) => [key, runCommand(cli, args, runner)]));
-	if (raw.vault.trim() !== vault.trim()) {
-		throw new Error(`Obsidian CLI targeted ${raw.vault.trim() || "an unnamed vault"}, expected ${vault.trim()}`);
+	const target = `vault=${vault.trim()}`;
+	const identity = () => runCommand(cli, ["vault", "info=name", target], runner);
+	const raw = {};
+	for (const { key, args } of commandSpecs(vault)) {
+		assertActiveVault(identity(), vault);
+		raw[key] = runCommand(cli, args, runner);
+		assertActiveVault(identity(), vault);
 	}
 	return raw;
+}
+
+function listWikiFiles(root, directory = root) {
+	const files = [];
+	for (const entry of readdirSync(directory, { withFileTypes: true })) {
+		const absolute = join(directory, entry.name);
+		if (entry.isDirectory()) files.push(...listWikiFiles(root, absolute));
+		else if (entry.isFile()) files.push(absolute.slice(root.length + 1).replaceAll("\\", "/"));
+	}
+	return files;
 }
 
 export function readInputs(wiki, vault) {
@@ -201,6 +254,7 @@ export function readInputs(wiki, vault) {
 		.map((name) => readFileSync(join(templatePath, name), "utf8"));
 	return {
 		vault,
+		wikiFiles: listWikiFiles(root).sort((a, b) => a.localeCompare(b)),
 		propertyReference: readFileSync(propertyPath, "utf8"),
 		rulebook: readFileSync(rulebookPath, "utf8"),
 		templates,

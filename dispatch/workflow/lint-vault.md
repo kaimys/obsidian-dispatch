@@ -9,7 +9,8 @@ Finds and resolves vault link-graph and property drift. It takes no arguments.
 ## Detect
 
 1. Read `dispatch/invariants.md` and `wiki/02_Product/Reports/_definitions/Vault lint.md` completely.
-2. Confirm the `wiki` symlink resolves and Obsidian is running. Run:
+2. Confirm the `wiki` symlink resolves, Obsidian is running and `Dispatch-Wiki` is the active vault
+   window. Run:
    `node scripts/dispatch/lint-vault.mjs --vault Dispatch-Wiki --format json`.
 3. Exit code `0` is clean: report that briefly and make **no wiki write**, including no [[log]] entry.
    Exit code `2` is an operational failure: report it and stop. Exit code `1` is a valid report with

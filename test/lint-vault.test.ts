@@ -15,6 +15,7 @@ import {
 	parseMarkdownPaths,
 	parseUnresolved,
 	templateProperties,
+	validateVaultPaths,
 } from "../scripts/dispatch/lint-vault.mjs";
 
 const propertyReference = `
@@ -41,6 +42,7 @@ const raw = {
 	properties: JSON.stringify([
 		{ name: "id", type: "text", count: 2 },
 		{ name: "open_test", type: "number", count: 1 },
+		{ name: "aliases", type: "multitext", count: 0 },
 	]),
 };
 
@@ -49,12 +51,13 @@ const inputs = {
 	propertyReference,
 	rulebook,
 	templates: ["---\nopen_tests:\nowner:\n---\n"],
+	wikiFiles: ["A.md", "B.md", "image.png", "01_Sources/Leaf.md", "Needs a link.md", "00_Start-Here/Home.md"],
 };
 
 describe("vault lint parsing", () => {
 	it("builds every CLI command with an explicit vault", () => {
 		const specs = commandSpecs("Dispatch-Wiki");
-		expect(specs.map((item) => item.key)).toEqual(["vault", "unresolved", "orphans", "deadends", "properties"]);
+		expect(specs.map((item) => item.key)).toEqual(["unresolved", "orphans", "deadends", "properties"]);
 		for (const item of specs) expect(item.args).toContain("vault=Dispatch-Wiki");
 		expect(() => commandSpecs(" ")).toThrow("required");
 	});
@@ -72,6 +75,10 @@ describe("vault lint parsing", () => {
 
 	it("keeps unique Markdown paths and ignores assets", () => {
 		expect(parseMarkdownPaths("b.md\r\na.png\r\na.md\r\nb.md\r\n")).toEqual(["a.md", "b.md"]);
+		expect(validateVaultPaths(["a.md", "image.png"], "test", {
+			vault: "Dispatch-Wiki", wikiFiles: ["a.md", "image.png"],
+		})).toEqual(["a.md", "image.png"]);
+		expect(() => validateVaultPaths(["Other.md"], "test", inputs)).toThrow("active vault window");
 	});
 
 	it("reads frontmatter, schema tables and template keys", () => {
@@ -101,6 +108,8 @@ describe("vault lint parsing", () => {
 		expect(report.properties.undeclared).toEqual([
 			{ name: "open_test", type: "number", count: 1, suggestion: "open_tests" },
 		]);
+		expect(report.properties.inUse.map((item) => item.name)).not.toContain("aliases");
+		expect(report.properties.undeclared.map((item) => item.name)).not.toContain("aliases");
 		expect(hasFindings(report)).toBe(true);
 		expect(formatReport(report)).toContain("Result: findings");
 	});
@@ -142,13 +151,13 @@ describe("vault lint orchestration", () => {
 			status: 0, stdout: args[0] === "vault" ? "Dispatch-Wiki\n" : `${args[0]} output`, stderr: "",
 		}));
 		expect(collectRaw("Dispatch-Wiki", { runner, cli: "obsidian" })).toEqual({
-			vault: "Dispatch-Wiki\n",
 			unresolved: "unresolved output",
 			orphans: "orphans output",
 			deadends: "deadends output",
 			properties: "properties output",
 		});
-		expect(runner).toHaveBeenCalledTimes(5);
+		expect(runner).toHaveBeenCalledTimes(12);
+		for (const [, args] of runner.mock.calls) expect(args).toContain("vault=Dispatch-Wiki");
 	});
 
 	it("surfaces missing executables and stopped Obsidian", () => {
@@ -165,7 +174,46 @@ describe("vault lint orchestration", () => {
 			runner: (_cli: string, args: string[]) => ({
 				status: 0, stdout: args[0] === "vault" ? "Other\n" : "[]", stderr: "",
 			}),
-		})).toThrow("targeted Other, expected Dispatch-Wiki");
+		})).toThrow("active vault window \"Other\"");
+	});
+
+	it("fails when the active vault changes between data calls", () => {
+		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+		let dataCalls = 0;
+		const runner = (_cli: string, args: string[]) => {
+			if (args[0] === "vault") {
+				return { status: 0, stdout: dataCalls >= 2 ? "Other\n" : "Dispatch-Wiki\n", stderr: "" };
+			}
+			dataCalls += 1;
+			return { status: 0, stdout: args[0] === "unresolved" || args[0] === "properties" ? "[]" : "", stderr: "" };
+		};
+		expect(main(["--vault", "Dispatch-Wiki"], { runner, inputs })).toBe(2);
+		expect(stderr).toHaveBeenCalledWith(expect.stringContaining('active vault window "Other"'));
+		stderr.mockRestore();
+	});
+
+	it("fails closed on unknown paths and exit-zero CLI errors", () => {
+		const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+		const runner = (_cli: string, args: string[]) => ({
+			status: 0,
+			stdout: args[0] === "vault" ? "Dispatch-Wiki\n" : args[0] === "unresolved" || args[0] === "properties" ? "[]" :
+				args[0] === "orphans" ? "Other.md\n" : "",
+			stderr: "",
+		});
+		expect(main(["--vault", "Dispatch-Wiki"], { runner, inputs })).toBe(2);
+		expect(stderr).toHaveBeenLastCalledWith(expect.stringContaining("outside Dispatch-Wiki"));
+
+		const errorRunner = (_cli: string, args: string[]) => ({
+			status: 0,
+			stdout: args[0] === "vault" ? "Dispatch-Wiki\n" : args[0] === "unresolved" || args[0] === "properties" ? "[]" :
+				args[0] === "deadends" ? 'Error: Command "deadends" not found.\n' : "",
+			stderr: "",
+		});
+		expect(main(["--vault", "Dispatch-Wiki"], { runner: errorRunner, inputs })).toBe(2);
+		expect(stderr).toHaveBeenLastCalledWith(expect.stringContaining('Command "deadends" not found'));
+		stdout.mockRestore();
+		stderr.mockRestore();
 	});
 
 	it("requires the vault and validates output format", () => {
