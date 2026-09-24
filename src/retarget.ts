@@ -92,10 +92,15 @@ export interface RetargetSummary {
 	plannedRemoved: string[];
 	/** A planned source entry renumbered in place (new destination only). */
 	plannedReplaced?: { from: string; to: string };
-	/** The source tag carried to a new destination. */
+	/** The source tag carried to a new destination that had no tag. */
 	tagMoved?: string;
-	/** The source tag dropped because the destination keeps its own. */
+	/** The source tag dropped because the destination keeps its own (or merges). */
 	tagRemoved?: string;
+	/**
+	 * A leftover tag already keyed to a new destination's line, which wins over
+	 * the source tag — named so the confirmation does not hide it.
+	 */
+	tagKept?: string;
 }
 
 export type RetargetRejection<F extends FileRef = FileRef> =
@@ -153,11 +158,15 @@ export function planRetarget<F extends FileRef>(
 		} else summary.plannedRemoved.push(entry);
 	}
 
+	// The destination's tag wins, even a leftover one on a line with no
+	// column; only an untagged new destination inherits the source tag.
 	const nextTags: Record<string, string> = { ...tags };
 	const sourceTag = nextTags[sourceKey];
+	const destTag = nextTags[dest.key];
 	delete nextTags[sourceKey];
+	if (!existing && destTag !== undefined) summary.tagKept = destTag;
 	if (sourceTag !== undefined) {
-		if (existing) summary.tagRemoved = sourceTag;
+		if (existing || destTag !== undefined) summary.tagRemoved = sourceTag;
 		else {
 			nextTags[dest.key] = sourceTag;
 			summary.tagMoved = sourceTag;

@@ -468,8 +468,11 @@ export class BoardView extends ItemView {
 				cls: "dispatch-column-header dispatch-milestone-header",
 			});
 			// Right-click only: left-clicks stay with the expand toggle and the tag.
+			// Inside the open tag input, the right-click stays the input's own
+			// cut/copy/paste menu.
 			if (isRetargetSource(col)) {
 				header.addEventListener("contextmenu", (e) => {
+					if (e.target instanceof HTMLElement && e.target.closest("input")) return;
 					e.preventDefault();
 					const menu = new Menu();
 					menu.addItem((item) =>
@@ -1739,6 +1742,9 @@ class RetargetConfirmModal extends Modal {
 			details.push(`Planned version ${s.plannedRemoved.join(", ")} is removed.`);
 		}
 		if (s.tagMoved !== undefined) details.push(`Tag "${s.tagMoved}" moves to ${plan.destKey}.`);
+		if (s.tagKept !== undefined) {
+			details.push(`${plan.destKey} keeps the tag "${s.tagKept}" it already has.`);
+		}
 		if (s.tagRemoved !== undefined) {
 			details.push(`Tag "${s.tagRemoved}" of ${plan.sourceKey} is removed.`);
 		}

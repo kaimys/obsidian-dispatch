@@ -176,6 +176,33 @@ describe("a new destination from a planned source", () => {
 	});
 });
 
+describe("a leftover tag on a new destination's line wins", () => {
+	// tags["0.6"] outlived its column; 0.6 has no planned entry and no card.
+	const cards = [card("A", "v0.4.0")];
+
+	it("keeps it over the source tag, and drops the source tag", () => {
+		const p = plan({ cards, destination: "0.6", tags: { "0.4": "MVP", "0.6": "Old" } });
+		expect(p.destinationExists).toBe(false);
+		expect(p.tags).toEqual({ "0.6": "Old" });
+		expect(p.summary.tagKept).toBe("Old");
+		expect(p.summary.tagRemoved).toBe("MVP");
+		expect(p.summary.tagMoved).toBeUndefined();
+	});
+
+	it("keeps it when the source is untagged", () => {
+		const p = plan({ cards, destination: "0.6", tags: { "0.6": "Old" } });
+		expect(p.tags).toEqual({ "0.6": "Old" });
+		expect(p.summary.tagKept).toBe("Old");
+		expect(p.summary.tagRemoved).toBeUndefined();
+	});
+
+	it("an untagged new destination still inherits the source tag", () => {
+		const p = plan({ cards, destination: "0.6", tags: { "0.4": "MVP" } });
+		expect(p.tags).toEqual({ "0.6": "MVP" });
+		expect(p.summary.tagKept).toBeUndefined();
+	});
+});
+
 describe("a new destination from a discovered source", () => {
 	it("leaves planned untouched and moves the tag", () => {
 		const planned = Object.freeze(["v0.3.0"]);
@@ -297,6 +324,16 @@ describe("the destination picker and the re-plan check", () => {
 		expect(sameRetarget(before, after)).toBe(false);
 		const retagged = plan({ ...base, tags: { "0.4": "GA" }, cards: [card("A", "v0.4.0")] });
 		expect(sameRetarget(before, retagged)).toBe(false);
+	});
+
+	it("sameRetarget spots a higher patch arriving on a merge destination", () => {
+		const cards = [card("A", "v0.4.0"), card("P", "v0.5.2")];
+		const before = plan({ cards, plannedVersions: ["v0.5.0"] });
+		const after = plan({ cards: [...cards, card("Q", "v0.5.3")], plannedVersions: ["v0.5.0"] });
+		expect(before.writeValue).toBe("v0.5.2");
+		expect(after.writeValue).toBe("v0.5.3");
+		expect(paths(after)).toEqual(paths(before));
+		expect(sameRetarget(before, after)).toBe(false);
 	});
 });
 
