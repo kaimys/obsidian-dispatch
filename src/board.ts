@@ -1,4 +1,15 @@
-import { App, ItemView, Menu, Modal, Notice, TFile, WorkspaceLeaf, debounce, setIcon } from "obsidian";
+import {
+	App,
+	ItemView,
+	Menu,
+	Modal,
+	Notice,
+	SuggestModal,
+	TFile,
+	WorkspaceLeaf,
+	debounce,
+	setIcon,
+} from "obsidian";
 import { CHIP_ICON, launchChip, launchColumnChip, launchEventChip } from "./chips";
 import { runHook, shellVars, substitute } from "./exec";
 import { renderSetupPanel } from "./setup";
@@ -16,8 +27,24 @@ import {
 } from "./cards";
 import type { CardData, CardSettings, ReleaseNote, VelocityResult } from "./cards";
 import type { FrontmatterPatch } from "./moves";
-import { buildLineColumns, buildPatchColumns, isVersionLine, linePatches } from "./milestones";
+import {
+	buildLineColumns,
+	buildPatchColumns,
+	isArchivedCard,
+	isVersionLine,
+	lineCandidates,
+	linePatches,
+} from "./milestones";
 import type { MilestoneColumn } from "./milestones";
+import {
+	isRetargetSource,
+	parseDestination,
+	planRetarget,
+	retargetBlockers,
+	retargetDestinations,
+	sameRetarget,
+} from "./retarget";
+import type { RetargetPlan, RetargetRejection } from "./retarget";
 import { frontmatterIn, frontmatterOf, updateFrontmatter } from "./vault";
 import {
 	planStatusDrop,
@@ -374,21 +401,18 @@ export class BoardView extends ItemView {
 		const velocity = this.velocityPerDay(allCards);
 		const releases = this.collectReleases();
 
-		// Built-in archive (leftmost): cards out of the roadmap — excluded
-		// statuses (e.g. Rejected) plus completed cards without a version.
-		// Keeps "(no version)" a pure pool of unscheduled open work.
-		const isArchived = (c: Card) =>
-			c.excludedFromProgress || ((c.progress ?? 0) >= 100 && !c.version);
-		const archived = cards.filter(isArchived);
-		const active = cards.filter((c) => !isArchived(c));
+		// Built-in archive (leftmost): cards out of the roadmap (isArchivedCard).
+		const archived = cards.filter(isArchivedCard);
+		const active = cards.filter((c) => !isArchivedCard(c));
 
 		// Columns come from what is on screen; what a line writes comes from
 		// every non-archived card, so a slice never downgrades a drop.
 		const shown = active.map((c) => c.version);
-		const lineOrder = buildLineColumns(ms.plannedVersions, shown, [
-			...ms.plannedVersions,
-			...allCards.filter((c) => !isArchived(c)).map((c) => c.version),
-		]);
+		const lineOrder = buildLineColumns(
+			ms.plannedVersions,
+			shown,
+			lineCandidates(ms.plannedVersions, allCards)
+		);
 		const patchesForLine = (lineKey: string): string[] =>
 			linePatches(lineKey, [...shown, ...ms.plannedVersions], releases.byPatch.keys());
 
@@ -443,6 +467,20 @@ export class BoardView extends ItemView {
 			const header = colEl.createDiv({
 				cls: "dispatch-column-header dispatch-milestone-header",
 			});
+			// Right-click only: left-clicks stay with the expand toggle and the tag.
+			if (isRetargetSource(col)) {
+				header.addEventListener("contextmenu", (e) => {
+					e.preventDefault();
+					const menu = new Menu();
+					menu.addItem((item) =>
+						item
+							.setTitle("Retarget release…")
+							.setIcon("move-right")
+							.onClick(() => this.retargetLine(col.key))
+					);
+					menu.showAtMouseEvent(e);
+				});
+			}
 			const titleRow = header.createDiv({ cls: "dispatch-milestone-title-row" });
 			// Expand a version line into its patch releases (1.4 → 1.4.0, 1.4.1 …)
 			// and collapse it again from any of those patch columns.
@@ -1439,6 +1477,120 @@ export class BoardView extends ItemView {
 		new Notice(`${card.file.basename}: ${versionKey(card.version) || "(no version)"} → ${col.display}`);
 	}
 
+	// ------------------------------------------------------ line retarget
+
+	/**
+	 * Move every card of a version line to another line (src/retarget.ts
+	 * decides every write). Finished cards are checked before the picker opens,
+	 * so nobody chooses a destination for an operation that cannot run.
+	 */
+	private retargetLine(sourceKey: string): void {
+		const cards = this.collectCards();
+		const blockers = retargetBlockers(cards, sourceKey);
+		if (blockers.length > 0) {
+			this.noticeRetargetRejected(sourceKey, { ok: false, reason: "protected", blockers });
+			return;
+		}
+		const ms = this.plugin.shared.milestones;
+		new RetargetSuggestModal(
+			this.app,
+			sourceKey,
+			retargetDestinations(ms.plannedVersions, cards, sourceKey),
+			ms.tags,
+			(destination) => this.confirmRetarget(sourceKey, destination)
+		).open();
+	}
+
+	private planRetarget(sourceKey: string, destination: string) {
+		const ms = this.plugin.shared.milestones;
+		return planRetarget({
+			cards: this.collectCards(),
+			sourceKey,
+			destination,
+			versionProperty: ms.versionProperty,
+			plannedVersions: ms.plannedVersions,
+			tags: ms.tags,
+		});
+	}
+
+	private confirmRetarget(sourceKey: string, destination: string): void {
+		const plan = this.planRetarget(sourceKey, destination);
+		if (!plan.ok) {
+			this.noticeRetargetRejected(sourceKey, plan);
+			return;
+		}
+		new RetargetConfirmModal(this.app, plan, () => void this.performRetarget(plan, destination)).open();
+	}
+
+	/**
+	 * Re-plan from fresh state, then write the notes and — only when every note
+	 * succeeded — the settings. Obsidian has no multi-file undo, so a partial
+	 * batch is made retryable instead of rolled back: the notes that moved are
+	 * off the source line, and a second run plans only the rest.
+	 */
+	private async performRetarget(confirmed: RetargetPlan<TFile>, destination: string): Promise<void> {
+		const plan = this.planRetarget(confirmed.sourceKey, destination);
+		if (!plan.ok || !sameRetarget(confirmed, plan)) {
+			new Notice("The board changed while the dialog was open. Nothing was written.", 8000);
+			return;
+		}
+		const route = `${plan.sourceKey} → ${plan.writeValue}`;
+		const failed: string[] = [];
+		for (const patch of plan.patches) {
+			try {
+				await this.applyPatch(patch);
+			} catch {
+				failed.push(patch.file.basename);
+			}
+		}
+		if (failed.length > 0) {
+			new Notice(
+				`Retarget ${route} stopped: ${failed.length} of ${plan.patches.length} notes could not be ` +
+					`written (${failed.join(", ")}). The ${plan.sourceKey} column and its tag were left ` +
+					`unchanged; run the retarget again to move the rest.`,
+				10000
+			);
+			return;
+		}
+		const ms = this.plugin.shared.milestones;
+		ms.plannedVersions = plan.plannedVersions;
+		ms.tags = plan.tags;
+		try {
+			await this.plugin.saveShared();
+		} catch (err) {
+			new Notice(
+				`Retarget ${route}: the tickets moved, but the board settings could not be saved ` +
+					`(${err instanceof Error ? err.message : String(err)}).`,
+				10000
+			);
+			return;
+		}
+		new Notice(`Retargeted ${ticketCount(plan.summary.cardCount)}: ${route}.`);
+	}
+
+	private noticeRetargetRejected(sourceKey: string, rejection: RetargetRejection<TFile>): void {
+		let text: string;
+		if (rejection.reason === "protected") {
+			const n = rejection.blockers.length;
+			const { titleProperty } = this.plugin.shared.board;
+			const ids = rejection.blockers
+				.map((c) => displayValue(c.raw[titleProperty]) || c.file.basename)
+				.join(", ");
+			text =
+				`Can't retarget ${sourceKey}: ${ticketCount(n)} ${n === 1 ? "is" : "are"} finished ` +
+				`(${ids}). Nothing was changed.`;
+		} else if (rejection.reason === "same-line") {
+			text =
+				`Can't retarget ${sourceKey} within its own line. Pick a different release line; ` +
+				`drag a single card to change its patch. Nothing was changed.`;
+		} else {
+			text =
+				`Can't retarget ${sourceKey}: the destination must be a version such as v0.6.0. ` +
+				`Nothing was changed.`;
+		}
+		new Notice(text, 8000);
+	}
+
 	// ------------------------------------------------------------------ misc
 
 	private notifyStatusChange(file: TFile, oldStatus: string, newStatus: string): void {
@@ -1491,6 +1643,121 @@ export class BoardView extends ItemView {
 			attr: { title: "Show board problems" },
 		});
 		badge.addEventListener("click", () => new ProblemsModal(this.app, problems).open());
+	}
+}
+
+function ticketCount(n: number): string {
+	return `${n} ticket${n === 1 ? "" : "s"}`;
+}
+
+interface RetargetChoice {
+	/** What the planner is handed: a line key or the typed text. */
+	destination: string;
+	label: string;
+	detail?: string;
+}
+
+/** The single destination control: existing lines, plus a typed new version. */
+class RetargetSuggestModal extends SuggestModal<RetargetChoice> {
+	constructor(
+		app: App,
+		private sourceKey: string,
+		private destinations: MilestoneColumn[],
+		private tags: Readonly<Record<string, string>>,
+		private onChoose: (destination: string) => void
+	) {
+		super(app);
+		this.setPlaceholder(`Move ${sourceKey} to… pick a release line or type a version`);
+		this.emptyStateText = "No matching release line. Type a version such as v0.6.0.";
+	}
+
+	getSuggestions(query: string): RetargetChoice[] {
+		const q = query.trim().toLowerCase();
+		const parsed = parseDestination(query);
+		const choices: RetargetChoice[] = this.destinations
+			.filter((c) =>
+				parsed
+					? c.key === parsed.key
+					: !q || c.key.includes(q) || (this.tags[c.key] ?? "").toLowerCase().includes(q)
+			)
+			.map((c) => {
+				const tag = this.tags[c.key];
+				return {
+					destination: c.key,
+					label: tag ? `${c.key} · ${tag}` : c.key,
+					detail: `Existing release: tickets get ${c.writeValue}`,
+				};
+			});
+		if (parsed && !this.destinations.some((c) => c.key === parsed.key)) {
+			const value = `v${parsed.key}.${parsed.patch ?? 0}`;
+			choices.unshift(
+				parsed.key === this.sourceKey
+					? { destination: query.trim(), label: value, detail: `Same line as ${this.sourceKey}` }
+					: { destination: query.trim(), label: `New release ${value}` }
+			);
+		}
+		return choices;
+	}
+
+	renderSuggestion(choice: RetargetChoice, el: HTMLElement): void {
+		el.createDiv({ text: choice.label });
+		if (choice.detail) el.createEl("small", { cls: "dispatch-retarget-detail", text: choice.detail });
+	}
+
+	onChooseSuggestion(choice: RetargetChoice): void {
+		this.onChoose(choice.destination);
+	}
+}
+
+/** Names what one click is about to write to N notes and the shared settings. */
+class RetargetConfirmModal extends Modal {
+	constructor(
+		app: App,
+		private plan: RetargetPlan<TFile>,
+		private onConfirm: () => void
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		const { plan } = this;
+		const s = plan.summary;
+		this.titleEl.setText(`Retarget ${plan.sourceKey}?`);
+		this.contentEl.createEl("p", {
+			text:
+				`Move ${ticketCount(s.cardCount)} from ${plan.sourceKey} to ${plan.writeValue} ` +
+				`and remove the ${plan.sourceKey} column?`,
+		});
+		const details: string[] = [];
+		if (plan.destinationExists) {
+			details.push(`${plan.destKey} already exists: its tickets and tag stay as they are.`);
+		}
+		if (s.plannedReplaced) {
+			details.push(`Planned version ${s.plannedReplaced.from} becomes ${s.plannedReplaced.to}.`);
+		}
+		if (s.plannedRemoved.length > 0) {
+			details.push(`Planned version ${s.plannedRemoved.join(", ")} is removed.`);
+		}
+		if (s.tagMoved !== undefined) details.push(`Tag "${s.tagMoved}" moves to ${plan.destKey}.`);
+		if (s.tagRemoved !== undefined) {
+			details.push(`Tag "${s.tagRemoved}" of ${plan.sourceKey} is removed.`);
+		}
+		details.push("Board automations do not run for this change.");
+		const list = this.contentEl.createEl("ul", { cls: "dispatch-retarget-list" });
+		for (const line of details) list.createEl("li", { text: line });
+
+		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
+		const ok = row.createEl("button", { cls: "mod-cta", text: "Retarget" });
+		ok.addEventListener("click", () => {
+			this.close();
+			this.onConfirm();
+		});
+		const cancel = row.createEl("button", { text: "Cancel" });
+		cancel.addEventListener("click", () => this.close());
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
 	}
 }
 
