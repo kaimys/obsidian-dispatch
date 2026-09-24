@@ -262,7 +262,7 @@ export class DispatchSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Planned versions")
 			.setDesc(
-				"One per line, in the exact form drops should write (e.g. v1.2.0). These columns are always shown, even when empty; versions found in notes appear automatically."
+				"One version per line, such as v1.2.0. These columns are always shown, even when empty; versions found in notes appear automatically. A drop on a version line writes its highest known patch in the form v1.2.3, listed here or not; other labels are written as listed."
 			)
 			.addTextArea((ta) =>
 				ta

@@ -16,13 +16,14 @@ import {
 } from "./cards";
 import type { CardData, CardSettings, ReleaseNote, VelocityResult } from "./cards";
 import type { FrontmatterPatch } from "./moves";
+import { buildLineColumns, buildPatchColumns, isVersionLine, linePatches } from "./milestones";
+import type { MilestoneColumn } from "./milestones";
 import { frontmatterIn, frontmatterOf, updateFrontmatter } from "./vault";
 import {
 	planStatusDrop,
 	planVersionDrop,
 } from "./moves";
 import {
-	comparePatchKeys,
 	compareRanks,
 	displayValue,
 	parseOpenActionOwners,
@@ -70,33 +71,7 @@ interface MeetingCard {
 
 type Card = CardData<TFile>;
 
-interface MilestoneColumn {
-	/** Normalized major.minor key ("" = no version). */
-	key: string;
-	display: string;
-	/** Exact value a drop writes into the version property ("" = remove it). */
-	writeValue: string;
-	/** Position in plannedVersions (discovered columns get a large index). */
-	order: number;
-	/** True for a patch column of an expanded line (1.4.0, 1.4.1, …). */
-	isPatch?: boolean;
-	/** For a patch column: the major.minor line it belongs to. */
-	line?: string;
-}
-
 type ReleaseInfo = ReleaseNote<TFile>;
-
-/**
- * Special (non-version) columns like "Rejected" or "Icebox" sort leftmost, in
- * their plannedVersions order; semver columns follow, ascending.
- */
-function compareMilestoneColumns(a: MilestoneColumn, b: MilestoneColumn): number {
-	const pa = a.key.match(/^(\d+)\.(\d+)$/);
-	const pb = b.key.match(/^(\d+)\.(\d+)$/);
-	if (!pa !== !pb) return pa ? 1 : -1;
-	if (pa && pb) return Number(pa[1]) - Number(pb[1]) || Number(pa[2]) - Number(pb[2]);
-	return a.order - b.order || a.key.localeCompare(b.key);
-}
 
 export class BoardView extends ItemView {
 	private plugin: DispatchPlugin;
@@ -407,59 +382,25 @@ export class BoardView extends ItemView {
 		const archived = cards.filter(isArchived);
 		const active = cards.filter((c) => !isArchived(c));
 
-		const columns = new Map<string, MilestoneColumn>();
-		ms.plannedVersions.forEach((v, i) => {
-			const key = versionKey(v);
-			if (key && !columns.has(key)) columns.set(key, { key, display: key, writeValue: v, order: i });
-		});
-		for (const card of active) {
-			if (!card.version) continue;
-			const key = versionKey(card.version);
-			if (!columns.has(key))
-				columns.set(key, { key, display: key, writeValue: key, order: Number.MAX_SAFE_INTEGER });
-		}
-		const lineOrder = [...columns.values()].sort(compareMilestoneColumns);
-
-		// Patch keys belonging to a version line — from its cards, its planned
-		// versions and its release notes (so shipped patches show even with no
-		// open ticket left).
-		const patchesForLine = (lineKey: string): string[] => {
-			const set = new Set<string>();
-			for (const c of active) {
-				if (c.version && versionKey(c.version) === lineKey) set.add(patchKey(c.version));
-			}
-			for (const v of ms.plannedVersions) {
-				if (versionKey(v) === lineKey) set.add(patchKey(v));
-			}
-			for (const key of releases.byPatch.keys()) {
-				if (versionKey(key) === lineKey) set.add(key);
-			}
-			return [...set].sort(comparePatchKeys);
-		};
+		// Columns come from what is on screen; what a line writes comes from
+		// every non-archived card, so a slice never downgrades a drop.
+		const shown = active.map((c) => c.version);
+		const lineOrder = buildLineColumns(ms.plannedVersions, shown, [
+			...ms.plannedVersions,
+			...allCards.filter((c) => !isArchived(c)).map((c) => c.version),
+		]);
+		const patchesForLine = (lineKey: string): string[] =>
+			linePatches(lineKey, [...shown, ...ms.plannedVersions], releases.byPatch.keys());
 
 		// Expand the lines the user opened into one column per patch version.
 		const ordered: MilestoneColumn[] = [];
 		for (const col of lineOrder) {
-			const patches = /^\d+\.\d+$/.test(col.key) ? patchesForLine(col.key) : [];
+			const patches = isVersionLine(col.key) ? patchesForLine(col.key) : [];
 			if (!this.expandedLines.has(col.key) || patches.length === 0) {
 				ordered.push(col);
 				continue;
 			}
-			for (const p of patches) {
-				// Write the planned spelling when we have one (keeps the "v" prefix
-				// convention), otherwise mirror the line's own spelling.
-				const planned = ms.plannedVersions.find((v) => patchKey(v) === p);
-				const writeValue =
-					planned ?? (/^[vV]/.test(col.writeValue) ? `v${p}` : p);
-				ordered.push({
-					key: p,
-					display: p,
-					writeValue,
-					order: col.order,
-					isPatch: true,
-					line: col.key,
-				});
-			}
+			ordered.push(...buildPatchColumns(col, patches));
 		}
 
 		if (archived.length > 0) {
