@@ -733,3 +733,15 @@
 	border-radius: var(--radius-s);
 	user-select: text;
 }
+
+/* ---------- Release line retarget ---------- */
+
+.dispatch-retarget-detail {
+	display: block;
+	color: var(--text-muted);
+}
+
+.dispatch-retarget-list {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}

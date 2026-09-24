@@ -6,6 +6,7 @@
  * "vMAJOR.MINOR.PATCH" form (ADR-0036); non-version labels ("Icebox") keep the
  * spelling they were planned or discovered with.
  */
+import type { CardData } from "./cards";
 import { comparePatchKeys, patchKey, versionKey } from "./parse";
 
 export interface MilestoneColumn {
@@ -59,6 +60,26 @@ export function lineWriteValue(lineKey: string, candidates: readonly string[]): 
 		if (patch > highest) highest = patch;
 	}
 	return `v${lineKey}.${highest}`;
+}
+
+type ArchiveFields = Pick<CardData, "excludedFromProgress" | "progress" | "version">;
+
+/**
+ * Cards out of the roadmap, shown in the (archive) column: excluded statuses
+ * (e.g. Rejected) plus completed cards without a version — which keeps
+ * "(no version)" a pure pool of unscheduled open work.
+ */
+export function isArchivedCard(card: ArchiveFields): boolean {
+	return card.excludedFromProgress || ((card.progress ?? 0) >= 100 && !card.version);
+}
+
+/**
+ * What decides a numeric line's write value: the planned entries plus the
+ * version of every non-archived card. Pass every card, not a slice, so a
+ * slice hiding the highest patch never downgrades a write.
+ */
+export function lineCandidates(planned: readonly string[], cards: readonly ArchiveFields[]): string[] {
+	return [...planned, ...cards.filter((c) => !isArchivedCard(c)).map((c) => c.version)];
 }
 
 /**
