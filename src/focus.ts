@@ -90,10 +90,23 @@ export function resolveKey(grid: FocusGrid, key: string): KeyAction | null {
 }
 
 /**
- * A card's note and, for a todo card (`file#line`), the line to open it at.
- * Only a trailing `#<digits>` is a line; any other `#` is part of the path.
+ * The focus key of an upcoming calendar event with a linked note. Two events
+ * can link the same note, so the note path alone would give both rows one
+ * identity (the outline would land on the first). Obsidian forbids `:` in
+ * file names, so the suffix cannot collide with a real path.
  */
-export function splitCardPath(path: string): { path: string; line?: number } {
-	const m = path.match(/^(.*)#(\d+)$/);
-	return m ? { path: m[1], line: Number(m[2]) } : { path };
+export function upcomingCardKey(notePath: string, index: number): string {
+	return `${notePath}:upcoming:${index}`;
+}
+
+/**
+ * A card key's note and, for a todo card (`file#line`), the line to open it
+ * at. Only a trailing `#<digits>` is a line; any other `#` is part of the
+ * path. An upcoming event's key (`upcomingCardKey`) opens its linked note.
+ */
+export function splitCardPath(key: string): { path: string; line?: number } {
+	const upcoming = key.match(/^(.*):upcoming:\d+$/);
+	if (upcoming) return { path: upcoming[1] };
+	const m = key.match(/^(.*)#(\d+)$/);
+	return m ? { path: m[1], line: Number(m[2]) } : { path: key };
 }

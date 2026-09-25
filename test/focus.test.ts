@@ -6,7 +6,7 @@
  * test plan (ADR-0016); what a key resolves to is asserted here.
  */
 import { describe, expect, it } from "vitest";
-import { focusTarget, resolveKey, splitCardPath } from "../src/focus";
+import { focusTarget, resolveKey, splitCardPath, upcomingCardKey } from "../src/focus";
 import type { FocusGrid } from "../src/focus";
 
 /** Backlog [A, B] · In progress [] · Review [C] · Done [D, E, F] */
@@ -128,5 +128,34 @@ describe("splitCardPath", () => {
 	it("keeps a # that is not a trailing line number", () => {
 		expect(splitCardPath("a/#tag b.md")).toEqual({ path: "a/#tag b.md" });
 		expect(splitCardPath("a/b#x.md")).toEqual({ path: "a/b#x.md" });
+	});
+});
+
+describe("upcoming events that link the same note", () => {
+	// Two calendar events on one date with a single meeting note: both link it.
+	const NOTE = "09_Meetings/2026-09-30 - Sync.md";
+	const first = upcomingCardKey(NOTE, 0);
+	const second = upcomingCardKey(NOTE, 1);
+	const meetings = [[first, second, "09_Meetings/2026-09-01 - Intro.md"]];
+
+	it("gives each event its own identity, so the clicked one is the one outlined", () => {
+		expect(first).not.toBe(second);
+		expect(focusTarget([second], second, meetings)).toBe(second);
+	});
+
+	it("navigation advances past both", () => {
+		const nav = (target: string, key: string) =>
+			resolveKey({ columns: meetings, target, movable: false }, key);
+		expect(nav(first, "ArrowDown")).toEqual({ kind: "focus", path: second });
+		expect(nav(second, "ArrowDown")).toEqual({
+			kind: "focus",
+			path: "09_Meetings/2026-09-01 - Intro.md",
+		});
+		expect(nav(second, "ArrowUp")).toEqual({ kind: "focus", path: first });
+	});
+
+	it("opening either opens the linked note", () => {
+		expect(splitCardPath(first)).toEqual({ path: NOTE });
+		expect(splitCardPath(second)).toEqual({ path: NOTE });
 	});
 });

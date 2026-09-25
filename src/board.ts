@@ -49,7 +49,7 @@ import {
 import type { RetargetPlan, RetargetRejection } from "./retarget";
 import { isCopyOrderSource, planCopyReleaseOrder, sameCopyPlan } from "./release-order";
 import type { CopyOrderPlan } from "./release-order";
-import { focusTarget, resolveKey, splitCardPath } from "./focus";
+import { focusTarget, resolveKey, splitCardPath, upcomingCardKey } from "./focus";
 import { frontmatterIn, frontmatterOf, updateFrontmatter } from "./vault";
 import { planReleaseDrop, planStatusDrop } from "./moves";
 import type { DropAnchor } from "./moves";
@@ -936,11 +936,11 @@ export class BoardView extends ItemView {
 					text: `no events in the next ${this.plugin.shared.meetings.calendarLookaheadDays} days`,
 				});
 			}
-			for (const event of events.slice(0, 6)) {
+			events.slice(0, 6).forEach((event, index) => {
 				const note = this.findMeetingNoteForEvent(event, meetings);
 				if (note) linkedPaths.add(note.file.path);
-				this.renderUpcomingRow(list, event, note);
-			}
+				this.renderUpcomingRow(list, event, note, index);
+			});
 			list.createEl("hr", { cls: "dispatch-meeting-divider" });
 		}
 
@@ -982,7 +982,8 @@ export class BoardView extends ItemView {
 	private renderUpcomingRow(
 		parent: HTMLElement,
 		event: { start: Date; title: string; allDay: boolean },
-		note: MeetingCard | undefined
+		note: MeetingCard | undefined,
+		index: number
 	): void {
 		const d = event.start;
 		const pad = (n: number) => String(n).padStart(2, "0");
@@ -1004,10 +1005,12 @@ export class BoardView extends ItemView {
 		if (note) {
 			badges.createSpan({ cls: "dispatch-badge dispatch-upcoming-agenda", text: "agenda ✓" });
 			el.setAttr("title", note.file.basename);
-			// Focusable like a meeting row: the linked note is not listed again below.
-			el.setAttr("data-path", note.file.path);
+			// Focusable like a meeting row, under its own key: two events can
+			// link the same note.
+			const key = upcomingCardKey(note.file.path, index);
+			el.setAttr("data-path", key);
 			el.addEventListener("click", () => {
-				this.setFocus(note.file.path);
+				this.setFocus(key);
 				void this.openFromBoard(note.file);
 			});
 		} else {
