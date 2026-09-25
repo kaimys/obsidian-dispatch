@@ -30,6 +30,7 @@ import type { FrontmatterPatch } from "./moves";
 import {
 	buildLineColumns,
 	buildPatchColumns,
+	inColumn,
 	isArchivedCard,
 	isVersionLine,
 	lineCandidates,
@@ -55,7 +56,6 @@ import {
 	displayValue,
 	parseOpenActionOwners,
 	parseTodoItems,
-	patchKey,
 	sliceKey,
 	versionKey,
 } from "./parse";
@@ -442,11 +442,7 @@ export class BoardView extends ItemView {
 			const colCards = (
 				isArchive
 					? archived
-					: active.filter((c) =>
-							col.isPatch
-								? patchKey(c.version) === col.key
-								: versionKey(c.version) === col.key
-						)
+					: active.filter((c) => inColumn(c, col))
 			).sort(
 				(a, b) =>
 					a.statusIdx - b.statusIdx ||

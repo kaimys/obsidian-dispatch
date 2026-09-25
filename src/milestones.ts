@@ -62,6 +62,18 @@ export function lineWriteValue(lineKey: string, candidates: readonly string[]): 
 	return `v${lineKey}.${highest}`;
 }
 
+/**
+ * Whether a card belongs to a column: a patch column holds its exact patch,
+ * every other column its normalized line or label. The board fills columns
+ * with this and a drop uses it to decide "already there", so the two agree.
+ */
+export function inColumn(
+	card: Pick<CardData, "version">,
+	col: Pick<MilestoneColumn, "key" | "isPatch">
+): boolean {
+	return col.isPatch ? patchKey(card.version) === col.key : versionKey(card.version) === col.key;
+}
+
 type ArchiveFields = Pick<CardData, "excludedFromProgress" | "progress" | "version">;
 
 /**

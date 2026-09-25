@@ -10,7 +10,7 @@
 import { sortByRank } from "./cards";
 import type { CardData, FileRef } from "./cards";
 import { substitute } from "./exec";
-import { versionKey } from "./parse";
+import { inColumn } from "./milestones";
 import type { AutomationRule } from "./settings";
 
 /** Spacing between freshly assigned ranks — leaves room for midpoint inserts. */
@@ -196,14 +196,16 @@ export function planRankInsert<F extends FileRef>(
  * Plan a Release Plan drop: write the column's canonical version, or remove the
  * property for the (no version) column. Null when the card is already in that
  * column — dropping a card back on its own column must not rewrite the value,
- * which is what keeps a hand-written "v1.4.0" from being reformatted.
+ * which is what keeps a hand-written "v1.4.0" from being reformatted. A patch
+ * column holds its exact patch, so "already in it" is decided the same way
+ * the board fills it (`inColumn`).
  */
 export function planVersionDrop<F extends FileRef>(
 	card: CardData<F>,
-	col: { key: string; writeValue: string },
+	col: { key: string; writeValue: string; isPatch?: boolean },
 	versionProperty: string
 ): FrontmatterPatch<F> | null {
-	if (versionKey(card.version) === col.key) return null;
+	if (inColumn(card, col)) return null;
 	if (col.writeValue === "") return { file: card.file, set: {}, unset: [versionProperty] };
 	return { file: card.file, set: { [versionProperty]: col.writeValue } };
 }

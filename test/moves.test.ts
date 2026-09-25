@@ -260,12 +260,16 @@ describe("planVersionDrop", () => {
 		expect(planVersionDrop(c(""), { key: "", writeValue: "" }, VERSION)).toBeNull();
 	});
 
-	it("still rewrites when dropped on its own patch column", () => {
-		// Current behaviour: the guard compares major.minor, so a patch column
-		// never matches and the same value is written back. Harmless, but it is
-		// a write where none is needed.
-		const patch = planVersionDrop(c("v1.4.1"), { key: "1.4.1", writeValue: "v1.4.1" }, VERSION);
-		expect(patch?.set).toEqual({ version_target: "v1.4.1" });
+	it("leaves a card alone when dropped on its own patch column", () => {
+		// The guard used to compare major.minor, so a patch column never
+		// matched and a hand-written "1.4.1" came back as "v1.4.1" (US00043).
+		const own = { key: "1.4.1", writeValue: "v1.4.1", isPatch: true };
+		expect(planVersionDrop(c("v1.4.1"), own, VERSION)).toBeNull();
+		expect(planVersionDrop(c("1.4.1"), own, VERSION)).toBeNull();
+		// The bare bucket of an expanded line holds only patch-less values.
+		const bare = { key: "1.4", writeValue: "v1.4.0", isPatch: true };
+		expect(planVersionDrop(c("v1.4"), bare, VERSION)).toBeNull();
+		expect(planVersionDrop(c("v1.4.1"), bare, VERSION)?.set).toEqual({ version_target: "v1.4.0" });
 	});
 
 	describe("onto columns built from the board (ADR-0036)", () => {
