@@ -231,7 +231,8 @@ export interface ReleaseDropPlan<F extends FileRef = FileRef> {
  * untouched by ordering) and the release order (`planRankInsert` over the
  * column's ordering scope), merged into one patch per note. Null when neither
  * changes — a drop back on its own spot, or a same-column drop with the
- * release order off. Archived cards never get a position.
+ * release order off. A card that is archived after the drop (excluded, or
+ * finished without a version) gets no position.
  */
 export function planReleaseDrop<F extends FileRef>(
 	cards: CardData<F>[],
@@ -247,7 +248,11 @@ export function planReleaseDrop<F extends FileRef>(
 	const versionOnly = versionPatch
 		? { moved, versionChanged: true, patches: [versionPatch] }
 		: null;
-	if (!opts.releaseOrderProperty || isArchivedCard(moved)) return versionOnly;
+	if (!opts.releaseOrderProperty) return versionOnly;
+	// Archived is judged after the drop: a finished card without a version
+	// leaves the archive by getting one, and then belongs to the line's order.
+	const versionAfter = versionPatch ? col.writeValue : moved.version;
+	if (isArchivedCard({ ...moved, version: versionAfter })) return versionOnly;
 
 	const withMoved = orderingScope(cards, col);
 	const scope = withMoved.filter((c) => c !== moved);

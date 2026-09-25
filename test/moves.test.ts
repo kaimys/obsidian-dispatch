@@ -410,10 +410,43 @@ describe("planReleaseDrop", () => {
 			expect(sets(plan)).toEqual([["x.md", { version_target: "v0.4.0" }, undefined]]);
 		});
 
-		it("gives an archived card no position", () => {
-			const cards = [...ranked(), rc("old", "", { status: "Deployed" })];
-			const plan = planReleaseDrop(cards, "old.md", line05, { before: "a.md" }, on);
-			expect(sets(plan)).toEqual([["old.md", { version_target: "v0.5.0" }, undefined]]);
+		describe("the archive", () => {
+			// Finished without a version: archived until a drop gives it one.
+			const finished = () => rc("old", "", { status: "Deployed", release_rank: 0 });
+
+			it("positions a finished card leaving the archive, ignoring its stale rank", () => {
+				const plan = planReleaseDrop([...ranked(), finished()], "old.md", line04, { before: "b.md" }, on);
+				expect(sets(plan)).toEqual([["old.md", { version_target: "v0.4.0", release_rank: 1536 }, undefined]]);
+			});
+
+			it("appends a finished card the keyboard moves out of the archive", () => {
+				const plan = planReleaseDrop([...ranked(), finished()], "old.md", line04, "end", on);
+				expect(sets(plan)).toEqual([
+					["old.md", { version_target: "v0.4.0", release_rank: 3072 + RANK_GAP }, undefined],
+				]);
+			});
+
+			it("gives no position to a card that stays archived", () => {
+				const settings = {
+					...CARD_SETTINGS,
+					columns: [...CARD_SETTINGS.columns, { value: "Rejected", excluded: true }],
+				};
+				const rejected = buildCard(
+					{ path: "no.md", basename: "no" },
+					{ status: "Rejected", version_target: "v0.5.0", release_rank: 0 },
+					settings
+				);
+				const plan = planReleaseDrop([...ranked(), rejected], "no.md", line04, { before: "b.md" }, on);
+				expect(sets(plan)).toEqual([["no.md", { version_target: "v0.4.0" }, undefined]]);
+			});
+
+			it("gives no position to a finished card sent to (no version)", () => {
+				const done = rc("done", "v0.4.0", { status: "Deployed", release_rank: 1024 });
+				const loose = rc("loose", "", { release_rank: 1024 });
+				const noVersion = { key: "", writeValue: "" };
+				const plan = planReleaseDrop([done, loose], "done.md", noVersion, { before: "loose.md" }, on);
+				expect(sets(plan)).toEqual([["done.md", {}, [VERSION]]]);
+			});
 		});
 	});
 
