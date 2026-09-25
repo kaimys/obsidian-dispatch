@@ -1547,6 +1547,7 @@ export class BoardView extends ItemView {
 			sourceKey,
 			destination,
 			versionProperty: ms.versionProperty,
+			releaseOrderProperty: ms.releaseOrderProperty,
 			plannedVersions: ms.plannedVersions,
 			tags: ms.tags,
 		});
@@ -1770,6 +1771,14 @@ class RetargetConfirmModal extends Modal {
 		const details: string[] = [];
 		if (plan.destinationExists) {
 			details.push(`${plan.destKey} already exists: its tickets and tag stay as they are.`);
+		}
+		if (s.destinationRenumbered !== undefined) {
+			details.push(
+				`The moved tickets follow ${plan.destKey}'s own in the release order; ` +
+					`${ticketCount(s.destinationRenumbered)} of ${plan.destKey} ${
+						s.destinationRenumbered === 1 ? "is" : "are"
+					} renumbered to make room.`
+			);
 		}
 		if (s.plannedReplaced) {
 			details.push(`Planned version ${s.plannedReplaced.from} becomes ${s.plannedReplaced.to}.`);
