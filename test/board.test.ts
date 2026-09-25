@@ -98,6 +98,21 @@ describe("building a card", () => {
 		expect(card("US00008").completedAt).toBe(Date.parse("2026-08-07"));
 	});
 
+	it("reads the release order only when a property is configured", () => {
+		const f = { path: "t.md", basename: "t" };
+		const fm = { release_rank: "2048", rank: 1024 };
+		expect(buildCard(f, fm, CARD_SETTINGS).releaseRank).toBe(2048);
+		expect(buildCard(f, fm, { ...CARD_SETTINGS, releaseOrderProperty: "" }).releaseRank).toBeUndefined();
+		expect(buildCard(f, { release_rank: "soon" }, CARD_SETTINGS).releaseRank).toBeUndefined();
+	});
+
+	it("ships with release ordering off, including for a vault saved before it existed", () => {
+		expect(DEFAULT_SHARED.milestones.releaseOrderProperty).toBe("");
+		const { releaseOrderProperty: _omitted, ...older } = DEFAULT_SHARED.milestones;
+		const loaded = normalizeMilestones({ ...DEFAULT_SHARED.milestones, ...older });
+		expect(loaded.releaseOrderProperty).toBe("");
+	});
+
 	it("drops a nested object badge instead of rendering [object Object]", () => {
 		// US00007 has `priority: { level: high, reason: regression }`, which
 		// cannot be shown as a badge — the type badge is kept, that one is not.

@@ -275,6 +275,18 @@ export class DispatchSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Release order property")
+			.setDesc(
+				"Frontmatter property storing the manual build order within each version column, such as release_rank. Written on drag & drop, separately from the order property. Leave empty to keep sorting by status."
+			)
+			.addText((t) =>
+				t.setValue(this.plugin.shared.milestones.releaseOrderProperty).onChange(async (v) => {
+					this.plugin.shared.milestones.releaseOrderProperty = v.trim();
+					await this.plugin.saveShared();
+				})
+			);
+
+		new Setting(containerEl)
 			.setName("Size property")
 			.setDesc(
 				"Numeric frontmatter property used as the ticket's weight in the progress metric. Missing or invalid values count as 1."

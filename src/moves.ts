@@ -150,9 +150,9 @@ export function planRankInsert<F extends FileRef>(
 	const nextRank = idx < scope.length ? rankOf(scope[idx]) : undefined;
 
 	const ranks = scope.map(rankOf);
-	const strictlyRanked =
-		ranks.every((r) => r !== undefined) &&
-		ranks.every((r, i) => i === 0 || (ranks[i - 1] as number) < (r as number));
+	const strictlyRanked = ranks.every(
+		(r, i) => r !== undefined && (i === 0 || (ranks[i - 1] ?? Infinity) < r)
+	);
 
 	// Preferred path: touch only the moved notes.
 	let placed: number[] | undefined;

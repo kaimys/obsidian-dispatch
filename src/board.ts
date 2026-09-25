@@ -167,6 +167,7 @@ export class BoardView extends ItemView {
 			findingsProperty: b.findingsProperty,
 			discussionProperty: b.discussionProperty,
 			orderProperty: b.orderProperty,
+			releaseOrderProperty: m.releaseOrderProperty,
 			columns: b.columns,
 			versionProperty: m.versionProperty,
 			sizeProperty: m.sizeProperty,

@@ -25,6 +25,8 @@ export interface CardData<F extends FileRef = FileRef> {
 	title: string;
 	badges: string[];
 	rank?: number;
+	/** Manual position on the Release Plan (the release order property). */
+	releaseRank?: number;
 	version: string;
 	size: number;
 	assignee?: string;
@@ -72,6 +74,7 @@ export interface CardSettings {
 	findingsProperty: string;
 	discussionProperty: string;
 	orderProperty: string;
+	releaseOrderProperty: string;
 	columns: ColumnConfig[];
 	versionProperty: string;
 	sizeProperty: string;
@@ -87,6 +90,15 @@ function parseCount(raw: unknown): number | undefined {
 	if (raw === "" || raw === null || raw === undefined) return undefined;
 	const n = typeof raw === "number" ? raw : Number(raw);
 	return Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined;
+}
+
+/** A numeric order property (a number or numeric string); undefined when unset, off or unusable. */
+function parseRank(fm: Record<string, unknown>, property: string): number | undefined {
+	if (!property) return undefined;
+	const raw = fm[property];
+	if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+	if (typeof raw === "string" && raw.trim() !== "" && !Number.isNaN(Number(raw))) return Number(raw);
+	return undefined;
 }
 
 /** Normalize a folder list: strip slashes, drop blanks. */
@@ -120,13 +132,8 @@ export function buildCard<F extends FileRef>(
 
 	const badges = s.badgeProperties.map((p) => displayValue(fm[p])).filter((v) => v !== "");
 
-	let rank: number | undefined;
-	if (s.orderProperty) {
-		const raw = fm[s.orderProperty];
-		if (typeof raw === "number" && Number.isFinite(raw)) rank = raw;
-		else if (typeof raw === "string" && raw.trim() !== "" && !Number.isNaN(Number(raw)))
-			rank = Number(raw);
-	}
+	const rank = parseRank(fm, s.orderProperty);
+	const releaseRank = parseRank(fm, s.releaseOrderProperty);
 
 	const rawVersion = fm[s.versionProperty];
 	const version =
@@ -169,6 +176,7 @@ export function buildCard<F extends FileRef>(
 		title,
 		badges,
 		rank,
+		releaseRank,
 		version,
 		size,
 		assignee,
