@@ -7,7 +7,7 @@
  * spelling they were planned or discovered with.
  */
 import type { CardData } from "./cards";
-import { comparePatchKeys, patchKey, versionKey } from "./parse";
+import { comparePatchKeys, compareRanks, patchKey, versionKey } from "./parse";
 
 export interface MilestoneColumn {
 	/** Normalized major.minor key ("" = no version). */
@@ -72,6 +72,23 @@ export function inColumn(
 	col: Pick<MilestoneColumn, "key" | "isPatch">
 ): boolean {
 	return col.isPatch ? patchKey(card.version) === col.key : versionKey(card.version) === col.key;
+}
+
+type OrderFields = Pick<CardData, "releaseRank" | "statusIdx" | "rank" | "title">;
+
+/**
+ * Release Plan order within a column: the manual release order first
+ * (ascending), then — for cards without one — by pipeline stage, Kanban rank
+ * and title. With the release order off no card has a release rank, so this
+ * is exactly the status-first sort the board used before it existed.
+ */
+export function compareReleaseOrder(a: OrderFields, b: OrderFields): number {
+	return (
+		compareRanks(a.releaseRank, b.releaseRank) ||
+		a.statusIdx - b.statusIdx ||
+		compareRanks(a.rank, b.rank) ||
+		a.title.localeCompare(b.title)
+	);
 }
 
 type ArchiveFields = Pick<CardData, "excludedFromProgress" | "progress" | "version">;
@@ -153,4 +170,23 @@ export function buildPatchColumns(line: MilestoneColumn, patches: readonly strin
 		isPatch: true,
 		line: line.key,
 	}));
+}
+
+/**
+ * The sequence a Release Plan position belongs to, in display order: the whole
+ * line for a patch column of an expanded line (one order per line), the
+ * column's own cards otherwise. Archived cards are never part of one.
+ */
+export function orderingScope<C extends CardData>(
+	cards: readonly C[],
+	col: Pick<MilestoneColumn, "key" | "isPatch" | "line">
+): C[] {
+	const line = col.isPatch && col.line !== undefined ? col.line : undefined;
+	return cards
+		.filter(
+			(c) =>
+				!isArchivedCard(c) &&
+				(line !== undefined ? versionKey(c.version) === line : inColumn(c, col))
+		)
+		.sort(compareReleaseOrder);
 }

@@ -4,13 +4,18 @@
  * tracker mirror, as a GitHub milestone title — so every spelling matters.
  */
 import { describe, expect, it } from "vitest";
+import { buildCard } from "../src/cards";
 import {
 	buildLineColumns,
 	buildPatchColumns,
 	canonicalVersion,
+	compareReleaseOrder,
+	inColumn,
 	lineWriteValue,
 	linePatches,
+	orderingScope,
 } from "../src/milestones";
+import { CARD_SETTINGS } from "./harness";
 
 /** Line columns when the same versions are both on screen and candidates. */
 const lines = (planned: string[], cards: string[]) =>
@@ -124,3 +129,60 @@ describe("canonicalVersion", () => {
 		expect(canonicalVersion("1.4.2")).toBe("v1.4.2");
 	});
 });
+
+/** A card on the Release Plan: version, status and both order properties. */
+const rc = (name: string, version: string, fm: Record<string, unknown> = {}) =>
+	buildCard(
+		{ path: `${name}.md`, basename: name },
+		{ status: "Refinement", version_target: version, ...fm },
+		CARD_SETTINGS
+	);
+const names = (cards: { file: { basename: string } }[]) => cards.map((c) => c.file.basename);
+
+describe("column membership", () => {
+	it("puts a patch column's own patch in it, and the line's cards in the line", () => {
+		const patch = { key: "0.4.1", isPatch: true };
+		expect(inColumn(rc("a", "v0.4.1"), patch)).toBe(true);
+		expect(inColumn(rc("a", "0.4.1"), patch)).toBe(true);
+		expect(inColumn(rc("a", "v0.4.2"), patch)).toBe(false);
+		expect(inColumn(rc("a", "v0.4.2"), { key: "0.4" })).toBe(true);
+		expect(inColumn(rc("a", ""), { key: "" })).toBe(true);
+	});
+});
+
+describe("release order", () => {
+	it("reduces to the status-first sort when no card has a release rank", () => {
+		const cards = [
+			rc("late", "v0.4.0", { status: "Development", rank: 1 }),
+			rc("b", "v0.4.0", { rank: 2048 }),
+			rc("a", "v0.4.0", { rank: 1024 }),
+			rc("z", "v0.4.0"),
+		];
+		expect(names([...cards].sort(compareReleaseOrder))).toEqual(["a", "b", "z", "late"]);
+	});
+
+	it("puts ranked cards first, overriding status, and the rest after in today's order", () => {
+		const cards = [
+			rc("new", "v0.4.0", { rank: 1 }),
+			rc("done", "v0.4.0", { status: "Deployed", release_rank: 1024 }),
+			rc("backlog", "v0.4.0", { status: "Ready for Refinement", release_rank: 2048 }),
+		];
+		expect(names([...cards].sort(compareReleaseOrder))).toEqual(["done", "backlog", "new"]);
+	});
+
+	it("scopes an expanded line's patch column to the whole line, never the archive", () => {
+		const cards = [
+			rc("p2", "v0.4.2", { release_rank: 1024 }),
+			rc("p1", "v0.4.1", { release_rank: 2048 }),
+			rc("other", "v0.5.0", { release_rank: 1 }),
+		];
+		const patch = { key: "0.4.1", isPatch: true, line: "0.4" };
+		expect(names(orderingScope(cards, patch))).toEqual(["p2", "p1"]);
+		expect(names(orderingScope(cards, { key: "0.4" }))).toEqual(["p2", "p1"]);
+		const archived = rc("gone", "", { status: "Deployed" });
+		expect(orderingScope([archived, rc("open", "")], { key: "" }).map((c) => c.file.basename)).toEqual([
+			"open",
+		]);
+	});
+});
+

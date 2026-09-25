@@ -10,7 +10,8 @@
 import { sortByRank } from "./cards";
 import type { CardData, FileRef } from "./cards";
 import { substitute } from "./exec";
-import { inColumn } from "./milestones";
+import { inColumn, isArchivedCard, orderingScope } from "./milestones";
+import type { MilestoneColumn } from "./milestones";
 import type { AutomationRule } from "./settings";
 
 /** Spacing between freshly assigned ranks — leaves room for midpoint inserts. */
@@ -208,4 +209,78 @@ export function planVersionDrop<F extends FileRef>(
 	if (inColumn(card, col)) return null;
 	if (col.writeValue === "") return { file: card.file, set: {}, unset: [versionProperty] };
 	return { file: card.file, set: { [versionProperty]: col.writeValue } };
+}
+
+/**
+ * Where a Release Plan drop lands, named by the visible card it lands before —
+ * or after, at the end of a list — rather than by an index: a sliced column
+ * shows fewer cards than the sequence the position is written into.
+ * "end" appends (the keyboard move).
+ */
+export type DropAnchor = { before: string } | { after: string } | "end";
+
+export interface ReleaseDropPlan<F extends FileRef = FileRef> {
+	moved: CardData<F>;
+	/** True when the drop writes a version, i.e. the card changes column. */
+	versionChanged: boolean;
+	patches: FrontmatterPatch<F>[];
+}
+
+/**
+ * Plan a Release Plan drop with its position: the version (`planVersionDrop`,
+ * untouched by ordering) and the release order (`planRankInsert` over the
+ * column's ordering scope), merged into one patch per note. Null when neither
+ * changes — a drop back on its own spot, or a same-column drop with the
+ * release order off. Archived cards never get a position.
+ */
+export function planReleaseDrop<F extends FileRef>(
+	cards: CardData<F>[],
+	path: string,
+	col: Pick<MilestoneColumn, "key" | "writeValue" | "isPatch" | "line">,
+	anchor: DropAnchor,
+	opts: { versionProperty: string; releaseOrderProperty: string }
+): ReleaseDropPlan<F> | null {
+	const moved = cards.find((c) => c.file.path === path);
+	if (!moved) return null;
+
+	const versionPatch = planVersionDrop(moved, col, opts.versionProperty);
+	const versionOnly = versionPatch
+		? { moved, versionChanged: true, patches: [versionPatch] }
+		: null;
+	if (!opts.releaseOrderProperty || isArchivedCard(moved)) return versionOnly;
+
+	const withMoved = orderingScope(cards, col);
+	const scope = withMoved.filter((c) => c !== moved);
+	const origIdx = withMoved.indexOf(moved);
+	const indexOf = (target: string) => {
+		if (target === path) return origIdx;
+		return scope.findIndex((c) => c.file.path === target);
+	};
+	let idx = -1;
+	if (anchor !== "end" && "before" in anchor) idx = indexOf(anchor.before);
+	else if (anchor !== "end") {
+		const after = indexOf(anchor.after);
+		idx = after === -1 ? -1 : anchor.after === path ? after : after + 1;
+	}
+	// An anchor that left the scope while the card was dragged appends.
+	if (idx === -1) idx = scope.length;
+
+	// Already at that spot: only the version (if any) changes.
+	if (idx === origIdx) return versionOnly;
+
+	const { patches } = planRankInsert(
+		scope,
+		[moved],
+		idx,
+		(c) => c.releaseRank,
+		opts.releaseOrderProperty
+	);
+	if (versionPatch) {
+		for (const patch of patches) {
+			if (patch.file.path !== path) continue;
+			patch.set = { ...versionPatch.set, ...patch.set };
+			if (versionPatch.unset) patch.unset = versionPatch.unset;
+		}
+	}
+	return { moved, versionChanged: versionPatch !== null, patches };
 }
