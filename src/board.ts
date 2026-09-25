@@ -30,6 +30,8 @@ import type { FrontmatterPatch } from "./moves";
 import {
 	buildLineColumns,
 	buildPatchColumns,
+	compareReleaseOrder,
+	inColumn,
 	isArchivedCard,
 	isVersionLine,
 	lineCandidates,
@@ -45,17 +47,16 @@ import {
 	sameRetarget,
 } from "./retarget";
 import type { RetargetPlan, RetargetRejection } from "./retarget";
+import { isCopyOrderSource, planCopyReleaseOrder, sameCopyPlan } from "./release-order";
+import type { CopyOrderPlan } from "./release-order";
 import { frontmatterIn, frontmatterOf, updateFrontmatter } from "./vault";
-import {
-	planStatusDrop,
-	planVersionDrop,
-} from "./moves";
+import { planReleaseDrop, planStatusDrop } from "./moves";
+import type { DropAnchor } from "./moves";
 import {
 	compareRanks,
 	displayValue,
 	parseOpenActionOwners,
 	parseTodoItems,
-	patchKey,
 	sliceKey,
 	versionKey,
 } from "./parse";
@@ -167,6 +168,7 @@ export class BoardView extends ItemView {
 			findingsProperty: b.findingsProperty,
 			discussionProperty: b.discussionProperty,
 			orderProperty: b.orderProperty,
+			releaseOrderProperty: m.releaseOrderProperty,
 			columns: b.columns,
 			versionProperty: m.versionProperty,
 			sizeProperty: m.sizeProperty,
@@ -439,20 +441,16 @@ export class BoardView extends ItemView {
 		let pipelineBefore = 0;
 		for (const col of ordered) {
 			const isArchive = col.key === ARCHIVE_KEY;
-			const colCards = (
-				isArchive
-					? archived
-					: active.filter((c) =>
-							col.isPatch
-								? patchKey(c.version) === col.key
-								: versionKey(c.version) === col.key
-						)
-			).sort(
-				(a, b) =>
-					a.statusIdx - b.statusIdx ||
-					compareRanks(a.rank, b.rank) ||
-					a.title.localeCompare(b.title)
-			);
+			// The archive is history, not a plan: it keeps the status-first
+			// sort even for cards that still carry a release rank.
+			const colCards = isArchive
+				? [...archived].sort(
+						(a, b) =>
+							a.statusIdx - b.statusIdx ||
+							compareRanks(a.rank, b.rank) ||
+							a.title.localeCompare(b.title)
+					)
+				: active.filter((c) => inColumn(c, col)).sort(compareReleaseOrder);
 
 			const colEl = board.createDiv({
 				cls: "dispatch-column",
@@ -462,6 +460,7 @@ export class BoardView extends ItemView {
 							"data-col-key": col.key,
 							"data-col-write": col.writeValue,
 							"data-col-display": col.display,
+							...(col.isPatch ? { "data-col-line": col.line ?? "" } : {}),
 						},
 			});
 			const header = colEl.createDiv({
@@ -481,6 +480,20 @@ export class BoardView extends ItemView {
 							.setIcon("move-right")
 							.onClick(() => this.retargetLine(col.key))
 					);
+					if (
+						isCopyOrderSource(
+							col,
+							this.plugin.shared.milestones.releaseOrderProperty,
+							this.plugin.shared.board.orderProperty
+						)
+					) {
+						menu.addItem((item) =>
+							item
+								.setTitle("Copy release order to Kanban")
+								.setIcon("list-ordered")
+								.onClick(() => this.copyReleaseOrder(col.key))
+						);
+					}
 					menu.showAtMouseEvent(e);
 				});
 			}
@@ -555,7 +568,7 @@ export class BoardView extends ItemView {
 			pipelineBefore += colRemaining;
 
 			const list = colEl.createDiv({ cls: "dispatch-cards" });
-			if (!isArchive) this.makeVersionDropTarget(colEl, col);
+			if (!isArchive) this.makeVersionDropTarget(colEl, list, col);
 			for (const card of colCards) this.renderCard(list, card, true);
 		}
 	}
@@ -1370,14 +1383,19 @@ export class BoardView extends ItemView {
 			if (status === undefined) return;
 			void this.moveCard(this.focusedPath, status, Number.MAX_SAFE_INTEGER);
 		} else {
-			const { colKey, colWrite, colDisplay } = colEl.dataset;
+			const { colKey, colWrite, colDisplay, colLine } = colEl.dataset;
 			if (colKey === undefined) return;
-			void this.moveCardToVersion(this.focusedPath, {
-				key: colKey,
-				writeValue: colWrite ?? "",
-				display: colDisplay ?? colKey,
-				order: 0,
-			});
+			void this.moveCardToVersion(
+				this.focusedPath,
+				{
+					key: colKey,
+					writeValue: colWrite ?? "",
+					display: colDisplay ?? colKey,
+					order: 0,
+					...(colLine !== undefined ? { isPatch: true, line: colLine } : {}),
+				},
+				"end"
+			);
 		}
 	}
 
@@ -1452,32 +1470,66 @@ export class BoardView extends ItemView {
 
 	// ----------------------------------------------------- version drag&drop
 
-	private makeVersionDropTarget(colEl: HTMLElement, col: MilestoneColumn): void {
+	private makeVersionDropTarget(colEl: HTMLElement, list: HTMLElement, col: MilestoneColumn): void {
+		const ordered = () => this.plugin.shared.milestones.releaseOrderProperty !== "";
 		colEl.addEventListener("dragover", (e) => {
 			e.preventDefault();
 			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
 			colEl.addClass("dispatch-drop-active");
+			if (!ordered()) return;
+			this.clearInsertMarkers(list);
+			const index = this.insertionIndex(list, e.clientY);
+			const children = Array.from(list.children) as HTMLElement[];
+			if (index < children.length) children[index].addClass("dispatch-insert-before");
+			else list.addClass("dispatch-insert-end");
 		});
 		colEl.addEventListener("dragleave", (e) => {
 			if (e.relatedTarget instanceof Node && colEl.contains(e.relatedTarget)) return;
 			colEl.removeClass("dispatch-drop-active");
+			this.clearInsertMarkers(list);
 		});
 		colEl.addEventListener("drop", (e) => {
 			e.preventDefault();
 			colEl.removeClass("dispatch-drop-active");
+			this.clearInsertMarkers(list);
 			const path = e.dataTransfer?.getData("text/plain");
-			if (path) void this.moveCardToVersion(path, col);
+			if (path) void this.moveCardToVersion(path, col, this.dropAnchor(list, e.clientY));
 		});
 	}
 
-	private async moveCardToVersion(path: string, col: MilestoneColumn): Promise<void> {
-		const card = this.collectCards().find((c) => c.file.path === path);
-		if (!card) return;
-		const patch = planVersionDrop(card, col, this.plugin.shared.milestones.versionProperty);
-		// Same column — the raw value stays untouched (no format rewrite).
-		if (!patch) return;
-		await this.applyPatch(patch);
-		new Notice(`${card.file.basename}: ${versionKey(card.version) || "(no version)"} → ${col.display}`);
+	/**
+	 * The visible card a drop lands before — or after the last one — so the
+	 * planner positions it in the full column whatever a slice hides.
+	 */
+	private dropAnchor(list: HTMLElement, y: number): DropAnchor {
+		const children = Array.from(list.children) as HTMLElement[];
+		const index = this.insertionIndex(list, y);
+		const before = children[index]?.dataset.path;
+		if (before !== undefined) return { before };
+		const after = children[children.length - 1]?.dataset.path;
+		return after !== undefined ? { after } : "end";
+	}
+
+	private async moveCardToVersion(
+		path: string,
+		col: MilestoneColumn,
+		anchor: DropAnchor
+	): Promise<void> {
+		const ms = this.plugin.shared.milestones;
+		const cards = this.collectCards();
+		const plan = planReleaseDrop(cards, path, col, anchor, {
+			versionProperty: ms.versionProperty,
+			releaseOrderProperty: ms.releaseOrderProperty,
+		});
+		// Same spot, or same column with ordering off — nothing is written.
+		if (!plan) return;
+		for (const patch of plan.patches) await this.applyPatch(patch);
+		// A reorder is silent, like one on the Kanban tab; no automation runs.
+		if (plan.versionChanged) {
+			new Notice(
+				`${plan.moved.file.basename}: ${versionKey(plan.moved.version) || "(no version)"} → ${col.display}`
+			);
+		}
 	}
 
 	// ------------------------------------------------------ line retarget
@@ -1511,6 +1563,7 @@ export class BoardView extends ItemView {
 			sourceKey,
 			destination,
 			versionProperty: ms.versionProperty,
+			releaseOrderProperty: ms.releaseOrderProperty,
 			plannedVersions: ms.plannedVersions,
 			tags: ms.tags,
 		});
@@ -1592,6 +1645,48 @@ export class BoardView extends ItemView {
 				`Nothing was changed.`;
 		}
 		new Notice(text, 8000);
+	}
+
+	// ------------------------------------------------- copy release order
+
+	private planCopyOrder(lineKey: string): CopyOrderPlan<TFile> {
+		return planCopyReleaseOrder(this.collectCards(), lineKey, this.plugin.shared.board.orderProperty);
+	}
+
+	/** Seed the Kanban order from a line's release order (src/release-order.ts decides every write). */
+	private copyReleaseOrder(lineKey: string): void {
+		const plan = this.planCopyOrder(lineKey);
+		if (plan.patches.length === 0) {
+			new Notice(`The Kanban order already follows ${lineKey}'s release order. Nothing was changed.`);
+			return;
+		}
+		new CopyOrderConfirmModal(this.app, plan, () => void this.performCopyOrder(plan)).open();
+	}
+
+	/** Re-plan from fresh state and write only what the dialog described. */
+	private async performCopyOrder(confirmed: CopyOrderPlan<TFile>): Promise<void> {
+		const plan = this.planCopyOrder(confirmed.lineKey);
+		if (!sameCopyPlan(confirmed, plan)) {
+			new Notice("The board changed while the dialog was open. Nothing was written.", 8000);
+			return;
+		}
+		const failed: string[] = [];
+		for (const patch of plan.patches) {
+			try {
+				await this.applyPatch(patch);
+			} catch {
+				failed.push(patch.file.basename);
+			}
+		}
+		if (failed.length > 0) {
+			new Notice(
+				`Copying ${plan.lineKey}'s release order stopped: ${failed.length} of ${plan.patches.length} ` +
+					`notes could not be written (${failed.join(", ")}). Run it again to finish.`,
+				10000
+			);
+			return;
+		}
+		new Notice(`The Kanban order now starts with ${plan.lineKey}'s release order.`);
 	}
 
 	// ------------------------------------------------------------------ misc
@@ -1735,6 +1830,14 @@ class RetargetConfirmModal extends Modal {
 		if (plan.destinationExists) {
 			details.push(`${plan.destKey} already exists: its tickets and tag stay as they are.`);
 		}
+		if (s.destinationRenumbered !== undefined) {
+			details.push(
+				`The moved tickets follow ${plan.destKey}'s own in the release order; ` +
+					`${ticketCount(s.destinationRenumbered)} of ${plan.destKey} ${
+						s.destinationRenumbered === 1 ? "is" : "are"
+					} renumbered to make room.`
+			);
+		}
 		if (s.plannedReplaced) {
 			details.push(`Planned version ${s.plannedReplaced.from} becomes ${s.plannedReplaced.to}.`);
 		}
@@ -1754,6 +1857,50 @@ class RetargetConfirmModal extends Modal {
 
 		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
 		const ok = row.createEl("button", { cls: "mod-cta", text: "Retarget" });
+		ok.addEventListener("click", () => {
+			this.close();
+			this.onConfirm();
+		});
+		const cancel = row.createEl("button", { text: "Cancel" });
+		cancel.addEventListener("click", () => this.close());
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
+/** Names what "Copy release order to Kanban" is about to write. */
+class CopyOrderConfirmModal extends Modal {
+	constructor(
+		app: App,
+		private plan: CopyOrderPlan<TFile>,
+		private onConfirm: () => void
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		const { plan } = this;
+		const n = plan.patches.length;
+		this.titleEl.setText(`Copy ${plan.lineKey}'s release order to Kanban?`);
+		this.contentEl.createEl("p", {
+			text:
+				`${plan.lineKey}'s tickets move to the top of ${plan.columns.join(", ")} on the Kanban tab, ` +
+				`in release order. Every other card keeps its order below them.`,
+		});
+		const list = this.contentEl.createEl("ul", { cls: "dispatch-retarget-list" });
+		for (const line of [
+			`Writes the Kanban order of ${n} ${n === 1 ? "note" : "notes"}; status and version stay as they are.`,
+			"There is no undo: the previous Kanban order is overwritten.",
+			"The two orders stay independent afterwards: a later release reorder does not copy again.",
+			"Board automations do not run for this change.",
+		]) {
+			list.createEl("li", { text: line });
+		}
+
+		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
+		const ok = row.createEl("button", { cls: "mod-cta", text: "Copy order" });
 		ok.addEventListener("click", () => {
 			this.close();
 			this.onConfirm();

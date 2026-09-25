@@ -204,7 +204,7 @@ Mistakes that silently produce a broken board:
 - Columns are **objects**, not pipe strings. The UI's `-` progress becomes `"excluded": true` — *never* `"progress": "-"`. Omit `label` to display the raw value; omit `wip` for no limit.
 - `chips.templates` (card chips) and `chips.columnTemplates` (batch chips on the column header; prompts get `{{ids}}`, `{{status}}`, `{{count}}`) are **separate lists**.
 - With more than one selected agent, write **one template per intent**, omit `tool`, and give command chips a stable `intent`. Never clone a workflow into `(Claude)` and `(Codex)` rows: one row already opens the per-tool picker, and the device config below supplies each agent's invocation prefix. Apply the same rule to meeting/calendar command chips.
-- Empty means off: `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` disables the forecast, `board.orderProperty: ""` disables manual ordering, and an empty badge property drops that badge.
+- Empty means off: `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` disables the forecast, `board.orderProperty: ""` disables manual ordering, `milestones.releaseOrderProperty: ""` (the default) keeps the Release Plan sorted by status, and an empty badge property drops that badge.
 - `milestones.tags` is keyed by normalized `major.minor` (`"1.2"`), `plannedVersions` by the canonical write form (`"v1.2.0"`) — a drop writes that exact string.
 - Every automation rule carries all four keys; a `set`-only rule keeps `"repo": ""` and `"command": ""`.
 

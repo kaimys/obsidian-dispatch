@@ -7,7 +7,14 @@ import { describe, expect, it } from "vitest";
 import { buildCard } from "../src/cards";
 import type { CardData, FileRef } from "../src/cards";
 import { buildLineColumns, buildPatchColumns } from "../src/milestones";
-import { RANK_GAP, planStatusDrop, planVersionDrop, ruleSetsFor } from "../src/moves";
+import {
+	RANK_GAP,
+	planRankInsert,
+	planReleaseDrop,
+	planStatusDrop,
+	planVersionDrop,
+	ruleSetsFor,
+} from "../src/moves";
 import { CARD_SETTINGS, loadVault } from "./harness";
 
 const STATUS = "status";
@@ -131,6 +138,64 @@ describe("planStatusDrop — renormalizing a messy column", () => {
 	});
 });
 
+describe("planRankInsert — placing a block of cards", () => {
+	const rankOf = (c: CardData<FileRef>) => c.rank;
+	const scope = [card("a.md", "Dev", 1024), card("b.md", "Dev", 2048), card("c.md", "Dev", 3072)];
+	const block = [card("x.md", "Todo"), card("y.md", "Todo")];
+
+	it("spaces a block evenly between two neighbours, writing only the block", () => {
+		const plan = planRankInsert(scope, block, 1, rankOf, ORDER);
+		expect(plan.renormalized).toBe(false);
+		expect(plan.patches.map((p) => [p.file.path, p.set[ORDER]])).toEqual([
+			["x.md", 1365],
+			["y.md", 1706],
+		]);
+	});
+
+	it("puts a block a gap apart at either end", () => {
+		expect(planRankInsert(scope, block, 3, rankOf, ORDER).patches.map((p) => p.set[ORDER])).toEqual([
+			3072 + RANK_GAP,
+			3072 + 2 * RANK_GAP,
+		]);
+		expect(planRankInsert(scope, block, 0, rankOf, ORDER).patches.map((p) => p.set[ORDER])).toEqual([
+			1024 - 2 * RANK_GAP,
+			1024 - RANK_GAP,
+		]);
+		expect(planRankInsert([], block, 0, rankOf, ORDER).patches.map((p) => p.set[ORDER])).toEqual([
+			RANK_GAP,
+			2 * RANK_GAP,
+		]);
+	});
+
+	it("renumbers when the neighbours leave fewer free ranks than the block needs", () => {
+		const tight = [card("a.md", "Dev", 1024), card("b.md", "Dev", 1026)];
+		const plan = planRankInsert(tight, block, 1, rankOf, ORDER);
+		expect(plan.renormalized).toBe(true);
+		// a.md already holds 1024, so it is not written.
+		expect(plan.patches.map((p) => [p.file.path, p.set[ORDER]])).toEqual([
+			["x.md", 2048],
+			["y.md", 3072],
+			["b.md", 4096],
+		]);
+	});
+
+	it("renumbers a scope with an unranked card in its displayed order", () => {
+		const messy = [card("a.md", "Dev", 1024), card("u.md", "Dev")];
+		const plan = planRankInsert(messy, [card("x.md", "Todo")], 2, rankOf, ORDER);
+		expect(plan.renormalized).toBe(true);
+		expect(plan.patches.map((p) => [p.file.path, p.set[ORDER]])).toEqual([
+			["u.md", 2048],
+			["x.md", 3072],
+		]);
+	});
+
+	it("writes a block card even when it already holds its renumbered rank", () => {
+		const messy = [card("u.md", "Dev")];
+		const plan = planRankInsert(messy, [card("x.md", "Todo", 1024)], 0, rankOf, ORDER);
+		expect(plan.patches.map((p) => p.file.path)).toEqual(["x.md", "u.md"]);
+	});
+});
+
 describe("automation rules", () => {
 	const now = new Date("2026-08-20T10:30:00Z");
 	const stampDeployed = [{ when: ["Deployed"], set: { deployed: "{{date}}" }, repo: "", command: "" }];
@@ -202,12 +267,16 @@ describe("planVersionDrop", () => {
 		expect(planVersionDrop(c(""), { key: "", writeValue: "" }, VERSION)).toBeNull();
 	});
 
-	it("still rewrites when dropped on its own patch column", () => {
-		// Current behaviour: the guard compares major.minor, so a patch column
-		// never matches and the same value is written back. Harmless, but it is
-		// a write where none is needed.
-		const patch = planVersionDrop(c("v1.4.1"), { key: "1.4.1", writeValue: "v1.4.1" }, VERSION);
-		expect(patch?.set).toEqual({ version_target: "v1.4.1" });
+	it("leaves a card alone when dropped on its own patch column", () => {
+		// The guard used to compare major.minor, so a patch column never
+		// matched and a hand-written "1.4.1" came back as "v1.4.1" (US00043).
+		const own = { key: "1.4.1", writeValue: "v1.4.1", isPatch: true };
+		expect(planVersionDrop(c("v1.4.1"), own, VERSION)).toBeNull();
+		expect(planVersionDrop(c("1.4.1"), own, VERSION)).toBeNull();
+		// The bare bucket of an expanded line holds only patch-less values.
+		const bare = { key: "1.4", writeValue: "v1.4.0", isPatch: true };
+		expect(planVersionDrop(c("v1.4"), bare, VERSION)).toBeNull();
+		expect(planVersionDrop(c("v1.4.1"), bare, VERSION)?.set).toEqual({ version_target: "v1.4.0" });
 	});
 
 	describe("onto columns built from the board (ADR-0036)", () => {
@@ -241,3 +310,190 @@ describe("planVersionDrop", () => {
 		});
 	});
 });
+
+describe("planReleaseDrop", () => {
+	const VERSION = "version_target";
+	const RELEASE = "release_rank";
+	const on = { versionProperty: VERSION, releaseOrderProperty: RELEASE };
+	const off = { versionProperty: VERSION, releaseOrderProperty: "" };
+	const rc = (name: string, version: string, fm: Record<string, unknown> = {}) =>
+		buildCard(
+			{ path: `${name}.md`, basename: name },
+			{ status: "Refinement", version_target: version, ...fm },
+			CARD_SETTINGS
+		);
+	const line04 = { key: "0.4", writeValue: "v0.4.0" };
+	const line05 = { key: "0.5", writeValue: "v0.5.0" };
+	const ranked = () => [
+		rc("a", "v0.4.0", { release_rank: 1024 }),
+		rc("b", "v0.4.0", { release_rank: 2048 }),
+		rc("c", "v0.4.0", { release_rank: 3072 }),
+	];
+	const sets = (plan: ReturnType<typeof planReleaseDrop>) =>
+		plan?.patches.map((p) => [p.file.path, p.set, p.unset]);
+
+	describe("a reorder in place", () => {
+		it("writes only the release rank of the moved note", () => {
+			const plan = planReleaseDrop(ranked(), "c.md", line04, { before: "b.md" }, on);
+			expect(plan?.versionChanged).toBe(false);
+			expect(sets(plan)).toEqual([["c.md", { release_rank: 1536 }, undefined]]);
+		});
+
+		it("never touches a hand-written version", () => {
+			const cards = [rc("a", "0.4", { release_rank: 1024 }), rc("b", "V0.4.1", { release_rank: 2048 })];
+			const plan = planReleaseDrop(cards, "b.md", line04, { before: "a.md" }, on);
+			expect(sets(plan)).toEqual([["b.md", { release_rank: 0 }, undefined]]);
+		});
+
+		it("writes nothing when the card is dropped back on its own spot", () => {
+			expect(planReleaseDrop(ranked(), "b.md", line04, { before: "b.md" }, on)).toBeNull();
+			expect(planReleaseDrop(ranked(), "b.md", line04, { before: "c.md" }, on)).toBeNull();
+			expect(planReleaseDrop(ranked(), "b.md", line04, { after: "a.md" }, on)).toBeNull();
+			expect(planReleaseDrop(ranked(), "c.md", line04, { after: "c.md" }, on)).toBeNull();
+			expect(planReleaseDrop(ranked(), "c.md", line04, "end", on)).toBeNull();
+		});
+
+		it("writes nothing at all with the release order off", () => {
+			expect(planReleaseDrop(ranked(), "c.md", line04, { before: "a.md" }, off)).toBeNull();
+		});
+
+		it("numbers a fresh column as it was displayed on the first drop", () => {
+			// Displayed today: by status, then Kanban rank — so a, then b, then c.
+			const cards = [
+				rc("c", "v0.4.0", { status: "Development" }),
+				rc("b", "v0.4.0", { rank: 2048 }),
+				rc("a", "v0.4.0", { rank: 1024 }),
+			];
+			const plan = planReleaseDrop(cards, "c.md", line04, { before: "b.md" }, on);
+			expect(sets(plan)).toEqual([
+				["a.md", { release_rank: 1024 }, undefined],
+				["c.md", { release_rank: 2048 }, undefined],
+				["b.md", { release_rank: 3072 }, undefined],
+			]);
+		});
+	});
+
+	describe("a move to another column", () => {
+		it("writes the version and the position in one patch", () => {
+			const cards = [...ranked(), rc("x", "v0.5.0", { release_rank: 99 })];
+			const plan = planReleaseDrop(cards, "x.md", line04, { after: "a.md" }, on);
+			expect(plan?.versionChanged).toBe(true);
+			expect(sets(plan)).toEqual([["x.md", { version_target: "v0.4.0", release_rank: 1536 }, undefined]]);
+		});
+
+		it("appends without a position (the keyboard move)", () => {
+			const cards = [...ranked(), rc("x", "v0.5.0")];
+			const plan = planReleaseDrop(cards, "x.md", line04, "end", on);
+			expect(sets(plan)).toEqual([
+				["x.md", { version_target: "v0.4.0", release_rank: 3072 + RANK_GAP }, undefined],
+			]);
+		});
+
+		it("appends when the anchor card has left the column", () => {
+			const cards = [...ranked(), rc("x", "v0.5.0")];
+			const plan = planReleaseDrop(cards, "x.md", line04, { before: "gone.md" }, on);
+			expect(plan?.patches[0].set[RELEASE]).toBe(3072 + RANK_GAP);
+		});
+
+		it("orders (no version) and label columns like a line", () => {
+			const cards = [rc("a", "", { release_rank: 1024 }), rc("x", "v0.4.0")];
+			const plan = planReleaseDrop(cards, "x.md", { key: "", writeValue: "" }, { before: "a.md" }, on);
+			expect(sets(plan)).toEqual([["x.md", { release_rank: 0 }, [VERSION]]]);
+			const icebox = [rc("i", "Icebox", { release_rank: 1024 }), rc("x", "v0.4.0")];
+			const onIce = planReleaseDrop(icebox, "x.md", { key: "Icebox", writeValue: "Icebox" }, "end", on);
+			expect(sets(onIce)).toEqual([["x.md", { version_target: "Icebox", release_rank: 2048 }, undefined]]);
+		});
+
+		it("writes only the version with the release order off", () => {
+			const cards = [...ranked(), rc("x", "v0.5.0")];
+			const plan = planReleaseDrop(cards, "x.md", line04, { before: "a.md" }, off);
+			expect(sets(plan)).toEqual([["x.md", { version_target: "v0.4.0" }, undefined]]);
+		});
+
+		describe("the archive", () => {
+			// Finished without a version: archived until a drop gives it one.
+			const finished = () => rc("old", "", { status: "Deployed", release_rank: 0 });
+
+			it("positions a finished card leaving the archive, ignoring its stale rank", () => {
+				const plan = planReleaseDrop([...ranked(), finished()], "old.md", line04, { before: "b.md" }, on);
+				expect(sets(plan)).toEqual([["old.md", { version_target: "v0.4.0", release_rank: 1536 }, undefined]]);
+			});
+
+			it("appends a finished card the keyboard moves out of the archive", () => {
+				const plan = planReleaseDrop([...ranked(), finished()], "old.md", line04, "end", on);
+				expect(sets(plan)).toEqual([
+					["old.md", { version_target: "v0.4.0", release_rank: 3072 + RANK_GAP }, undefined],
+				]);
+			});
+
+			it("gives no position to a card that stays archived", () => {
+				const settings = {
+					...CARD_SETTINGS,
+					columns: [...CARD_SETTINGS.columns, { value: "Rejected", excluded: true }],
+				};
+				const rejected = buildCard(
+					{ path: "no.md", basename: "no" },
+					{ status: "Rejected", version_target: "v0.5.0", release_rank: 0 },
+					settings
+				);
+				const plan = planReleaseDrop([...ranked(), rejected], "no.md", line04, { before: "b.md" }, on);
+				expect(sets(plan)).toEqual([["no.md", { version_target: "v0.4.0" }, undefined]]);
+			});
+
+			it("gives no position to a finished card sent to (no version)", () => {
+				const done = rc("done", "v0.4.0", { status: "Deployed", release_rank: 1024 });
+				const loose = rc("loose", "", { release_rank: 1024 });
+				const noVersion = { key: "", writeValue: "" };
+				const plan = planReleaseDrop([done, loose], "done.md", noVersion, { before: "loose.md" }, on);
+				expect(sets(plan)).toEqual([["done.md", {}, [VERSION]]]);
+			});
+		});
+	});
+
+	describe("an expanded line", () => {
+		const cards = () => [
+			rc("p0", "v0.4.0", { release_rank: 1024 }),
+			rc("p1", "v0.4.1", { release_rank: 2048 }),
+			rc("q0", "v0.4.0", { release_rank: 3072 }),
+		];
+		const patch0 = { key: "0.4.0", writeValue: "v0.4.0", isPatch: true, line: "0.4" };
+		const patch1 = { key: "0.4.1", writeValue: "v0.4.1", isPatch: true, line: "0.4" };
+
+		it("positions within the line's single order", () => {
+			// q0 dropped before p0 in the 0.4.0 column: first in the whole line.
+			const plan = planReleaseDrop(cards(), "q0.md", patch0, { before: "p0.md" }, on);
+			expect(sets(plan)).toEqual([["q0.md", { release_rank: 0 }, undefined]]);
+		});
+
+		it("changes only the patch when the card keeps its place in the line", () => {
+			// p1 dropped after p0 into 0.4.0 stays second in the line.
+			const plan = planReleaseDrop(cards(), "p1.md", patch0, { after: "p0.md" }, on);
+			expect(sets(plan)).toEqual([["p1.md", { version_target: "v0.4.0" }, undefined]]);
+		});
+
+		it("renumbers the whole line, not just the patch column", () => {
+			const tight = [
+				rc("p0", "v0.4.0", { release_rank: 1024 }),
+				rc("p1", "v0.4.1", { release_rank: 1025 }),
+				rc("x", "v0.5.0"),
+			];
+			const plan = planReleaseDrop(tight, "x.md", patch1, { before: "p1.md" }, on);
+			expect(sets(plan)).toEqual([
+				["x.md", { version_target: "v0.4.1", release_rank: 2048 }, undefined],
+				["p1.md", { release_rank: 3072 }, undefined],
+			]);
+		});
+	});
+
+	describe("a sliced column", () => {
+		it("lands next to the visible neighbour, whatever the slice hides", () => {
+			// A slice shows only a and c. Dropped just above c, x lands directly
+			// before c in the full column (after the hidden b) — not at the sliced
+			// index 1, which would put it above b.
+			const cards = [...ranked(), rc("x", "v0.5.0")];
+			const plan = planReleaseDrop(cards, "x.md", line04, { before: "c.md" }, on);
+			expect(plan?.patches[0].set[RELEASE]).toBe(2560);
+		});
+	});
+});
+

@@ -10,8 +10,16 @@
  * a plan that came back `ok`.
  */
 import type { CardData, FileRef } from "./cards";
-import { buildLineColumns, isArchivedCard, isVersionLine, lineCandidates } from "./milestones";
+import {
+	buildLineColumns,
+	compareReleaseOrder,
+	isArchivedCard,
+	isVersionLine,
+	lineCandidates,
+	orderingScope,
+} from "./milestones";
 import type { MilestoneColumn } from "./milestones";
+import { planRankInsert } from "./moves";
 import type { FrontmatterPatch } from "./moves";
 import { versionKey } from "./parse";
 
@@ -81,6 +89,8 @@ export interface RetargetInput<F extends FileRef = FileRef> {
 	/** A picked line key or typed text. */
 	destination: string;
 	versionProperty: string;
+	/** The Release Plan order property; empty or absent = ordering off. */
+	releaseOrderProperty?: string;
 	plannedVersions: readonly string[];
 	tags: Readonly<Record<string, string>>;
 }
@@ -101,6 +111,11 @@ export interface RetargetSummary {
 	 * the source tag — named so the confirmation does not hide it.
 	 */
 	tagKept?: string;
+	/**
+	 * With the release order on, a merge appends the source cards after the
+	 * destination's; this many destination cards are renumbered to make room.
+	 */
+	destinationRenumbered?: number;
 }
 
 export type RetargetRejection<F extends FileRef = FileRef> =
@@ -143,12 +158,41 @@ export function planRetarget<F extends FileRef>(
 	);
 	const writeValue = existing ? existing.writeValue : `v${dest.key}.${dest.patch ?? 0}`;
 
-	const patches: FrontmatterPatch<F>[] = retargetSourceCards(cards, sourceKey).map((c) => ({
+	const sourceCards = retargetSourceCards(cards, sourceKey);
+	const patches: FrontmatterPatch<F>[] = sourceCards.map((c) => ({
 		file: c.file,
 		set: { [versionProperty]: writeValue },
 	}));
 
 	const summary: RetargetSummary = { cardCount: patches.length, plannedRemoved: [] };
+
+	// A merge appends the source line, in its own release order, after the
+	// destination's cards. A new line has nothing to interleave with, so the
+	// positions travel unchanged.
+	const releaseOrderProperty = input.releaseOrderProperty ?? "";
+	if (existing && releaseOrderProperty && sourceCards.length > 0) {
+		const destination = orderingScope(cards, { key: dest.key });
+		const ordered = [...sourceCards].sort(compareReleaseOrder);
+		const ranks = planRankInsert(
+			destination,
+			ordered,
+			destination.length,
+			(c) => c.releaseRank,
+			releaseOrderProperty
+		);
+		const byPath = new Map(patches.map((p) => [p.file.path, p]));
+		let renumbered = 0;
+		for (const rank of ranks.patches) {
+			const own = byPath.get(rank.file.path);
+			if (own) own.set = { ...own.set, ...rank.set };
+			else {
+				patches.push(rank);
+				renumbered++;
+			}
+		}
+		if (renumbered > 0) summary.destinationRenumbered = renumbered;
+	}
+
 	const nextPlanned: string[] = [];
 	for (const entry of plannedVersions) {
 		if (versionKey(entry) !== sourceKey) nextPlanned.push(entry);
@@ -192,9 +236,11 @@ export function planRetarget<F extends FileRef>(
  * open and the confirmation must describe what is actually written.
  */
 export function sameRetarget(a: RetargetPlan, b: RetargetPlan): boolean {
+	// Every write, not only which notes: a card added to the destination while
+	// the dialog is open changes the release ranks a merge appends with.
 	const paths = (p: RetargetPlan) =>
 		p.patches
-			.map((x) => x.file.path)
+			.map((x) => `${x.file.path}\t${JSON.stringify(Object.entries(x.set).sort())}`)
 			.sort()
 			.join("\n");
 	const tagsOf = (p: RetargetPlan) => JSON.stringify(Object.entries(p.tags).sort());

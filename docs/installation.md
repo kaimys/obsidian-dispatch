@@ -84,7 +84,9 @@ The sections below describe both layers as the **settings UI** presents them. If
 - **Discussion property** — a thread URL rendered as a chat icon in the card title
 - **Required properties** — drives the ⚠ problems panel (typically `id, status, updated`)
 
-**Milestones** (the Release Plan tab): version property, planned versions, per-version tags, size property, completed property, velocity look-back window, minimum completions, release-notes folder.
+**Milestones** (the Release Plan tab): version property, planned versions, per-version tags, release order property, size property, completed property, velocity look-back window, minimum completions, release-notes folder.
+
+- **Release order property** — where the manual build order inside a version column is stored (e.g. `release_rank`; empty, the default, keeps the columns sorted by status and turns off *Copy release order to Kanban*). Separate from the order property, so the Kanban and Release Plan orders never reorder each other.
 
 The forecast's velocity comes from the completions inside the look-back window. The earliest must be the only one on its UTC calendar date: it is the baseline and adds no weight. The sizes of all later completions are divided by the whole UTC days from the baseline's date through the last completion's, both ends counted — Monday to Thursday is 4 days, which is the *over N days* in the header tooltip. Gaps between completions stay in that span; days since the last completion do not. Fewer completions than *Minimum completions* (default `4`, at least `2`, since the baseline alone gives no rate) or a tie on the earliest date shows no forecast.
 
@@ -244,6 +246,7 @@ Missing keys fall back to the defaults in `src/settings.ts`, but writing the ful
     "versionProperty": "version_target",
     "plannedVersions": ["v1.1.0", "v1.2.0", "v1.3.0"],
     "tags": { "1.2": "Beta" },
+    "releaseOrderProperty": "release_rank",
     "sizeProperty": "size",
     "completedProperty": "deployed",
     "velocityWindowDays": 28,
@@ -287,7 +290,7 @@ Where the stored shape differs from the settings UI:
 
 - **Columns are objects, not `value | Label | progress | WIP` strings.** `label` may be omitted (the `value` is then displayed), an omitted `wip` means no limit, and the UI's `-` progress becomes `"excluded": true` — *not* `"progress": "-"`.
 - **`chips.templates` and `chips.columnTemplates` are separate lists** — card chips vs. batch chips on a column header. Both use `label`, `repo` and `prompt`; command chips should also have a stable `intent`, while `tool` is optional and should be omitted when the same chip must offer every configured agent. Only column prompts get `{{ids}}`, `{{status}}` and `{{count}}`.
-- **Empty means off, and hides the tab.** `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` turns the forecast off, `board.orderProperty: ""` disables manual ordering, and an empty `assigneeProperty`/`questionsProperty`/`testsProperty`/`findingsProperty`/`discussionProperty` drops that badge.
+- **Empty means off, and hides the tab.** `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` turns the forecast off, `board.orderProperty: ""` disables manual ordering, `milestones.releaseOrderProperty: ""` keeps the Release Plan sorted by status, and an empty `assigneeProperty`/`questionsProperty`/`testsProperty`/`findingsProperty`/`discussionProperty` drops that badge.
 - **The forecast numbers are read as whole numbers when the plugin loads.** `milestones.velocityWindowDays` and `milestones.velocityMinimumCompletions` may be stored as numbers or numeric strings; fractions are rounded down. A value that is not a number or is below its floor (`1` day, `2` completions) is replaced by the default (`28`, `4`), which is what the settings tab then shows.
 - **`milestones.tags` is keyed by normalized `major.minor`** (`"1.2": "Beta"`), while `plannedVersions` only decides which columns exist, empty ones included. **A drop on a version line writes that line's highest known patch** — across its planned entries and its cards — in canonical `vMAJOR.MINOR.PATCH` form, a missing patch counting as `.0`: planned `"v1.2.0"` plus a card on `1.2.3` writes `"v1.2.3"`. An expanded patch column writes its own patch (`"v1.2.1"`), a non-version label (`"Icebox"`) is written as listed, and a card dropped back on the line it is already in is never rewritten. So the list is optional: a version a card already carries gets its column, and writes the same value, without it.
 - **Automation rules always carry all four keys.** A `set`-only rule keeps `"repo": ""` and `"command": ""`; an empty `when` means every status change.

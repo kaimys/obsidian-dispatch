@@ -39,6 +39,12 @@ export interface MilestoneSettings {
 	plannedVersions: string[];
 	/** Optional tag per version (MVP, Closed beta, …), keyed by major.minor. */
 	tags: Record<string, string>;
+	/**
+	 * Frontmatter property that stores the manual build order on the Release
+	 * Plan (numeric, gap-based like the Kanban order). Empty string disables
+	 * it — columns then sort by status, rank and title.
+	 */
+	releaseOrderProperty: string;
 	/** Frontmatter property with the ticket size/weight (numeric). Missing/invalid = 1. */
 	sizeProperty: string;
 	/**
@@ -379,6 +385,7 @@ export const DEFAULT_SHARED: SharedSettings = {
 		versionProperty: "version",
 		plannedVersions: [],
 		tags: {},
+		releaseOrderProperty: "",
 		sizeProperty: "size",
 		completedProperty: "",
 		velocityWindowDays: 28,

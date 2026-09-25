@@ -23,19 +23,20 @@ const VERSION = "version_target";
 function card(
 	id: string,
 	version: string,
-	opts: { progress?: number; excluded?: boolean } = {}
+	opts: { progress?: number; excluded?: boolean; releaseRank?: number; statusIdx?: number } = {}
 ): CardData<FileRef> {
 	return {
 		file: { path: `${id}.md`, basename: id },
 		status: "",
 		statusLabel: "",
-		statusIdx: 0,
+		statusIdx: opts.statusIdx ?? 0,
 		title: id,
 		badges: [],
 		version,
 		size: 1,
 		progress: opts.progress ?? 10,
 		excludedFromProgress: opts.excluded ?? false,
+		releaseRank: opts.releaseRank,
 		raw: {},
 	};
 }
@@ -350,3 +351,67 @@ describe("line membership shared with the board", () => {
 		expect(lineCandidates(["v0.4.0"], cards)).toEqual(["v0.4.0", "v0.4.1"]);
 	});
 });
+
+describe("the release order on a retarget (US00043)", () => {
+	const RELEASE = "release_rank";
+	const planned = Object.freeze(["v0.4.0", "v0.5.0"]);
+	const sets = (p: RetargetPlan) => p.patches.map((x) => [x.file.path, x.set]);
+
+	it("appends a merged line after the destination, in the source's own order", () => {
+		const cards = [
+			card("A", "v0.4.0", { releaseRank: 2048 }),
+			card("B", "v0.4.0", { releaseRank: 1024 }),
+			card("P", "v0.5.0", { releaseRank: 1024 }),
+			card("Q", "v0.5.0", { releaseRank: 2048 }),
+		];
+		const p = plan({ cards, plannedVersions: planned, releaseOrderProperty: RELEASE });
+		// One patch per moved card, version and position together.
+		expect(sets(p)).toEqual([
+			["A.md", { version_target: "v0.5.0", release_rank: 2048 + 2048 }],
+			["B.md", { version_target: "v0.5.0", release_rank: 2048 + 1024 }],
+		]);
+		expect(p.summary.cardCount).toBe(2);
+		expect(p.summary.destinationRenumbered).toBeUndefined();
+	});
+
+	it("renumbers an unranked destination and says how many of its cards it touched", () => {
+		const cards = [
+			card("A", "v0.4.0", { releaseRank: 1024 }),
+			card("P", "v0.5.0", { statusIdx: 1 }),
+			card("Q", "v0.5.0", { releaseRank: 1024 }),
+		];
+		const p = plan({ cards, plannedVersions: planned, releaseOrderProperty: RELEASE });
+		expect(sets(p)).toEqual([
+			["A.md", { version_target: "v0.5.0", release_rank: 3072 }],
+			["P.md", { release_rank: 2048 }],
+		]);
+		expect(p.summary.destinationRenumbered).toBe(1);
+	});
+
+	it("leaves every position alone on a retarget to a new line", () => {
+		const cards = [card("A", "v0.4.0", { releaseRank: 1024 })];
+		const p = plan({ cards, destination: "v0.6.0", releaseOrderProperty: RELEASE });
+		expect(sets(p)).toEqual([["A.md", { version_target: "v0.6.0" }]]);
+	});
+
+	it("plans exactly as before with the release order off", () => {
+		const cards = [card("A", "v0.4.0", { releaseRank: 1024 }), card("P", "v0.5.0")];
+		const p = plan({ cards, plannedVersions: planned });
+		expect(sets(p)).toEqual([["A.md", { version_target: "v0.5.0" }]]);
+	});
+
+	it("refuses a confirmed plan once a new destination card shifts the appended ranks", () => {
+		const cards = [card("A", "v0.4.0"), card("P", "v0.5.0", { releaseRank: 1024 })];
+		const before = plan({ cards, plannedVersions: planned, releaseOrderProperty: RELEASE });
+		const after = plan({
+			cards: [...cards, card("R", "v0.5.0", { releaseRank: 9000 })],
+			plannedVersions: planned,
+			releaseOrderProperty: RELEASE,
+		});
+		expect(sameRetarget(before, after)).toBe(false);
+		expect(sameRetarget(before, plan({ cards, plannedVersions: planned, releaseOrderProperty: RELEASE }))).toBe(
+			true
+		);
+	});
+});
+

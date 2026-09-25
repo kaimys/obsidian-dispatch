@@ -10,7 +10,8 @@
 import { sortByRank } from "./cards";
 import type { CardData, FileRef } from "./cards";
 import { substitute } from "./exec";
-import { versionKey } from "./parse";
+import { inColumn, isArchivedCard, orderingScope } from "./milestones";
+import type { MilestoneColumn } from "./milestones";
 import type { AutomationRule } from "./settings";
 
 /** Spacing between freshly assigned ranks — leaves room for midpoint inserts. */
@@ -112,66 +113,179 @@ export function planStatusDrop<F extends FileRef>(
 	idx = Math.max(0, Math.min(idx, columnCards.length));
 	if (!statusChanged && idx === origIdx) return null;
 
-	const prev = idx > 0 ? columnCards[idx - 1] : undefined;
-	const next = idx < columnCards.length ? columnCards[idx] : undefined;
+	const { patches, renormalized } = planRankInsert(
+		columnCards,
+		[moved],
+		idx,
+		(c) => c.rank,
+		opts.orderProperty
+	);
+	// Status and automation stamps travel in the moved note's own patch.
+	for (const patch of patches) {
+		if (patch.file.path === path) patch.set = { ...statusSet, ...patch.set };
+	}
+	return { moved, oldStatus, statusChanged, renormalized, patches };
+}
 
-	const strictlyRanked =
-		columnCards.every((c) => c.rank !== undefined) &&
-		columnCards.every(
-			(c, i) => i === 0 || (columnCards[i - 1].rank as number) < (c.rank as number)
-		);
+/**
+ * The gap-based ordering maths shared by every ordering write (ADR-0007):
+ * place `moved` — one card or a block, in the order given — at `index` of
+ * `scope`, which is in display order and must not contain `moved`.
+ *
+ * When the scope is strictly ranked and the neighbours leave room, only the
+ * moved notes are written: evenly spaced between the neighbours (the midpoint
+ * for a single card), or a gap apart at either end. Otherwise the whole scope
+ * is renumbered in its displayed order, writing the moved notes and only
+ * those others whose value actually changes.
+ */
+export function planRankInsert<F extends FileRef>(
+	scope: CardData<F>[],
+	moved: CardData<F>[],
+	index: number,
+	rankOf: (card: CardData<F>) => number | undefined,
+	property: string
+): { patches: FrontmatterPatch<F>[]; renormalized: boolean } {
+	const idx = Math.max(0, Math.min(index, scope.length));
+	const n = moved.length;
+	const prevRank = idx > 0 ? rankOf(scope[idx - 1]) : undefined;
+	const nextRank = idx < scope.length ? rankOf(scope[idx]) : undefined;
 
-	// Preferred path: touch only the moved note.
-	let singleRank: number | undefined;
+	const ranks = scope.map(rankOf);
+	const strictlyRanked = ranks.every(
+		(r, i) => r !== undefined && (i === 0 || (ranks[i - 1] ?? Infinity) < r)
+	);
+
+	// Preferred path: touch only the moved notes.
+	let placed: number[] | undefined;
 	if (strictlyRanked) {
-		if (prev && next) {
-			if ((next.rank as number) - (prev.rank as number) > 1) {
-				singleRank = Math.floor(((prev.rank as number) + (next.rank as number)) / 2);
+		const hasPrev = idx > 0;
+		const hasNext = idx < scope.length;
+		const p = prevRank as number;
+		const q = nextRank as number;
+		if (hasPrev && hasNext) {
+			if (q - p > n) {
+				placed = moved.map((_, i) => Math.floor((p * (n - i) + q * (i + 1)) / (n + 1)));
 			}
-		} else if (prev) singleRank = (prev.rank as number) + RANK_GAP;
-		else if (next) singleRank = (next.rank as number) - RANK_GAP;
-		else singleRank = RANK_GAP;
+		} else if (hasPrev) placed = moved.map((_, i) => p + (i + 1) * RANK_GAP);
+		else if (hasNext) placed = moved.map((_, i) => q - (n - i) * RANK_GAP);
+		else placed = moved.map((_, i) => (i + 1) * RANK_GAP);
 	}
 
-	if (singleRank !== undefined) {
+	if (placed) {
+		const ranksPlaced = placed;
 		return {
-			moved,
-			oldStatus,
-			statusChanged,
 			renormalized: false,
-			patches: [{ file: moved.file, set: { ...statusSet, [opts.orderProperty]: singleRank } }],
+			patches: moved.map((card, i) => ({ file: card.file, set: { [property]: ranksPlaced[i] } })),
 		};
 	}
 
-	// The column has unranked or duplicate ranks, or the gap is exhausted:
-	// renormalize, writing only the notes whose rank actually changes.
-	const desired = [...columnCards.slice(0, idx), moved, ...columnCards.slice(idx)];
+	// The scope has unranked or duplicate ranks, or the gap is exhausted:
+	// renumber, writing only the notes whose rank actually changes.
+	const movedPaths = new Set(moved.map((c) => c.file.path));
+	const desired = [...scope.slice(0, idx), ...moved, ...scope.slice(idx)];
 	const patches: FrontmatterPatch<F>[] = [];
 	for (let i = 0; i < desired.length; i++) {
 		const card = desired[i];
 		const rank = (i + 1) * RANK_GAP;
-		const isMoved = card.file.path === path;
-		if (!isMoved && card.rank === rank) continue;
-		patches.push({
-			file: card.file,
-			set: { ...(isMoved ? statusSet : {}), [opts.orderProperty]: rank },
-		});
+		if (!movedPaths.has(card.file.path) && rankOf(card) === rank) continue;
+		patches.push({ file: card.file, set: { [property]: rank } });
 	}
-	return { moved, oldStatus, statusChanged, renormalized: true, patches };
+	return { renormalized: true, patches };
 }
 
 /**
  * Plan a Release Plan drop: write the column's canonical version, or remove the
  * property for the (no version) column. Null when the card is already in that
  * column — dropping a card back on its own column must not rewrite the value,
- * which is what keeps a hand-written "v1.4.0" from being reformatted.
+ * which is what keeps a hand-written "v1.4.0" from being reformatted. A patch
+ * column holds its exact patch, so "already in it" is decided the same way
+ * the board fills it (`inColumn`).
  */
 export function planVersionDrop<F extends FileRef>(
 	card: CardData<F>,
-	col: { key: string; writeValue: string },
+	col: { key: string; writeValue: string; isPatch?: boolean },
 	versionProperty: string
 ): FrontmatterPatch<F> | null {
-	if (versionKey(card.version) === col.key) return null;
+	if (inColumn(card, col)) return null;
 	if (col.writeValue === "") return { file: card.file, set: {}, unset: [versionProperty] };
 	return { file: card.file, set: { [versionProperty]: col.writeValue } };
+}
+
+/**
+ * Where a Release Plan drop lands, named by the visible card it lands before —
+ * or after, at the end of a list — rather than by an index: a sliced column
+ * shows fewer cards than the sequence the position is written into.
+ * "end" appends (the keyboard move).
+ */
+export type DropAnchor = { before: string } | { after: string } | "end";
+
+export interface ReleaseDropPlan<F extends FileRef = FileRef> {
+	moved: CardData<F>;
+	/** True when the drop writes a version, i.e. the card changes column. */
+	versionChanged: boolean;
+	patches: FrontmatterPatch<F>[];
+}
+
+/**
+ * Plan a Release Plan drop with its position: the version (`planVersionDrop`,
+ * untouched by ordering) and the release order (`planRankInsert` over the
+ * column's ordering scope), merged into one patch per note. Null when neither
+ * changes — a drop back on its own spot, or a same-column drop with the
+ * release order off. A card that is archived after the drop (excluded, or
+ * finished without a version) gets no position.
+ */
+export function planReleaseDrop<F extends FileRef>(
+	cards: CardData<F>[],
+	path: string,
+	col: Pick<MilestoneColumn, "key" | "writeValue" | "isPatch" | "line">,
+	anchor: DropAnchor,
+	opts: { versionProperty: string; releaseOrderProperty: string }
+): ReleaseDropPlan<F> | null {
+	const moved = cards.find((c) => c.file.path === path);
+	if (!moved) return null;
+
+	const versionPatch = planVersionDrop(moved, col, opts.versionProperty);
+	const versionOnly = versionPatch
+		? { moved, versionChanged: true, patches: [versionPatch] }
+		: null;
+	if (!opts.releaseOrderProperty) return versionOnly;
+	// Archived is judged after the drop: a finished card without a version
+	// leaves the archive by getting one, and then belongs to the line's order.
+	const versionAfter = versionPatch ? col.writeValue : moved.version;
+	if (isArchivedCard({ ...moved, version: versionAfter })) return versionOnly;
+
+	const withMoved = orderingScope(cards, col);
+	const scope = withMoved.filter((c) => c !== moved);
+	const origIdx = withMoved.indexOf(moved);
+	const indexOf = (target: string) => {
+		if (target === path) return origIdx;
+		return scope.findIndex((c) => c.file.path === target);
+	};
+	let idx = -1;
+	if (anchor !== "end" && "before" in anchor) idx = indexOf(anchor.before);
+	else if (anchor !== "end") {
+		const after = indexOf(anchor.after);
+		idx = after === -1 ? -1 : anchor.after === path ? after : after + 1;
+	}
+	// An anchor that left the scope while the card was dragged appends.
+	if (idx === -1) idx = scope.length;
+
+	// Already at that spot: only the version (if any) changes.
+	if (idx === origIdx) return versionOnly;
+
+	const { patches } = planRankInsert(
+		scope,
+		[moved],
+		idx,
+		(c) => c.releaseRank,
+		opts.releaseOrderProperty
+	);
+	if (versionPatch) {
+		for (const patch of patches) {
+			if (patch.file.path !== path) continue;
+			patch.set = { ...versionPatch.set, ...patch.set };
+			if (versionPatch.unset) patch.unset = versionPatch.unset;
+		}
+	}
+	return { moved, versionChanged: versionPatch !== null, patches };
 }
