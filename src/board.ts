@@ -49,6 +49,7 @@ import {
 import type { RetargetPlan, RetargetRejection } from "./retarget";
 import { isCopyOrderSource, planCopyReleaseOrder, sameCopyPlan } from "./release-order";
 import type { CopyOrderPlan } from "./release-order";
+import { focusTarget, resolveKey, splitCardPath } from "./focus";
 import { frontmatterIn, frontmatterOf, updateFrontmatter } from "./vault";
 import { planReleaseDrop, planStatusDrop } from "./moves";
 import type { DropAnchor } from "./moves";
@@ -810,12 +811,12 @@ export class BoardView extends ItemView {
 			}
 		});
 		el.addEventListener("click", () => {
-			this.focusedPath = card.file.path;
-			void this.app.workspace.getLeaf("tab").openFile(card.file);
+			this.setFocus(card.file.path);
+			void this.openFromBoard(card.file);
 		});
 		el.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
-			this.focusedPath = card.file.path;
+			this.setFocus(card.file.path);
 			this.showCardMenu(e, card);
 		});
 	}
@@ -1003,8 +1004,11 @@ export class BoardView extends ItemView {
 		if (note) {
 			badges.createSpan({ cls: "dispatch-badge dispatch-upcoming-agenda", text: "agenda ✓" });
 			el.setAttr("title", note.file.basename);
+			// Focusable like a meeting row: the linked note is not listed again below.
+			el.setAttr("data-path", note.file.path);
 			el.addEventListener("click", () => {
-				void this.app.workspace.getLeaf("tab").openFile(note.file);
+				this.setFocus(note.file.path);
+				void this.openFromBoard(note.file);
 			});
 		} else {
 			badges.createSpan({
@@ -1096,8 +1100,8 @@ export class BoardView extends ItemView {
 		}
 
 		el.addEventListener("click", () => {
-			this.focusedPath = meeting.file.path;
-			void this.app.workspace.getLeaf("tab").openFile(meeting.file);
+			this.setFocus(meeting.file.path);
+			void this.openFromBoard(meeting.file);
 		});
 		el.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
@@ -1268,15 +1272,26 @@ export class BoardView extends ItemView {
 		meta.createSpan({ text: todo.source });
 		el.setAttr("title", "Open the note at this item — tick it there");
 		el.addEventListener("click", () => {
-			this.focusedPath = `${todo.file.path}#${todo.line}`;
-			void this.app.workspace
-				.getLeaf("tab")
-				.openFile(todo.file, { eState: { line: todo.line } });
+			this.setFocus(`${todo.file.path}#${todo.line}`);
+			void this.openFromBoard(todo.file, { line: todo.line });
 		});
 	}
 
 	// -------------------------------------------------------------- keyboard
 
+	/**
+	 * The one writer of `focusedPath`: the outline moves with it in the same
+	 * call, so it never sits on one card while keys act on another.
+	 */
+	private setFocus(path: string | null): void {
+		this.contentEl
+			.querySelectorAll(".dispatch-card-focused")
+			.forEach((c) => c.removeClass("dispatch-card-focused"));
+		this.focusedPath = path;
+		this.applyFocus();
+	}
+
+	/** Re-draws the outline after a render; never writes `focusedPath`. */
 	private applyFocus(): void {
 		if (!this.focusedPath) return;
 		const el = this.contentEl.querySelector<HTMLElement>(
@@ -1287,6 +1302,17 @@ export class BoardView extends ItemView {
 		el.scrollIntoView({ block: "nearest", inline: "nearest" });
 	}
 
+	/**
+	 * Opens a card's note in a new tab and keeps the board active, so the next
+	 * key still reaches it. `getLeaf("tab")` activates the new leaf whatever
+	 * `active` says, hence the explicit hand-back.
+	 */
+	private async openFromBoard(file: TFile, eState?: Record<string, unknown>): Promise<void> {
+		await this.app.workspace.getLeaf("tab").openFile(file, { active: false, eState });
+		this.app.workspace.setActiveLeaf(this.leaf, { focus: true });
+		this.contentEl.focus({ preventScroll: true });
+	}
+
 	private onKey(e: KeyboardEvent): void {
 		if (
 			e.target instanceof HTMLInputElement ||
@@ -1294,99 +1320,56 @@ export class BoardView extends ItemView {
 			e.target instanceof HTMLSelectElement
 		)
 			return;
-		const columns = Array.from(this.contentEl.querySelectorAll<HTMLElement>(".dispatch-column"));
-		if (columns.length === 0) return;
-		const cardsOf = (col: HTMLElement) =>
-			Array.from(col.querySelectorAll<HTMLElement>(".dispatch-card"));
-
-		let colIdx = -1;
-		let cardIdx = -1;
-		outer: for (let i = 0; i < columns.length; i++) {
-			const cards = cardsOf(columns[i]);
-			for (let j = 0; j < cards.length; j++) {
-				if (cards[j].dataset.path === this.focusedPath) {
-					colIdx = i;
-					cardIdx = j;
-					break outer;
+		// The Meetings tab is one list, navigated as a single column.
+		const columnEls = Array.from(
+			this.contentEl.querySelectorAll<HTMLElement>(".dispatch-column, .dispatch-meeting-list")
+		);
+		if (columnEls.length === 0) return;
+		const pathsOf = (els: ArrayLike<HTMLElement>) =>
+			Array.from(els, (el) => el.dataset.path ?? "").filter((p) => p !== "");
+		const columns = columnEls.map((col) =>
+			pathsOf(col.querySelectorAll<HTMLElement>(".dispatch-card[data-path]"))
+		);
+		const outlined = pathsOf(this.contentEl.querySelectorAll<HTMLElement>(".dispatch-card-focused"));
+		const action = resolveKey(
+			{
+				columns,
+				target: focusTarget(outlined, this.focusedPath, columns),
+				movable: this.mode === "status" || this.mode === "milestone",
+			},
+			e.key
+		);
+		if (!action) return;
+		switch (action.kind) {
+			case "focus":
+				this.setFocus(action.path);
+				break;
+			case "open": {
+				const { path, line } = splitCardPath(action.path);
+				const file = this.app.vault.getAbstractFileByPath(path);
+				if (file instanceof TFile) {
+					void this.openFromBoard(file, line === undefined ? undefined : { line });
 				}
-			}
-		}
-
-		const focusAt = (ci: number, ri: number) => {
-			const cards = cardsOf(columns[ci]);
-			if (cards.length === 0) return false;
-			const el = cards[Math.max(0, Math.min(ri, cards.length - 1))];
-			this.focusedPath = el.dataset.path ?? null;
-			this.contentEl
-				.querySelectorAll(".dispatch-card-focused")
-				.forEach((c) => c.removeClass("dispatch-card-focused"));
-			this.applyFocus();
-			return true;
-		};
-		const nextColumnWithCards = (start: number, dir: number): number => {
-			for (let i = start + dir; i >= 0 && i < columns.length; i += dir) {
-				if (cardsOf(columns[i]).length > 0) return i;
-			}
-			return -1;
-		};
-
-		switch (e.key) {
-			case "ArrowDown":
-			case "ArrowUp": {
-				if (colIdx === -1) {
-					const first = nextColumnWithCards(-1, 1);
-					if (first !== -1) focusAt(first, 0);
-					break;
-				}
-				focusAt(colIdx, cardIdx + (e.key === "ArrowDown" ? 1 : -1));
 				break;
 			}
-			case "ArrowLeft":
-			case "ArrowRight": {
-				const dir = e.key === "ArrowRight" ? 1 : -1;
-				if (colIdx === -1) {
-					const first = nextColumnWithCards(-1, 1);
-					if (first !== -1) focusAt(first, 0);
-					break;
-				}
-				const target = nextColumnWithCards(colIdx, dir);
-				if (target !== -1) focusAt(target, cardIdx);
+			case "move":
+				this.moveFocusedTo(action.path, columnEls[action.column]);
 				break;
-			}
-			case "Enter":
-			case "o": {
-				if (!this.focusedPath) return;
-				const file = this.app.vault.getAbstractFileByPath(this.focusedPath);
-				if (file instanceof TFile) void this.app.workspace.getLeaf("tab").openFile(file);
-				break;
-			}
-			case "[":
-			case "]": {
-				if (colIdx === -1 || !this.focusedPath) return;
-				const dir = e.key === "]" ? 1 : -1;
-				const targetIdx = colIdx + dir;
-				if (targetIdx < 0 || targetIdx >= columns.length) return;
-				this.moveFocusedTo(columns[targetIdx]);
-				break;
-			}
-			default:
-				return;
 		}
 		e.preventDefault();
 	}
 
-	/** Move the focused card into the given column element (keyboard [ / ]). */
-	private moveFocusedTo(colEl: HTMLElement): void {
-		if (!this.focusedPath) return;
+	/** Move a card into the given column element (keyboard [ / ]). */
+	private moveFocusedTo(path: string, colEl: HTMLElement): void {
 		if (this.mode === "status") {
 			const status = colEl.dataset.col;
 			if (status === undefined) return;
-			void this.moveCard(this.focusedPath, status, Number.MAX_SAFE_INTEGER);
+			void this.moveCard(path, status, Number.MAX_SAFE_INTEGER);
 		} else {
 			const { colKey, colWrite, colDisplay, colLine } = colEl.dataset;
 			if (colKey === undefined) return;
 			void this.moveCardToVersion(
-				this.focusedPath,
+				path,
 				{
 					key: colKey,
 					writeValue: colWrite ?? "",
