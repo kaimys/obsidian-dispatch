@@ -1892,6 +1892,7 @@ class CopyOrderConfirmModal extends Modal {
 		const list = this.contentEl.createEl("ul", { cls: "dispatch-retarget-list" });
 		for (const line of [
 			`Writes the Kanban order of ${n} ${n === 1 ? "note" : "notes"}; status and version stay as they are.`,
+			"There is no undo: the previous Kanban order is overwritten.",
 			"The two orders stay independent afterwards: a later release reorder does not copy again.",
 			"Board automations do not run for this change.",
 		]) {
