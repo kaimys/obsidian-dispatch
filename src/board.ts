@@ -30,6 +30,7 @@ import type { FrontmatterPatch } from "./moves";
 import {
 	buildLineColumns,
 	buildPatchColumns,
+	compareReleaseOrder,
 	inColumn,
 	isArchivedCard,
 	isVersionLine,
@@ -47,10 +48,8 @@ import {
 } from "./retarget";
 import type { RetargetPlan, RetargetRejection } from "./retarget";
 import { frontmatterIn, frontmatterOf, updateFrontmatter } from "./vault";
-import {
-	planStatusDrop,
-	planVersionDrop,
-} from "./moves";
+import { planReleaseDrop, planStatusDrop } from "./moves";
+import type { DropAnchor } from "./moves";
 import {
 	compareRanks,
 	displayValue,
@@ -440,16 +439,16 @@ export class BoardView extends ItemView {
 		let pipelineBefore = 0;
 		for (const col of ordered) {
 			const isArchive = col.key === ARCHIVE_KEY;
-			const colCards = (
-				isArchive
-					? archived
-					: active.filter((c) => inColumn(c, col))
-			).sort(
-				(a, b) =>
-					a.statusIdx - b.statusIdx ||
-					compareRanks(a.rank, b.rank) ||
-					a.title.localeCompare(b.title)
-			);
+			// The archive is history, not a plan: it keeps the status-first
+			// sort even for cards that still carry a release rank.
+			const colCards = isArchive
+				? [...archived].sort(
+						(a, b) =>
+							a.statusIdx - b.statusIdx ||
+							compareRanks(a.rank, b.rank) ||
+							a.title.localeCompare(b.title)
+					)
+				: active.filter((c) => inColumn(c, col)).sort(compareReleaseOrder);
 
 			const colEl = board.createDiv({
 				cls: "dispatch-column",
@@ -459,6 +458,7 @@ export class BoardView extends ItemView {
 							"data-col-key": col.key,
 							"data-col-write": col.writeValue,
 							"data-col-display": col.display,
+							...(col.isPatch ? { "data-col-line": col.line ?? "" } : {}),
 						},
 			});
 			const header = colEl.createDiv({
@@ -552,7 +552,7 @@ export class BoardView extends ItemView {
 			pipelineBefore += colRemaining;
 
 			const list = colEl.createDiv({ cls: "dispatch-cards" });
-			if (!isArchive) this.makeVersionDropTarget(colEl, col);
+			if (!isArchive) this.makeVersionDropTarget(colEl, list, col);
 			for (const card of colCards) this.renderCard(list, card, true);
 		}
 	}
@@ -1367,14 +1367,19 @@ export class BoardView extends ItemView {
 			if (status === undefined) return;
 			void this.moveCard(this.focusedPath, status, Number.MAX_SAFE_INTEGER);
 		} else {
-			const { colKey, colWrite, colDisplay } = colEl.dataset;
+			const { colKey, colWrite, colDisplay, colLine } = colEl.dataset;
 			if (colKey === undefined) return;
-			void this.moveCardToVersion(this.focusedPath, {
-				key: colKey,
-				writeValue: colWrite ?? "",
-				display: colDisplay ?? colKey,
-				order: 0,
-			});
+			void this.moveCardToVersion(
+				this.focusedPath,
+				{
+					key: colKey,
+					writeValue: colWrite ?? "",
+					display: colDisplay ?? colKey,
+					order: 0,
+					...(colLine !== undefined ? { isPatch: true, line: colLine } : {}),
+				},
+				"end"
+			);
 		}
 	}
 
@@ -1449,32 +1454,66 @@ export class BoardView extends ItemView {
 
 	// ----------------------------------------------------- version drag&drop
 
-	private makeVersionDropTarget(colEl: HTMLElement, col: MilestoneColumn): void {
+	private makeVersionDropTarget(colEl: HTMLElement, list: HTMLElement, col: MilestoneColumn): void {
+		const ordered = () => this.plugin.shared.milestones.releaseOrderProperty !== "";
 		colEl.addEventListener("dragover", (e) => {
 			e.preventDefault();
 			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
 			colEl.addClass("dispatch-drop-active");
+			if (!ordered()) return;
+			this.clearInsertMarkers(list);
+			const index = this.insertionIndex(list, e.clientY);
+			const children = Array.from(list.children) as HTMLElement[];
+			if (index < children.length) children[index].addClass("dispatch-insert-before");
+			else list.addClass("dispatch-insert-end");
 		});
 		colEl.addEventListener("dragleave", (e) => {
 			if (e.relatedTarget instanceof Node && colEl.contains(e.relatedTarget)) return;
 			colEl.removeClass("dispatch-drop-active");
+			this.clearInsertMarkers(list);
 		});
 		colEl.addEventListener("drop", (e) => {
 			e.preventDefault();
 			colEl.removeClass("dispatch-drop-active");
+			this.clearInsertMarkers(list);
 			const path = e.dataTransfer?.getData("text/plain");
-			if (path) void this.moveCardToVersion(path, col);
+			if (path) void this.moveCardToVersion(path, col, this.dropAnchor(list, e.clientY));
 		});
 	}
 
-	private async moveCardToVersion(path: string, col: MilestoneColumn): Promise<void> {
-		const card = this.collectCards().find((c) => c.file.path === path);
-		if (!card) return;
-		const patch = planVersionDrop(card, col, this.plugin.shared.milestones.versionProperty);
-		// Same column — the raw value stays untouched (no format rewrite).
-		if (!patch) return;
-		await this.applyPatch(patch);
-		new Notice(`${card.file.basename}: ${versionKey(card.version) || "(no version)"} → ${col.display}`);
+	/**
+	 * The visible card a drop lands before — or after the last one — so the
+	 * planner positions it in the full column whatever a slice hides.
+	 */
+	private dropAnchor(list: HTMLElement, y: number): DropAnchor {
+		const children = Array.from(list.children) as HTMLElement[];
+		const index = this.insertionIndex(list, y);
+		const before = children[index]?.dataset.path;
+		if (before !== undefined) return { before };
+		const after = children[children.length - 1]?.dataset.path;
+		return after !== undefined ? { after } : "end";
+	}
+
+	private async moveCardToVersion(
+		path: string,
+		col: MilestoneColumn,
+		anchor: DropAnchor
+	): Promise<void> {
+		const ms = this.plugin.shared.milestones;
+		const cards = this.collectCards();
+		const plan = planReleaseDrop(cards, path, col, anchor, {
+			versionProperty: ms.versionProperty,
+			releaseOrderProperty: ms.releaseOrderProperty,
+		});
+		// Same spot, or same column with ordering off — nothing is written.
+		if (!plan) return;
+		for (const patch of plan.patches) await this.applyPatch(patch);
+		// A reorder is silent, like one on the Kanban tab; no automation runs.
+		if (plan.versionChanged) {
+			new Notice(
+				`${plan.moved.file.basename}: ${versionKey(plan.moved.version) || "(no version)"} → ${col.display}`
+			);
+		}
 	}
 
 	// ------------------------------------------------------ line retarget
