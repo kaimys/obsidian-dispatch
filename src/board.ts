@@ -47,6 +47,8 @@ import {
 	sameRetarget,
 } from "./retarget";
 import type { RetargetPlan, RetargetRejection } from "./retarget";
+import { isCopyOrderSource, planCopyReleaseOrder, sameCopyPlan } from "./release-order";
+import type { CopyOrderPlan } from "./release-order";
 import { frontmatterIn, frontmatterOf, updateFrontmatter } from "./vault";
 import { planReleaseDrop, planStatusDrop } from "./moves";
 import type { DropAnchor } from "./moves";
@@ -478,6 +480,20 @@ export class BoardView extends ItemView {
 							.setIcon("move-right")
 							.onClick(() => this.retargetLine(col.key))
 					);
+					if (
+						isCopyOrderSource(
+							col,
+							this.plugin.shared.milestones.releaseOrderProperty,
+							this.plugin.shared.board.orderProperty
+						)
+					) {
+						menu.addItem((item) =>
+							item
+								.setTitle("Copy release order to Kanban")
+								.setIcon("list-ordered")
+								.onClick(() => this.copyReleaseOrder(col.key))
+						);
+					}
 					menu.showAtMouseEvent(e);
 				});
 			}
@@ -1631,6 +1647,48 @@ export class BoardView extends ItemView {
 		new Notice(text, 8000);
 	}
 
+	// ------------------------------------------------- copy release order
+
+	private planCopyOrder(lineKey: string): CopyOrderPlan<TFile> {
+		return planCopyReleaseOrder(this.collectCards(), lineKey, this.plugin.shared.board.orderProperty);
+	}
+
+	/** Seed the Kanban order from a line's release order (src/release-order.ts decides every write). */
+	private copyReleaseOrder(lineKey: string): void {
+		const plan = this.planCopyOrder(lineKey);
+		if (plan.patches.length === 0) {
+			new Notice(`The Kanban order already follows ${lineKey}'s release order. Nothing was changed.`);
+			return;
+		}
+		new CopyOrderConfirmModal(this.app, plan, () => void this.performCopyOrder(plan)).open();
+	}
+
+	/** Re-plan from fresh state and write only what the dialog described. */
+	private async performCopyOrder(confirmed: CopyOrderPlan<TFile>): Promise<void> {
+		const plan = this.planCopyOrder(confirmed.lineKey);
+		if (!sameCopyPlan(confirmed, plan)) {
+			new Notice("The board changed while the dialog was open. Nothing was written.", 8000);
+			return;
+		}
+		const failed: string[] = [];
+		for (const patch of plan.patches) {
+			try {
+				await this.applyPatch(patch);
+			} catch {
+				failed.push(patch.file.basename);
+			}
+		}
+		if (failed.length > 0) {
+			new Notice(
+				`Copying ${plan.lineKey}'s release order stopped: ${failed.length} of ${plan.patches.length} ` +
+					`notes could not be written (${failed.join(", ")}). Run it again to finish.`,
+				10000
+			);
+			return;
+		}
+		new Notice(`The Kanban order now starts with ${plan.lineKey}'s release order.`);
+	}
+
 	// ------------------------------------------------------------------ misc
 
 	private notifyStatusChange(file: TFile, oldStatus: string, newStatus: string): void {
@@ -1799,6 +1857,49 @@ class RetargetConfirmModal extends Modal {
 
 		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
 		const ok = row.createEl("button", { cls: "mod-cta", text: "Retarget" });
+		ok.addEventListener("click", () => {
+			this.close();
+			this.onConfirm();
+		});
+		const cancel = row.createEl("button", { text: "Cancel" });
+		cancel.addEventListener("click", () => this.close());
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
+/** Names what "Copy release order to Kanban" is about to write. */
+class CopyOrderConfirmModal extends Modal {
+	constructor(
+		app: App,
+		private plan: CopyOrderPlan<TFile>,
+		private onConfirm: () => void
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		const { plan } = this;
+		const n = plan.patches.length;
+		this.titleEl.setText(`Copy ${plan.lineKey}'s release order to Kanban?`);
+		this.contentEl.createEl("p", {
+			text:
+				`${plan.lineKey}'s tickets move to the top of ${plan.columns.join(", ")} on the Kanban tab, ` +
+				`in release order. Every other card keeps its order below them.`,
+		});
+		const list = this.contentEl.createEl("ul", { cls: "dispatch-retarget-list" });
+		for (const line of [
+			`Writes the Kanban order of ${n} ${n === 1 ? "note" : "notes"}; status and version stay as they are.`,
+			"The two orders stay independent afterwards: a later release reorder does not copy again.",
+			"Board automations do not run for this change.",
+		]) {
+			list.createEl("li", { text: line });
+		}
+
+		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
+		const ok = row.createEl("button", { cls: "mod-cta", text: "Copy order" });
 		ok.addEventListener("click", () => {
 			this.close();
 			this.onConfirm();

@@ -23,7 +23,7 @@ export default [
 		rules: {
 			"obsidianmd/ui/sentence-case": ["warn", {
 				// Extend the vocabulary without replacing the rule's built-in brands/acronyms.
-				ignoreWords: ["Dispatch", "Code", "Codex", "Calendar", "iCal", "IDs", "MVP", "WIP", "ICS", "N", "Alex", "Robin", "Morgan", "Milestones", "Meetings"],
+				ignoreWords: ["Dispatch", "Code", "Codex", "Calendar", "iCal", "IDs", "MVP", "WIP", "ICS", "N", "Alex", "Robin", "Morgan", "Milestones", "Meetings", "Kanban"],
 				// These are literal examples, not prose. Anchor exceptions so ordinary
 				// labels and descriptions continue to be checked.
 				ignoreRegex: [
