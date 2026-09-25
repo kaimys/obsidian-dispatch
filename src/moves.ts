@@ -112,52 +112,84 @@ export function planStatusDrop<F extends FileRef>(
 	idx = Math.max(0, Math.min(idx, columnCards.length));
 	if (!statusChanged && idx === origIdx) return null;
 
-	const prev = idx > 0 ? columnCards[idx - 1] : undefined;
-	const next = idx < columnCards.length ? columnCards[idx] : undefined;
+	const { patches, renormalized } = planRankInsert(
+		columnCards,
+		[moved],
+		idx,
+		(c) => c.rank,
+		opts.orderProperty
+	);
+	// Status and automation stamps travel in the moved note's own patch.
+	for (const patch of patches) {
+		if (patch.file.path === path) patch.set = { ...statusSet, ...patch.set };
+	}
+	return { moved, oldStatus, statusChanged, renormalized, patches };
+}
 
+/**
+ * The gap-based ordering maths shared by every ordering write (ADR-0007):
+ * place `moved` — one card or a block, in the order given — at `index` of
+ * `scope`, which is in display order and must not contain `moved`.
+ *
+ * When the scope is strictly ranked and the neighbours leave room, only the
+ * moved notes are written: evenly spaced between the neighbours (the midpoint
+ * for a single card), or a gap apart at either end. Otherwise the whole scope
+ * is renumbered in its displayed order, writing the moved notes and only
+ * those others whose value actually changes.
+ */
+export function planRankInsert<F extends FileRef>(
+	scope: CardData<F>[],
+	moved: CardData<F>[],
+	index: number,
+	rankOf: (card: CardData<F>) => number | undefined,
+	property: string
+): { patches: FrontmatterPatch<F>[]; renormalized: boolean } {
+	const idx = Math.max(0, Math.min(index, scope.length));
+	const n = moved.length;
+	const prevRank = idx > 0 ? rankOf(scope[idx - 1]) : undefined;
+	const nextRank = idx < scope.length ? rankOf(scope[idx]) : undefined;
+
+	const ranks = scope.map(rankOf);
 	const strictlyRanked =
-		columnCards.every((c) => c.rank !== undefined) &&
-		columnCards.every(
-			(c, i) => i === 0 || (columnCards[i - 1].rank as number) < (c.rank as number)
-		);
+		ranks.every((r) => r !== undefined) &&
+		ranks.every((r, i) => i === 0 || (ranks[i - 1] as number) < (r as number));
 
-	// Preferred path: touch only the moved note.
-	let singleRank: number | undefined;
+	// Preferred path: touch only the moved notes.
+	let placed: number[] | undefined;
 	if (strictlyRanked) {
-		if (prev && next) {
-			if ((next.rank as number) - (prev.rank as number) > 1) {
-				singleRank = Math.floor(((prev.rank as number) + (next.rank as number)) / 2);
+		const hasPrev = idx > 0;
+		const hasNext = idx < scope.length;
+		const p = prevRank as number;
+		const q = nextRank as number;
+		if (hasPrev && hasNext) {
+			if (q - p > n) {
+				placed = moved.map((_, i) => Math.floor((p * (n - i) + q * (i + 1)) / (n + 1)));
 			}
-		} else if (prev) singleRank = (prev.rank as number) + RANK_GAP;
-		else if (next) singleRank = (next.rank as number) - RANK_GAP;
-		else singleRank = RANK_GAP;
+		} else if (hasPrev) placed = moved.map((_, i) => p + (i + 1) * RANK_GAP);
+		else if (hasNext) placed = moved.map((_, i) => q - (n - i) * RANK_GAP);
+		else placed = moved.map((_, i) => (i + 1) * RANK_GAP);
 	}
 
-	if (singleRank !== undefined) {
+	if (placed) {
+		const ranksPlaced = placed;
 		return {
-			moved,
-			oldStatus,
-			statusChanged,
 			renormalized: false,
-			patches: [{ file: moved.file, set: { ...statusSet, [opts.orderProperty]: singleRank } }],
+			patches: moved.map((card, i) => ({ file: card.file, set: { [property]: ranksPlaced[i] } })),
 		};
 	}
 
-	// The column has unranked or duplicate ranks, or the gap is exhausted:
-	// renormalize, writing only the notes whose rank actually changes.
-	const desired = [...columnCards.slice(0, idx), moved, ...columnCards.slice(idx)];
+	// The scope has unranked or duplicate ranks, or the gap is exhausted:
+	// renumber, writing only the notes whose rank actually changes.
+	const movedPaths = new Set(moved.map((c) => c.file.path));
+	const desired = [...scope.slice(0, idx), ...moved, ...scope.slice(idx)];
 	const patches: FrontmatterPatch<F>[] = [];
 	for (let i = 0; i < desired.length; i++) {
 		const card = desired[i];
 		const rank = (i + 1) * RANK_GAP;
-		const isMoved = card.file.path === path;
-		if (!isMoved && card.rank === rank) continue;
-		patches.push({
-			file: card.file,
-			set: { ...(isMoved ? statusSet : {}), [opts.orderProperty]: rank },
-		});
+		if (!movedPaths.has(card.file.path) && rankOf(card) === rank) continue;
+		patches.push({ file: card.file, set: { [property]: rank } });
 	}
-	return { moved, oldStatus, statusChanged, renormalized: true, patches };
+	return { renormalized: true, patches };
 }
 
 /**

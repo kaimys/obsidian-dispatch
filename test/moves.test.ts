@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { buildCard } from "../src/cards";
 import type { CardData, FileRef } from "../src/cards";
 import { buildLineColumns, buildPatchColumns } from "../src/milestones";
-import { RANK_GAP, planStatusDrop, planVersionDrop, ruleSetsFor } from "../src/moves";
+import { RANK_GAP, planRankInsert, planStatusDrop, planVersionDrop, ruleSetsFor } from "../src/moves";
 import { CARD_SETTINGS, loadVault } from "./harness";
 
 const STATUS = "status";
@@ -128,6 +128,64 @@ describe("planStatusDrop — renormalizing a messy column", () => {
 		const plan = planStatusDrop(cards, "x.md", "Dev", 1, opts);
 		expect(plan?.renormalized).toBe(true);
 		expect(plan?.patches.map((p) => p.set[ORDER])).toEqual([2048, 3072]);
+	});
+});
+
+describe("planRankInsert — placing a block of cards", () => {
+	const rankOf = (c: CardData<FileRef>) => c.rank;
+	const scope = [card("a.md", "Dev", 1024), card("b.md", "Dev", 2048), card("c.md", "Dev", 3072)];
+	const block = [card("x.md", "Todo"), card("y.md", "Todo")];
+
+	it("spaces a block evenly between two neighbours, writing only the block", () => {
+		const plan = planRankInsert(scope, block, 1, rankOf, ORDER);
+		expect(plan.renormalized).toBe(false);
+		expect(plan.patches.map((p) => [p.file.path, p.set[ORDER]])).toEqual([
+			["x.md", 1365],
+			["y.md", 1706],
+		]);
+	});
+
+	it("puts a block a gap apart at either end", () => {
+		expect(planRankInsert(scope, block, 3, rankOf, ORDER).patches.map((p) => p.set[ORDER])).toEqual([
+			3072 + RANK_GAP,
+			3072 + 2 * RANK_GAP,
+		]);
+		expect(planRankInsert(scope, block, 0, rankOf, ORDER).patches.map((p) => p.set[ORDER])).toEqual([
+			1024 - 2 * RANK_GAP,
+			1024 - RANK_GAP,
+		]);
+		expect(planRankInsert([], block, 0, rankOf, ORDER).patches.map((p) => p.set[ORDER])).toEqual([
+			RANK_GAP,
+			2 * RANK_GAP,
+		]);
+	});
+
+	it("renumbers when the neighbours leave fewer free ranks than the block needs", () => {
+		const tight = [card("a.md", "Dev", 1024), card("b.md", "Dev", 1026)];
+		const plan = planRankInsert(tight, block, 1, rankOf, ORDER);
+		expect(plan.renormalized).toBe(true);
+		// a.md already holds 1024, so it is not written.
+		expect(plan.patches.map((p) => [p.file.path, p.set[ORDER]])).toEqual([
+			["x.md", 2048],
+			["y.md", 3072],
+			["b.md", 4096],
+		]);
+	});
+
+	it("renumbers a scope with an unranked card in its displayed order", () => {
+		const messy = [card("a.md", "Dev", 1024), card("u.md", "Dev")];
+		const plan = planRankInsert(messy, [card("x.md", "Todo")], 2, rankOf, ORDER);
+		expect(plan.renormalized).toBe(true);
+		expect(plan.patches.map((p) => [p.file.path, p.set[ORDER]])).toEqual([
+			["u.md", 2048],
+			["x.md", 3072],
+		]);
+	});
+
+	it("writes a block card even when it already holds its renumbered rank", () => {
+		const messy = [card("u.md", "Dev")];
+		const plan = planRankInsert(messy, [card("x.md", "Todo", 1024)], 0, rankOf, ORDER);
+		expect(plan.patches.map((p) => p.file.path)).toEqual(["x.md", "u.md"]);
 	});
 });
 
