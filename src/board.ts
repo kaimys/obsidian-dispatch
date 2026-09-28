@@ -148,10 +148,12 @@ export class BoardView extends ItemView {
 		// Coming back to the board (its tab, Esc's round trip, a fresh open)
 		// makes it the active leaf without giving it DOM focus, and keys only
 		// reach it with focus. Leave focus alone when it is already inside,
-		// e.g. on the slice picker.
+		// e.g. on the slice picker. Read it from the board's own document: a
+		// pop-out window has its own.
 		this.registerEvent(
 			this.app.workspace.on("active-leaf-change", (leaf) => {
-				if (leaf === this.leaf && !this.contentEl.contains(document.activeElement)) {
+				if (leaf !== this.leaf) return;
+				if (!this.contentEl.contains(this.contentEl.ownerDocument.activeElement)) {
 					this.contentEl.focus({ preventScroll: true });
 				}
 			})
