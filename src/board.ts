@@ -145,6 +145,17 @@ export class BoardView extends ItemView {
 		this.registerEvent(this.app.vault.on("rename", () => this.requestRender()));
 		this.contentEl.setAttr("tabindex", "0");
 		this.registerDomEvent(this.contentEl, "keydown", (e) => this.onKey(e));
+		// Coming back to the board (its tab, Esc's round trip, a fresh open)
+		// makes it the active leaf without giving it DOM focus, and keys only
+		// reach it with focus. Leave focus alone when it is already inside,
+		// e.g. on the slice picker.
+		this.registerEvent(
+			this.app.workspace.on("active-leaf-change", (leaf) => {
+				if (leaf === this.leaf && !this.contentEl.contains(document.activeElement)) {
+					this.contentEl.focus({ preventScroll: true });
+				}
+			})
+		);
 		this.render();
 		return Promise.resolve();
 	}
@@ -1306,14 +1317,11 @@ export class BoardView extends ItemView {
 	}
 
 	/**
-	 * Opens a card's note in a new tab and keeps the board active, so the next
-	 * key still reaches it. `getLeaf("tab")` activates the new leaf whatever
-	 * `active` says, hence the explicit hand-back.
+	 * Opens a card's note in a new tab, in front. The card stays outlined, so
+	 * back on the board a key acts on the card that was opened.
 	 */
 	private async openFromBoard(file: TFile, eState?: Record<string, unknown>): Promise<void> {
-		await this.app.workspace.getLeaf("tab").openFile(file, { active: false, eState });
-		this.app.workspace.setActiveLeaf(this.leaf, { focus: true });
-		this.contentEl.focus({ preventScroll: true });
+		await this.app.workspace.getLeaf("tab").openFile(file, { eState });
 	}
 
 	private onKey(e: KeyboardEvent): void {

@@ -24,7 +24,7 @@ Columns are the values of your **status** property, in the order you configure �
 - **Right-click a card** for its chips, or to edit size and badge properties inline.
 - **Click a column header** for batch chips: one agent session working through every ticket in that column in sequence.
 - **WIP limits** per column: the header shows `count/limit`, and the column outlines amber at the limit, red above it.
-- **Keyboard**: click a card to focus it and open its note in a background tab; arrows move focus, `Enter`/`o` opens the note, `[` / `]` move the focused card one column left or right — they do nothing when no card shows the focus outline.
+- **Keyboard**: click a card to focus it and open its note; back on the board, arrows move focus, `Enter`/`o` opens the note, `[` / `]` move the focused card one column left or right — they do nothing when no card shows the focus outline.
 
 ## Release Plan
 
