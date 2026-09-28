@@ -60,15 +60,17 @@ export function ruleSetsFor(
 
 /**
  * Plan a Kanban drop: the status change, the new position, and any automation
- * stamps — as the exact set of frontmatter writes. Returns null when the drop
- * is a no-op (unknown card, or dropped back where it already was), so an
- * accidental drag never rewrites a note.
+ * stamps — as the exact set of frontmatter writes. The position is the visible
+ * card the drop landed next to, resolved in the full column so a slice cannot
+ * shift it (ADR-0037). Returns null when the drop is a no-op (unknown card, or
+ * dropped back where it already was), so an accidental drag never rewrites a
+ * note.
  */
 export function planStatusDrop<F extends FileRef>(
 	cards: CardData<F>[],
 	path: string,
 	newStatus: string,
-	insertIndex: number,
+	anchor: DropAnchor,
 	opts: {
 		statusProperty: string;
 		orderProperty: string;
@@ -98,20 +100,13 @@ export function planStatusDrop<F extends FileRef>(
 		};
 	}
 
-	const columnCards = sortByRank(
-		cards.filter((c) => c.status === newStatus && c.file.path !== path)
-	);
-
-	// The visual index counts the moved card itself on same-column drags.
-	let idx = insertIndex;
-	let origIdx = -1;
-	if (!statusChanged) {
-		const visual = sortByRank(cards.filter((c) => c.status === newStatus));
-		origIdx = visual.findIndex((c) => c.file.path === path);
-		if (origIdx !== -1 && origIdx < idx) idx--;
-	}
-	idx = Math.max(0, Math.min(idx, columnCards.length));
-	if (!statusChanged && idx === origIdx) return null;
+	// The full column, whatever a slice hides; the moved card is in it only
+	// on a same-column drop.
+	const withMoved = sortByRank(cards.filter((c) => c.status === newStatus));
+	const columnCards = withMoved.filter((c) => c !== moved);
+	const idx = anchorIndex(withMoved, columnCards, moved, anchor);
+	// Already at that spot.
+	if (idx === withMoved.indexOf(moved)) return null;
 
 	const { patches, renormalized } = planRankInsert(
 		columnCards,
@@ -212,12 +207,40 @@ export function planVersionDrop<F extends FileRef>(
 }
 
 /**
- * Where a Release Plan drop lands, named by the visible card it lands before —
- * or after, at the end of a list — rather than by an index: a sliced column
- * shows fewer cards than the sequence the position is written into.
+ * Where a drop lands, named by the visible card it lands before — or after, at
+ * the end of a list — rather than by an index: a sliced column shows fewer
+ * cards than the sequence the position is written into (ADR-0037).
  * "end" appends (the keyboard move).
  */
 export type DropAnchor = { before: string } | { after: string } | "end";
+
+/**
+ * The index in `scope` that `anchor` names. `scope` is the ordering scope in
+ * display order without the moved card; `withMoved` is the same with it, when
+ * the card is already in the scope. An anchor on the card itself or on its
+ * neighbour resolves to the card's own index, which callers read as "nothing
+ * moved". An anchor that left the scope while the card was dragged appends.
+ */
+function anchorIndex<F extends FileRef>(
+	withMoved: CardData<F>[],
+	scope: CardData<F>[],
+	moved: CardData<F>,
+	anchor: DropAnchor
+): number {
+	const path = moved.file.path;
+	const origIdx = withMoved.indexOf(moved);
+	const indexOf = (target: string) => {
+		if (target === path) return origIdx;
+		return scope.findIndex((c) => c.file.path === target);
+	};
+	let idx = -1;
+	if (anchor !== "end" && "before" in anchor) idx = indexOf(anchor.before);
+	else if (anchor !== "end") {
+		const after = indexOf(anchor.after);
+		idx = after === -1 ? -1 : anchor.after === path ? after : after + 1;
+	}
+	return idx === -1 ? scope.length : idx;
+}
 
 export interface ReleaseDropPlan<F extends FileRef = FileRef> {
 	moved: CardData<F>;
@@ -256,22 +279,10 @@ export function planReleaseDrop<F extends FileRef>(
 
 	const withMoved = orderingScope(cards, col);
 	const scope = withMoved.filter((c) => c !== moved);
-	const origIdx = withMoved.indexOf(moved);
-	const indexOf = (target: string) => {
-		if (target === path) return origIdx;
-		return scope.findIndex((c) => c.file.path === target);
-	};
-	let idx = -1;
-	if (anchor !== "end" && "before" in anchor) idx = indexOf(anchor.before);
-	else if (anchor !== "end") {
-		const after = indexOf(anchor.after);
-		idx = after === -1 ? -1 : anchor.after === path ? after : after + 1;
-	}
-	// An anchor that left the scope while the card was dragged appends.
-	if (idx === -1) idx = scope.length;
+	const idx = anchorIndex(withMoved, scope, moved, anchor);
 
 	// Already at that spot: only the version (if any) changes.
-	if (idx === origIdx) return versionOnly;
+	if (idx === withMoved.indexOf(moved)) return versionOnly;
 
 	const { patches } = planRankInsert(
 		scope,
