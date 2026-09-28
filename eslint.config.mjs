@@ -16,14 +16,14 @@ const literalDescriptions = [
 const exactPattern = (text) => `^${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
 
 export default [
-	{ ignores: ["main.js", "node_modules/**", "docs/**", "wiki/**", "test/**", "*.config.*", "plugins/**"] },
+	{ ignores: ["main.js", "node_modules/**", "docs/**", "dispatch/wiki/**", "test/**", "*.config.*", "plugins/**"] },
 	...obsidianmd.configs.recommended,
 	{
 		files: ["**/*.ts"],
 		rules: {
 			"obsidianmd/ui/sentence-case": ["warn", {
 				// Extend the vocabulary without replacing the rule's built-in brands/acronyms.
-				ignoreWords: ["Dispatch", "Code", "Codex", "Calendar", "iCal", "IDs", "MVP", "WIP", "ICS", "N", "Alex", "Robin", "Morgan", "Milestones", "Meetings"],
+				ignoreWords: ["Dispatch", "Code", "Codex", "Calendar", "iCal", "IDs", "MVP", "WIP", "ICS", "N", "Alex", "Robin", "Morgan", "Milestones", "Meetings", "Kanban"],
 				// These are literal examples, not prose. Anchor exceptions so ordinary
 				// labels and descriptions continue to be checked.
 				ignoreRegex: [
@@ -44,12 +44,12 @@ export default [
 		},
 	},
 	{
-		// `scripts/` is Node, not plugin code — it is never bundled and never runs
+		// `dispatch/scripts/` is Node, not plugin code — it is never bundled and never runs
 		// inside Obsidian, so `requestUrl` (an Obsidian API) does not exist there
 		// and `fetch` is the correct call. The recommended ruleset assumes every
 		// file is plugin code; this is the same mismatch that makes these scripts
 		// write through `process.stdout` instead of `console`.
-		files: ["scripts/**/*.mjs"],
+		files: ["dispatch/scripts/**/*.mjs"],
 		rules: { "no-restricted-globals": "off" },
 	},
 ];

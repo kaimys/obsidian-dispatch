@@ -1,5 +1,5 @@
 /**
- * `scripts/dispatch/move-ticket.mjs`'s destination mapping — the one place a
+ * `dispatch/scripts/move-ticket.mjs`'s destination mapping — the one place a
  * board column turns into a GitHub issue state (US00040).
  *
  * The script's own header advertises `--dry-run` as the seam built for this: a
@@ -13,15 +13,15 @@
  * what "closed as completed" claims. Nothing else would notice that flipping
  * back, in either direction.
  */
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const script = join(repoRoot, "scripts", "dispatch", "move-ticket.mjs");
+const script = join(repoRoot, "dispatch", "scripts", "move-ticket.mjs");
 const dir = mkdtempSync(join(tmpdir(), "move-ticket-"));
 
 /** A ticket note on disk, carrying only the frontmatter the script reads. */
@@ -77,5 +77,27 @@ describe("what a destination column means on GitHub", () => {
 		const path = join(dir, "US00042.md");
 		writeFileSync(path, "---\nid: US00042\n---\n\nBody.\n");
 		expect(move(path, "Done", "Released")).toBe("US00042: no GitHub issue linked — tracker skipped");
+	});
+});
+
+/**
+ * US00033 criterion 4: the vault is reached through `dispatch/wiki` only. A
+ * checkout that still has just the old root `wiki` link must be told which link
+ * is missing, not that every note is "not found".
+ */
+describe("the vault link", () => {
+	it("names dispatch/wiki when only a root wiki link exists", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "move-ticket-root-wiki-"));
+		const note = join("05_Requirements", "Tickets", "US00033.md");
+		mkdirSync(join(cwd, "wiki", "05_Requirements", "Tickets"), { recursive: true });
+		writeFileSync(join(cwd, "wiki", note), "---\nid: US00033\n---\n");
+		const run = spawnSync(process.execPath, [script, note, "Refinement", "In progress", "--dry-run"], {
+			cwd,
+			encoding: "utf8",
+		});
+		expect(run.status).toBe(1);
+		expect(run.stdout.trim()).toBe(
+			"move-ticket: vault link dispatch/wiki not found — create it (see dispatch/invariants.md)"
+		);
 	});
 });

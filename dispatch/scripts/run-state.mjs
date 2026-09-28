@@ -3,13 +3,13 @@
  * Dispatch run-lifecycle hook — reference implementation.
  *
  * Copy this file into the TARGET REPO (the one chips launch agents into), e.g.
- * `scripts/dispatch/run-state.mjs`, and wire it in that repo's
+ * `dispatch/scripts/run-state.mjs`, and wire it in that repo's
  * `.claude/settings.json`:
  *
- *   SessionStart      -> node scripts/dispatch/run-state.mjs running
- *   UserPromptSubmit  -> node scripts/dispatch/run-state.mjs running
- *   Stop              -> node scripts/dispatch/run-state.mjs waiting
- *   SessionEnd        -> node scripts/dispatch/run-state.mjs done
+ *   SessionStart      -> node dispatch/scripts/run-state.mjs running
+ *   UserPromptSubmit  -> node dispatch/scripts/run-state.mjs running
+ *   Stop              -> node dispatch/scripts/run-state.mjs waiting
+ *   SessionEnd        -> node dispatch/scripts/run-state.mjs done
  *
  * What it does
  * ------------

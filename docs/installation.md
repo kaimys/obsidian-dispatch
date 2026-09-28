@@ -59,6 +59,12 @@ Because the device layer lives outside the vault (Windows: `%USERPROFILE%\.dispa
 
 Scripts Dispatch ships — currently the Meet transcript import — keep their settings in that same per-vault file rather than one of their own, under a `google` key. A script the *project* chooses, such as a tracker sync, is configured by the project and Dispatch never writes it.
 
+### The Dispatch folder in your repository
+
+Everything Dispatch adds to a code repository sits in one folder, `dispatch/`: the workflow files (`workflow/`), the repo-side scripts (`scripts/`), the shared project invariants (`invariants.md`) and `wiki`, a git-ignored link to the vault. The folder also has room for project-level settings in `settings.yaml`; this repository keeps its tracker repository there, but the setup skill does not create the file yet and still writes the tracker into each workflow. It is committed and shared like the rest of the repository, so it never holds an absolute path, a secret or device state; those stay in `~/.dispatch/`. The page templates stay in the vault, where Obsidian's Templates plugin can read them.
+
+**Set up before v0.3.0?** Your project keeps its older layout (`scripts/dispatch/`, a root `wiki` link), and it keeps working after a plugin update: the plugin reads no path from your repository. Re-running the setup skill migrates it.
+
 The sections below describe both layers as the **settings UI** presents them. If you (or an agent) write the files directly, read [The config files on disk](#the-config-files-on-disk) — the stored JSON does not have the same shape as the UI's compact input forms.
 
 ## Board settings
@@ -78,7 +84,9 @@ The sections below describe both layers as the **settings UI** presents them. If
 - **Discussion property** — a thread URL rendered as a chat icon in the card title
 - **Required properties** — drives the ⚠ problems panel (typically `id, status, updated`)
 
-**Milestones** (the Release Plan tab): version property, planned versions, per-version tags, size property, completed property, velocity look-back window, minimum completions, release-notes folder.
+**Milestones** (the Release Plan tab): version property, planned versions, per-version tags, release order property, size property, completed property, velocity look-back window, minimum completions, release-notes folder.
+
+- **Release order property** — where the manual build order inside a version column is stored (e.g. `release_rank`; empty, the default, keeps the columns sorted by status and turns off *Copy release order to Kanban*). Separate from the order property, so the Kanban and Release Plan orders never reorder each other.
 
 The forecast's velocity comes from the completions inside the look-back window. The earliest must be the only one on its UTC calendar date: it is the baseline and adds no weight. The sizes of all later completions are divided by the whole UTC days from the baseline's date through the last completion's, both ends counted — Monday to Thursday is 4 days, which is the *over N days* in the header tooltip. Gaps between completions stay in that span; days since the last completion do not. Fewer completions than *Minimum completions* (default `4`, at least `2`, since the baseline alone gives no rate) or a tie on the earliest date shows no forecast.
 
@@ -163,7 +171,7 @@ Variables: `{{cwd}}`, `{{prompt}}`, `{{promptFile}}` (the prompt written to a te
 
 When a chip launches a tool, Dispatch records the run in a machine-local file (`~/.dispatch/runs/…jsonl`) and passes `DISPATCH_RUN_ID`, `DISPATCH_RUNS_FILE`, `DISPATCH_NOTE`, `DISPATCH_LABEL` and `DISPATCH_STARTED` into the process.
 
-Lifecycle hooks in the target repo — `SessionStart`/`UserPromptSubmit`/`Stop`/`SessionEnd` calling a small script — append records back. A ready-to-copy implementation ships with the setup plugin: [`plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs`](https://github.com/kaimys/obsidian-dispatch/blob/main/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs) — drop it into the target repo (e.g. `scripts/dispatch/run-state.mjs`) and wire the four events for each agent you run:
+Lifecycle hooks in the target repo — `SessionStart`/`UserPromptSubmit`/`Stop`/`SessionEnd` calling a small script — append records back. A ready-to-copy implementation ships with the setup plugin: [`plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs`](https://github.com/kaimys/obsidian-dispatch/blob/main/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs) — drop it into the target repo as `dispatch/scripts/run-state.mjs` and wire the four events for each agent you run:
 
 | Agent | Where the hooks are wired |
 | --- | --- |
@@ -189,7 +197,7 @@ Rules evaluated when a card **enters a column** (settings → Automations, JSON)
   { "when": ["Deployed"], "set": { "deployed": "{{date}}" }, "repo": "", "command": "" },
   { "when": [], "set": {},
     "repo": "my-project",
-    "command": "node scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
+    "command": "node dispatch/scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
 ]
 ```
 
@@ -231,13 +239,14 @@ Missing keys fall back to the defaults in `src/settings.ts`, but writing the ful
     "requiredProperties": ["id", "status", "updated"],
     "automations": [
       { "when": ["Deployed"], "set": { "deployed": "{{date}}" }, "repo": "", "command": "" },
-      { "when": [], "set": {}, "repo": "my-app", "command": "node scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
+      { "when": [], "set": {}, "repo": "my-app", "command": "node dispatch/scripts/move-ticket.mjs {{file}} {{from}} {{to}}" }
     ]
   },
   "milestones": {
     "versionProperty": "version_target",
     "plannedVersions": ["v1.1.0", "v1.2.0", "v1.3.0"],
     "tags": { "1.2": "Beta" },
+    "releaseOrderProperty": "release_rank",
     "sizeProperty": "size",
     "completedProperty": "deployed",
     "velocityWindowDays": 28,
@@ -281,9 +290,9 @@ Where the stored shape differs from the settings UI:
 
 - **Columns are objects, not `value | Label | progress | WIP` strings.** `label` may be omitted (the `value` is then displayed), an omitted `wip` means no limit, and the UI's `-` progress becomes `"excluded": true` — *not* `"progress": "-"`.
 - **`chips.templates` and `chips.columnTemplates` are separate lists** — card chips vs. batch chips on a column header. Both use `label`, `repo` and `prompt`; command chips should also have a stable `intent`, while `tool` is optional and should be omitted when the same chip must offer every configured agent. Only column prompts get `{{ids}}`, `{{status}}` and `{{count}}`.
-- **Empty means off, and hides the tab.** `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` turns the forecast off, `board.orderProperty: ""` disables manual ordering, and an empty `assigneeProperty`/`questionsProperty`/`testsProperty`/`findingsProperty`/`discussionProperty` drops that badge.
+- **Empty means off, and hides the tab.** `meetings.folder: ""` hides the Meetings tab, `todos.folders: []` hides Todos, `milestones.completedProperty: ""` turns the forecast off, `board.orderProperty: ""` disables manual ordering, `milestones.releaseOrderProperty: ""` keeps the Release Plan sorted by status, and an empty `assigneeProperty`/`questionsProperty`/`testsProperty`/`findingsProperty`/`discussionProperty` drops that badge.
 - **The forecast numbers are read as whole numbers when the plugin loads.** `milestones.velocityWindowDays` and `milestones.velocityMinimumCompletions` may be stored as numbers or numeric strings; fractions are rounded down. A value that is not a number or is below its floor (`1` day, `2` completions) is replaced by the default (`28`, `4`), which is what the settings tab then shows.
-- **`milestones.tags` is keyed by normalized `major.minor`** (`"1.2": "Beta"`), while `plannedVersions` holds the canonical *write* form (`"v1.2.0"`) — dropping a card writes that exact string.
+- **`milestones.tags` is keyed by normalized `major.minor`** (`"1.2": "Beta"`), while `plannedVersions` only decides which columns exist, empty ones included. **A drop on a version line writes that line's highest known patch** — across its planned entries and its cards — in canonical `vMAJOR.MINOR.PATCH` form, a missing patch counting as `.0`: planned `"v1.2.0"` plus a card on `1.2.3` writes `"v1.2.3"`. An expanded patch column writes its own patch (`"v1.2.1"`), a non-version label (`"Icebox"`) is written as listed, and a card dropped back on the line it is already in is never rewritten. So the list is optional: a version a card already carries gets its column, and writes the same value, without it.
 - **Automation rules always carry all four keys.** A `set`-only rule keeps `"repo": ""` and `"command": ""`; an empty `when` means every status change.
 
 ### `~/.dispatch/<vault>-<hash>.json` — this device
@@ -330,7 +339,7 @@ const filename = `${vaultName}-${hash.toString(16)}.json`;
 >
 > What this section adds is skipping that download. It costs a Google Cloud project of your own, an OAuth consent screen on **a domain you have verified in Search Console**, and a published app — perhaps twenty minutes if you have done it before, and an afternoon if you have not. That is worth it if you run recurring meetings, or are setting Dispatch up for a team who should not each be exporting documents by hand. For one meeting a fortnight, download the file.
 
-`scripts/dispatch/meet-fetch.mjs` imports a Google Meet meeting's Gemini document into the vault. It is a **Dispatch-scope** script — Dispatch ships it and it does the same thing for everyone — so its settings are ordinary device settings and live in the same per-vault file as everything else above, under a `google` key. (A script the *project* chooses, like a tracker sync, is configured by the project instead; that split is the whole of ADR-0027.)
+`dispatch/scripts/meet-fetch.mjs` imports a Google Meet meeting's Gemini document into the vault. It is a **Dispatch-scope** script — Dispatch ships it and it does the same thing for everyone — so its settings are ordinary device settings and live in the same per-vault file as everything else above, under a `google` key. (A script the *project* chooses, like a tracker sync, is configured by the project instead; that split is the whole of ADR-0027.)
 
 It also **ships in this repository rather than in the plugin bundle**, so the import is available to people working from a clone. Installing Dispatch from the community directory does not put the script on your machine.
 
@@ -370,7 +379,7 @@ The script reads `calendarUrl` from the same file: the calendar feed carries eac
 Then, once per machine:
 
 ```bash
-node scripts/dispatch/meet-fetch.mjs --auth
+node dispatch/scripts/meet-fetch.mjs --auth
 ```
 
 An **"unverified app"** screen is expected — *Advanced → Go to … (unsafe)*. That is the consequence of step 4, not a fault. The refresh token is written back into the same device file, under `google`, and every later run is non-interactive. Re-run `--auth` if the script ever reports the token as no longer valid; Google revokes them on a password change.
@@ -394,7 +403,7 @@ Caveat: commands run through your system shell. On Windows (`cmd.exe`), `%VAR%` 
 - **Executes local processes** — but only commands *you* configure on *your* device. Note content can never introduce a command; the confirmation dialog is on by default.
 - **Reads/writes outside the vault** — device settings at `~/.dispatch/<vault>-<hash>.json` and run records at `~/.dispatch/runs/…jsonl`, deliberately outside the vault so machine paths never sync.
 - **One network request type** — if (and only if) you configure a calendar ICS URL, the plugin fetches that feed read-only (cached 15 min) for the Meetings tab. Nothing else leaves your machine; no telemetry. Commands you configure act under your own credentials.
-- **The plugin makes no Google requests.** `scripts/dispatch/meet-fetch.mjs` does, when you run it — read-only, with credentials you supply. It ships in this repository, not in the plugin bundle; the plugin stores its settings and never uses them. See the [privacy policy](https://eightnine.de/dispatch/privacy.html) for what those scopes cover.
+- **The plugin makes no Google requests.** `dispatch/scripts/meet-fetch.mjs` does, when you run it — read-only, with credentials you supply. It ships in this repository, not in the plugin bundle; the plugin stores its settings and never uses them. See the [privacy policy](https://eightnine.de/dispatch/privacy.html) for what those scopes cover.
 
 ## Building from source
 

@@ -1,5 +1,5 @@
 /**
- * Guards US00024 (AC5, AC7): the wiki is reached through the `wiki` symlink,
+ * Guards US00024 (AC5, AC7): the wiki is reached through the `dispatch/wiki` link,
  * never a hardcoded `docs/` location. A regression here is silent at runtime
  * — `move-ticket.mjs` just prints "note not found" and exits 1, and a stray
  * `docs/wiki/…` in a workflow command resolves to nothing after the move.
@@ -14,7 +14,7 @@
  * `settings-tab.test.ts`'s approach for a repo-layout invariant that has no
  * Obsidian API to exercise.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -26,12 +26,60 @@ function body(text: string): string {
 	return m ? m[1] : text;
 }
 
-describe("scripts/dispatch/move-ticket.mjs", () => {
-	const source = readFileSync(`${repoRoot}/scripts/dispatch/move-ticket.mjs`, "utf8");
+describe("dispatch/scripts/ — US00033", () => {
+	const moveTicket = readFileSync(`${repoRoot}/dispatch/scripts/move-ticket.mjs`, "utf8");
+	const lintVault = readFileSync(`${repoRoot}/dispatch/scripts/lint-vault.mjs`, "utf8");
 
-	it("names the wiki through the symlink, not a literal docs/ location", () => {
-		expect(source).not.toMatch(/"docs"/);
-		expect(source).toContain('const VAULT_DIR = "wiki"');
+	it("names the wiki through the dispatch/wiki link, not a literal docs/ location", () => {
+		expect(moveTicket).not.toMatch(/"docs"/);
+		expect(moveTicket).toContain('const VAULT_DIR = "dispatch/wiki"');
+		expect(lintVault).toContain('const DEFAULT_WIKI = "dispatch/wiki"');
+	});
+
+	it("leaves no scripts/ folder behind — the move carries no shims", () => {
+		expect(existsSync(`${repoRoot}/scripts`)).toBe(false);
+	});
+});
+
+/** Every file under `dir` whose name ends in one of `extensions`. */
+function filesUnder(dir: string, extensions: string[]): string[] {
+	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+		const path = `${dir}/${entry.name}`;
+		if (entry.isDirectory()) return filesUnder(path, extensions);
+		return extensions.some((ext) => entry.name.endsWith(ext)) ? [path] : [];
+	});
+}
+
+/**
+ * US00033 criteria 7 and 12. Nothing that ships or instructs names the old
+ * layout: a stale path in a workflow makes an agent improvise (ADR-0020's
+ * failure mode), and anything under `src/` reaches every user in `main.js` on
+ * a plugin update — which must work whatever layout the user's repo is on.
+ */
+describe("no old-layout path survives — US00033", () => {
+	const stale = [
+		{ what: "scripts/dispatch/", pattern: /scripts\/dispatch\// },
+		{ what: "scripts/move-ticket", pattern: /(?<![\w/.-])scripts\/move-ticket/ },
+		{ what: "a repo-root wiki/ path", pattern: /(?<![\w/.-])wiki\// },
+	];
+	const files = [
+		...filesUnder(`${repoRoot}/dispatch/workflow`, [".md"]),
+		...filesUnder(`${repoRoot}/src`, [".ts"]),
+		...filesUnder(`${repoRoot}/.claude/commands`, [".md"]),
+		...filesUnder(`${repoRoot}/.codex/skills`, [".md"]),
+		...["dispatch/invariants.md", "CLAUDE.md", "AGENTS.md", "package.json"].map((f) => `${repoRoot}/${f}`),
+		...[".claude/settings.json", ".codex/hooks.json"].map((f) => `${repoRoot}/${f}`),
+	];
+
+	it("finds the files it sweeps", () => {
+		expect(files.length).toBeGreaterThan(40);
+	});
+
+	it.each(stale)("no file names $what", ({ what, pattern }) => {
+		for (const file of files) {
+			const text = readFileSync(file, "utf8");
+			expect(pattern.test(text), `${file.slice(repoRoot.length)} names ${what}`).toBe(false);
+		}
 	});
 });
 
@@ -98,7 +146,7 @@ describe("the per-agent stubs — ADR-0020", () => {
 });
 
 /**
- * N1: `scripts/dispatch/run-state.mjs` and the copy `dispatch-setup` installs
+ * N1: `dispatch/scripts/run-state.mjs` and the copy `dispatch-setup` installs
  * into a fresh project are the same program with different headers. They drifted
  * once already — the repo copy learned Codex's payload and the shipped one did
  * not, so every new user got a run log with no excerpt and no agent name. The
@@ -113,7 +161,7 @@ describe("the run-state hook ships as one program", () => {
 	}
 
 	it("keeps the packaged copy identical to the repo script", () => {
-		const repo = readFileSync(`${repoRoot}/scripts/dispatch/run-state.mjs`, "utf8");
+		const repo = readFileSync(`${repoRoot}/dispatch/scripts/run-state.mjs`, "utf8");
 		const asset = readFileSync(
 			`${repoRoot}/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs`,
 			"utf8"

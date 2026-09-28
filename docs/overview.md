@@ -24,23 +24,33 @@ Columns are the values of your **status** property, in the order you configure �
 - **Right-click a card** for its chips, or to edit size and badge properties inline.
 - **Click a column header** for batch chips: one agent session working through every ticket in that column in sequence.
 - **WIP limits** per column: the header shows `count/limit`, and the column outlines amber at the limit, red above it.
-- **Keyboard**: arrows move focus, `Enter`/`o` opens the note, `[` / `]` move the focused card one column left or right.
+- **Keyboard**: click a card to focus it and open its note; back on the board, arrows move focus, `Enter`/`o` opens the note, `[` / `]` move the focused card one column left or right — they do nothing when no card shows the focus outline.
 
 ## Release Plan
 
-The same cards, grouped by **target version** instead of status. Dragging a card between columns changes only the version — never its status or rank.
+The same cards, grouped by **target version** instead of status. Dragging a card between columns changes only the version — never its status or its Kanban rank. With a release order property configured, it also sets the card's place in the column (see below).
 
 ![Release Board](assets/Release-Teaser.png)
 
 - **Version columns are keyed by `major.minor`**, so `v1.2.0`, `1.2.0` and `1.2.1` all land in the same `1.2` column. Inconsistent formatting in your notes doesn't split a milestone.
 - **Planned versions are always shown**, even when empty — that's how you plan a release before any ticket is assigned to it. Non-version planned values ("Icebox") become special columns on the left.
+- **A drop writes one convention.** Dropping a card on a version line writes that line's highest known patch as `vMAJOR.MINOR.PATCH` — `v1.2.3` if any card or planned entry already targets it, `v1.2.0` if none names a patch — whether the column was planned or appeared from the cards. A card dropped back on its own line keeps whatever it had.
 - **An (archive) column** on the far left collects cards excluded from progress (Rejected) and completed work with no version, keeping *(no version)* a clean pool of unscheduled open work.
 - **Each version carries a progress bar**: `Σ(size × status progress) / Σ(size)`. Status progress is a number you assign per column (e.g. Development = 55, Done = 100, Rejected = excluded); size is a numeric property, defaulting to 1 when missing.
 - **Each version can carry a tag** — "MVP", "Closed Beta" — edited by clicking the chip in the header.
 - **Shipped versions link their release note** and show the release date instead of an estimate. Unreleased ones show a **velocity-based forecast** that accumulates along the pipeline: a version's ETA covers the remaining weight of every earlier version plus its own, so a later release can never be forecast before an earlier one. The rate is measured from the completions in the look-back window: the earliest is a baseline, and the work finished after it is divided by the days from that date to the last completion. Fewer completions than the configured minimum (default four), or more than one on the earliest date, means no forecast — it never guesses.
+- **Retarget a whole release from its header.** Right-click a version line (`0.4`, not a patch column, *(no version)* or a label) and choose *Retarget release…* to move every card it shows to another line, whatever slice is active. Pick an existing line to merge into it — the cards get that line's highest known patch, and its own cards and tag stay as they are — or type a new version such as `v0.6.0`. The emptied line disappears: its planned entry is removed, or renumbered when the target is new, and its tag follows it to a new line or is dropped on a merge. A tag the target line already has always wins. A line holding any finished card (a status at 100 % progress, such as Done or Released) cannot be retargeted at all — nothing is written, and the notice names the cards. A target on the same line (`0.4.0` → `0.4.1`) is refused; drag single cards to change a patch. A confirmation says how many tickets move and what happens to the column before anything is written, and board automations do not run for it.
 - **Patch releases expand on demand**: a `+` on a version line splits `1.4` into `1.4.0`, `1.4.1`, `1.4.2` …, each with its own progress, drop target and release note; `−` collapses it again. The expansion is view-local, so opening a line never changes anyone else's board.
 
-Cards inside a version column sort by workflow progress — furthest-along first — so the column reads as "what's nearly done" from the top.
+**Order inside a column.** By default, cards inside a version column follow the configured status-column order — with Backlog → Refinement → In progress → Review → Done, Backlog comes first — then Kanban rank, then title.
+
+Set **Release order property** (e.g. `release_rank`) to **drag cards into the order you intend to build them**. The order is data, written into that property the same gap-based way as the Kanban `rank`, and kept separate from it, so the two tabs never reorder each other.
+- **Your order wins.** A card with a release position sorts above one without, whatever their status — a `Backlog` card can sit above a `Done` one. Cards without a position follow in the default order, so the board looks exactly as before until someone drags. The first drop in a column numbers the whole column as it was shown.
+- **A drop lands where you drop it**, next to the visible card it was dropped on, even while a slice hides some of the column. Dropping a card back on its own spot writes nothing, and reordering never touches the version, however it is spelled.
+- **A position belongs to its line.** Expanding a line shows each patch column's cards in the line's one order. A card that changes column without a chosen spot — the `[` / `]` keys, or a *Retarget release…* that merges into an existing line — joins the end of the target, and a merged line keeps its own order after the target's cards.
+- **(no version) and label columns are ordered too**; the (archive) keeps the default sort.
+- **Copy release order to Kanban.** Right-click a version line and choose it to start building that release: on the Kanban tab, the line's cards move to the top of each status column in release order, and every other card keeps its order below them. It writes `rank` only, once — a later release reorder does not copy again, and running it again right away writes nothing.
+- A reorder is silent and runs no board automation.
 
 ## Meetings board
 

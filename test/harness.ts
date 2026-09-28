@@ -96,6 +96,7 @@ export const CARD_SETTINGS = {
 	findingsProperty: 'open_findings',
 	discussionProperty: 'discussion',
 	orderProperty: 'rank',
+	releaseOrderProperty: 'release_rank',
 	columns: SETTINGS.columns,
 	versionProperty: 'version_target',
 	sizeProperty: 'size',

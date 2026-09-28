@@ -18,7 +18,7 @@ The convention is in the canonical file. The mechanism here is `set_session_titl
 
 ## Run-lifecycle hooks
 
-`.claude/settings.json` wires four events to `scripts/dispatch/run-state.mjs`, which reports chip
+`.claude/settings.json` wires four events to `dispatch/scripts/run-state.mjs`, which reports chip
 run state back to the board and appends the run log to the note:
 
 | Event | State |

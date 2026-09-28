@@ -4,13 +4,13 @@
 > `.codex/skills/meeting/SKILL.md` are stubs that point here and carry no steps. `<ARGS>` is
 > what the caller passed — `agenda|report <date> <title>`.
 
-Two modes over the meeting notes in `wiki/09_Meetings-and-Workshops` (`YYYY-MM-DD - <title>.md`). `<ARGS>` starts with `agenda` or `report`, followed by the date and/or title identifying the meeting.
+Two modes over the meeting notes in `dispatch/wiki/09_Meetings-and-Workshops` (`YYYY-MM-DD - <title>.md`). `<ARGS>` starts with `agenda` or `report`, followed by the date and/or title identifying the meeting.
 
 ---
 
 ## Mode: agenda (before)
 
-1. Confirm the date with `date`. Locate or create the note from `wiki/00_Start-Here/Templates/meeting.md`.
+1. Confirm the date with `date`. Locate or create the note from `dispatch/wiki/00_Start-Here/Templates/meeting.md`.
 2. **Build the agenda from the board, not from memory.** Pull:
    - open refinement questions (`open_questions > 0`) — the ones actually blocking, ranked by what they hold up
    - tickets waiting for manual sign-off (`open_tests > 0`)
@@ -22,16 +22,16 @@ Two modes over the meeting notes in `wiki/09_Meetings-and-Workshops` (`YYYY-MM-D
 
 ## Mode: report (after)
 
-4. **Locate the meeting's document in `wiki/09_Meetings-and-Workshops/Transcripts/`** — Google's own filename, `<Title> - <YYYY_MM_DD HH_MM TZ> - Notes by Gemini.md`. **One file holds both** the Gemini summary and the transcript with speaker labels; Google stopped producing a separate `Transcript by Gemini` file. Never edit it; it is a raw source, and a wrong interpretation must always be redoable from it.
+4. **Locate the meeting's document in `dispatch/wiki/09_Meetings-and-Workshops/Transcripts/`** — Google's own filename, `<Title> - <YYYY_MM_DD HH_MM TZ> - Notes by Gemini.md`. **One file holds both** the Gemini summary and the transcript with speaker labels; Google stopped producing a separate `Transcript by Gemini` file. Never edit it; it is a raw source, and a wrong interpretation must always be redoable from it.
 
    **Not there yet?** There are two ways it gets there, and the ordinary one needs no setup.
 
-   **The default: ask for it.** Say which meeting you need and what to do — *open the Gemini document in Google Docs and use File → Download → Markdown for **both tabs** (Notizen and Transkript), then drop the files in `wiki/09_Meetings-and-Workshops/Transcripts/`* — then stop and wait. When the files appear, step 4 finds them and nothing else changes. This is not a fallback or a degraded path; it is how most people will always do it, and a report written from a hand-downloaded file is identical to one written from a fetched file.
+   **The default: ask for it.** Say which meeting you need and what to do — *open the Gemini document in Google Docs and use File → Download → Markdown for **both tabs** (Notizen and Transkript), then drop the files in `dispatch/wiki/09_Meetings-and-Workshops/Transcripts/`* — then stop and wait. When the files appear, step 4 finds them and nothing else changes. This is not a fallback or a degraded path; it is how most people will always do it, and a report written from a hand-downloaded file is identical to one written from a fetched file.
 
    **The optional automated import.** If the `google` block is configured in this vault's device file (`~/.dispatch/<vault>-<hash>.json`), the download is skipped and you fetch it yourself — from the repo root:
    ```bash
-   node scripts/dispatch/meet-fetch.mjs --title "<meeting title>" --date <YYYY-MM-DD> \
-     --dir wiki/09_Meetings-and-Workshops/Transcripts
+   node dispatch/scripts/meet-fetch.mjs --title "<meeting title>" --date <YYYY-MM-DD> \
+     --dir dispatch/wiki/09_Meetings-and-Workshops/Transcripts
    ```
    **Check whether it is configured before reaching for it**, and if it is not, take the default above rather than walking someone through a Google Cloud project mid-report. Setting it up is a deliberate act — a Cloud project, an OAuth consent screen on a verified domain — worth it for a team or a recurring series, not for one meeting. `docs/installation.md` has it; offer it, never impose it.
 
@@ -49,7 +49,7 @@ Two modes over the meeting notes in `wiki/09_Meetings-and-Workshops` (`YYYY-MM-D
    - **`WARNING: this event has N Gemini documents`** — several conferences ran against one calendar entry (a call that dropped and was rejoined, or a series started more than once), and the first was taken. **Check before writing.** Read the fetched document's title: it carries the conference's own start time. If it is not the meeting you are reporting on, re-run with one of the `--doc` lines the warning prints. They are all the same day, so nothing else will flag this for you.
    - **No document matched** — the script prints every document it considered, and if that list is empty, every Gemini document in reach with its parsed title and date. **Read that list before concluding anything**; the answer is usually one line in it. If the meeting genuinely is not there, Gemini has not generated it yet (it lags the meeting) or the meeting was never recorded — stop and report, and never invent a report from the agenda.
 
-   `node scripts/dispatch/meet-fetch.mjs --list` shows the same inventory at any time.
+   `node dispatch/scripts/meet-fetch.mjs --list` shows the same inventory at any time.
 
    **Three recoverable errors. Run the fix yourself — never hand the user a command to paste.** You have a shell; asking someone to copy a line back into the terminal you are already holding is work you are supposed to be doing.
 
@@ -57,7 +57,7 @@ Two modes over the meeting notes in `wiki/09_Meetings-and-Workshops` (`YYYY-MM-D
    - **`Could not tell which vault's settings to use`** — more than one vault on the machine, and the run was not started from a chip (a chip launch sets `DISPATCH_LOCAL_SETTINGS`, which answers this). The error lists the device files; pick the one whose name matches this vault (`Dispatch-Wiki-<hash>.json` here) and re-run with `--config "<that path>"`. Do not ask which one.
    - **`The stored refresh token is no longer valid`** — the import is configured but not yet authorised on this machine, or the grant was revoked. (No `google` block at all is not this error, and not a problem: take the default and ask for the download.) **Ask first, then run it.** This opens a browser and asks for access to the user's Google Docs, so say so plainly and give them the choice — something like:
 
-     > *"To fetch the transcript I need your permission once, to read the Gemini document for this meeting. It opens a Google consent page in your browser and asks for read-only access to your Google Docs — nothing in your Drive. Shall I go ahead? If you'd rather not, you can download the document yourself instead: open it in Google Docs, and for **both tabs** (Notizen and Transkript) use File → Download → Markdown, then drop the files in `wiki/09_Meetings-and-Workshops/Transcripts/`. I'll work from those."*
+     > *"To fetch the transcript I need your permission once, to read the Gemini document for this meeting. It opens a Google consent page in your browser and asks for read-only access to your Google Docs — nothing in your Drive. Shall I go ahead? If you'd rather not, you can download the document yourself instead: open it in Google Docs, and for **both tabs** (Notizen and Transkript) use File → Download → Markdown, then drop the files in `dispatch/wiki/09_Meetings-and-Workshops/Transcripts/`. I'll work from those."*
 
      Both answers are fine and neither needs persuading. **If they agree:** run the exact `--auth` command the error prints, including its `--config`, and **keep waiting in that same tool call until it returns.** It opens the consent page itself and then blocks on a local callback; an "unverified app" screen is expected (*Advanced → Go to Dispatch*). Give it a long timeout — several minutes — because it is waiting for a human. When it reports the token stored, re-run the fetch and carry on with step 5. **If they decline:** stop and wait for the files; once they are in the folder, step 4 finds them and nothing else changes.
 

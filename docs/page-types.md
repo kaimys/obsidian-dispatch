@@ -73,6 +73,7 @@ frozen: 2026-08-05             # stamped when the spec closes (see below)
 | `type`, `priority` | badges, slice-by |
 | `status` | **Kanban columns** — the configured order is your pipeline |
 | `rank` | manual order within a column (priority) |
+| `release_rank` | manual build order within a Release Plan column, if the board names it as the release order property |
 | `version_target` | **Release Plan columns**, normalized by `major.minor` |
 | `size` | weighted progress and the velocity forecast |
 | `assignee` | owner badge, slice-by, Todos fallback owner |

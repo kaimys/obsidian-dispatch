@@ -1,4 +1,15 @@
-import { App, ItemView, Menu, Modal, Notice, TFile, WorkspaceLeaf, debounce, setIcon } from "obsidian";
+import {
+	App,
+	ItemView,
+	Menu,
+	Modal,
+	Notice,
+	SuggestModal,
+	TFile,
+	WorkspaceLeaf,
+	debounce,
+	setIcon,
+} from "obsidian";
 import { CHIP_ICON, launchChip, launchColumnChip, launchEventChip } from "./chips";
 import { runHook, shellVars, substitute } from "./exec";
 import { renderSetupPanel } from "./setup";
@@ -16,18 +27,37 @@ import {
 } from "./cards";
 import type { CardData, CardSettings, ReleaseNote, VelocityResult } from "./cards";
 import type { FrontmatterPatch } from "./moves";
+import {
+	buildLineColumns,
+	buildPatchColumns,
+	compareReleaseOrder,
+	inColumn,
+	isArchivedCard,
+	isVersionLine,
+	lineCandidates,
+	linePatches,
+} from "./milestones";
+import type { MilestoneColumn } from "./milestones";
+import {
+	isRetargetSource,
+	parseDestination,
+	planRetarget,
+	retargetBlockers,
+	retargetDestinations,
+	sameRetarget,
+} from "./retarget";
+import type { RetargetPlan, RetargetRejection } from "./retarget";
+import { isCopyOrderSource, planCopyReleaseOrder, sameCopyPlan } from "./release-order";
+import type { CopyOrderPlan } from "./release-order";
+import { focusTarget, resolveKey, splitCardPath, upcomingCardKey } from "./focus";
 import { frontmatterIn, frontmatterOf, updateFrontmatter } from "./vault";
+import { planReleaseDrop, planStatusDrop } from "./moves";
+import type { DropAnchor } from "./moves";
 import {
-	planStatusDrop,
-	planVersionDrop,
-} from "./moves";
-import {
-	comparePatchKeys,
 	compareRanks,
 	displayValue,
 	parseOpenActionOwners,
 	parseTodoItems,
-	patchKey,
 	sliceKey,
 	versionKey,
 } from "./parse";
@@ -70,33 +100,7 @@ interface MeetingCard {
 
 type Card = CardData<TFile>;
 
-interface MilestoneColumn {
-	/** Normalized major.minor key ("" = no version). */
-	key: string;
-	display: string;
-	/** Exact value a drop writes into the version property ("" = remove it). */
-	writeValue: string;
-	/** Position in plannedVersions (discovered columns get a large index). */
-	order: number;
-	/** True for a patch column of an expanded line (1.4.0, 1.4.1, …). */
-	isPatch?: boolean;
-	/** For a patch column: the major.minor line it belongs to. */
-	line?: string;
-}
-
 type ReleaseInfo = ReleaseNote<TFile>;
-
-/**
- * Special (non-version) columns like "Rejected" or "Icebox" sort leftmost, in
- * their plannedVersions order; semver columns follow, ascending.
- */
-function compareMilestoneColumns(a: MilestoneColumn, b: MilestoneColumn): number {
-	const pa = a.key.match(/^(\d+)\.(\d+)$/);
-	const pb = b.key.match(/^(\d+)\.(\d+)$/);
-	if (!pa !== !pb) return pa ? 1 : -1;
-	if (pa && pb) return Number(pa[1]) - Number(pb[1]) || Number(pa[2]) - Number(pb[2]);
-	return a.order - b.order || a.key.localeCompare(b.key);
-}
 
 export class BoardView extends ItemView {
 	private plugin: DispatchPlugin;
@@ -141,6 +145,19 @@ export class BoardView extends ItemView {
 		this.registerEvent(this.app.vault.on("rename", () => this.requestRender()));
 		this.contentEl.setAttr("tabindex", "0");
 		this.registerDomEvent(this.contentEl, "keydown", (e) => this.onKey(e));
+		// Coming back to the board (its tab, Esc's round trip, a fresh open)
+		// makes it the active leaf without giving it DOM focus, and keys only
+		// reach it with focus. Leave focus alone when it is already inside,
+		// e.g. on the slice picker. Read it from the board's own document: a
+		// pop-out window has its own.
+		this.registerEvent(
+			this.app.workspace.on("active-leaf-change", (leaf) => {
+				if (leaf !== this.leaf) return;
+				if (!this.contentEl.contains(this.contentEl.ownerDocument.activeElement)) {
+					this.contentEl.focus({ preventScroll: true });
+				}
+			})
+		);
 		this.render();
 		return Promise.resolve();
 	}
@@ -165,6 +182,7 @@ export class BoardView extends ItemView {
 			findingsProperty: b.findingsProperty,
 			discussionProperty: b.discussionProperty,
 			orderProperty: b.orderProperty,
+			releaseOrderProperty: m.releaseOrderProperty,
 			columns: b.columns,
 			versionProperty: m.versionProperty,
 			sizeProperty: m.sizeProperty,
@@ -399,67 +417,30 @@ export class BoardView extends ItemView {
 		const velocity = this.velocityPerDay(allCards);
 		const releases = this.collectReleases();
 
-		// Built-in archive (leftmost): cards out of the roadmap — excluded
-		// statuses (e.g. Rejected) plus completed cards without a version.
-		// Keeps "(no version)" a pure pool of unscheduled open work.
-		const isArchived = (c: Card) =>
-			c.excludedFromProgress || ((c.progress ?? 0) >= 100 && !c.version);
-		const archived = cards.filter(isArchived);
-		const active = cards.filter((c) => !isArchived(c));
+		// Built-in archive (leftmost): cards out of the roadmap (isArchivedCard).
+		const archived = cards.filter(isArchivedCard);
+		const active = cards.filter((c) => !isArchivedCard(c));
 
-		const columns = new Map<string, MilestoneColumn>();
-		ms.plannedVersions.forEach((v, i) => {
-			const key = versionKey(v);
-			if (key && !columns.has(key)) columns.set(key, { key, display: key, writeValue: v, order: i });
-		});
-		for (const card of active) {
-			if (!card.version) continue;
-			const key = versionKey(card.version);
-			if (!columns.has(key))
-				columns.set(key, { key, display: key, writeValue: key, order: Number.MAX_SAFE_INTEGER });
-		}
-		const lineOrder = [...columns.values()].sort(compareMilestoneColumns);
-
-		// Patch keys belonging to a version line — from its cards, its planned
-		// versions and its release notes (so shipped patches show even with no
-		// open ticket left).
-		const patchesForLine = (lineKey: string): string[] => {
-			const set = new Set<string>();
-			for (const c of active) {
-				if (c.version && versionKey(c.version) === lineKey) set.add(patchKey(c.version));
-			}
-			for (const v of ms.plannedVersions) {
-				if (versionKey(v) === lineKey) set.add(patchKey(v));
-			}
-			for (const key of releases.byPatch.keys()) {
-				if (versionKey(key) === lineKey) set.add(key);
-			}
-			return [...set].sort(comparePatchKeys);
-		};
+		// Columns come from what is on screen; what a line writes comes from
+		// every non-archived card, so a slice never downgrades a drop.
+		const shown = active.map((c) => c.version);
+		const lineOrder = buildLineColumns(
+			ms.plannedVersions,
+			shown,
+			lineCandidates(ms.plannedVersions, allCards)
+		);
+		const patchesForLine = (lineKey: string): string[] =>
+			linePatches(lineKey, [...shown, ...ms.plannedVersions], releases.byPatch.keys());
 
 		// Expand the lines the user opened into one column per patch version.
 		const ordered: MilestoneColumn[] = [];
 		for (const col of lineOrder) {
-			const patches = /^\d+\.\d+$/.test(col.key) ? patchesForLine(col.key) : [];
+			const patches = isVersionLine(col.key) ? patchesForLine(col.key) : [];
 			if (!this.expandedLines.has(col.key) || patches.length === 0) {
 				ordered.push(col);
 				continue;
 			}
-			for (const p of patches) {
-				// Write the planned spelling when we have one (keeps the "v" prefix
-				// convention), otherwise mirror the line's own spelling.
-				const planned = ms.plannedVersions.find((v) => patchKey(v) === p);
-				const writeValue =
-					planned ?? (/^[vV]/.test(col.writeValue) ? `v${p}` : p);
-				ordered.push({
-					key: p,
-					display: p,
-					writeValue,
-					order: col.order,
-					isPatch: true,
-					line: col.key,
-				});
-			}
+			ordered.push(...buildPatchColumns(col, patches));
 		}
 
 		if (archived.length > 0) {
@@ -474,20 +455,16 @@ export class BoardView extends ItemView {
 		let pipelineBefore = 0;
 		for (const col of ordered) {
 			const isArchive = col.key === ARCHIVE_KEY;
-			const colCards = (
-				isArchive
-					? archived
-					: active.filter((c) =>
-							col.isPatch
-								? patchKey(c.version) === col.key
-								: versionKey(c.version) === col.key
-						)
-			).sort(
-				(a, b) =>
-					a.statusIdx - b.statusIdx ||
-					compareRanks(a.rank, b.rank) ||
-					a.title.localeCompare(b.title)
-			);
+			// The archive is history, not a plan: it keeps the status-first
+			// sort even for cards that still carry a release rank.
+			const colCards = isArchive
+				? [...archived].sort(
+						(a, b) =>
+							a.statusIdx - b.statusIdx ||
+							compareRanks(a.rank, b.rank) ||
+							a.title.localeCompare(b.title)
+					)
+				: active.filter((c) => inColumn(c, col)).sort(compareReleaseOrder);
 
 			const colEl = board.createDiv({
 				cls: "dispatch-column",
@@ -497,11 +474,43 @@ export class BoardView extends ItemView {
 							"data-col-key": col.key,
 							"data-col-write": col.writeValue,
 							"data-col-display": col.display,
+							...(col.isPatch ? { "data-col-line": col.line ?? "" } : {}),
 						},
 			});
 			const header = colEl.createDiv({
 				cls: "dispatch-column-header dispatch-milestone-header",
 			});
+			// Right-click only: left-clicks stay with the expand toggle and the tag.
+			// Inside the open tag input, the right-click stays the input's own
+			// cut/copy/paste menu.
+			if (isRetargetSource(col)) {
+				header.addEventListener("contextmenu", (e) => {
+					if (e.target instanceof HTMLElement && e.target.closest("input")) return;
+					e.preventDefault();
+					const menu = new Menu();
+					menu.addItem((item) =>
+						item
+							.setTitle("Retarget release…")
+							.setIcon("move-right")
+							.onClick(() => this.retargetLine(col.key))
+					);
+					if (
+						isCopyOrderSource(
+							col,
+							this.plugin.shared.milestones.releaseOrderProperty,
+							this.plugin.shared.board.orderProperty
+						)
+					) {
+						menu.addItem((item) =>
+							item
+								.setTitle("Copy release order to Kanban")
+								.setIcon("list-ordered")
+								.onClick(() => this.copyReleaseOrder(col.key))
+						);
+					}
+					menu.showAtMouseEvent(e);
+				});
+			}
 			const titleRow = header.createDiv({ cls: "dispatch-milestone-title-row" });
 			// Expand a version line into its patch releases (1.4 → 1.4.0, 1.4.1 …)
 			// and collapse it again from any of those patch columns.
@@ -573,7 +582,7 @@ export class BoardView extends ItemView {
 			pipelineBefore += colRemaining;
 
 			const list = colEl.createDiv({ cls: "dispatch-cards" });
-			if (!isArchive) this.makeVersionDropTarget(colEl, col);
+			if (!isArchive) this.makeVersionDropTarget(colEl, list, col);
 			for (const card of colCards) this.renderCard(list, card, true);
 		}
 	}
@@ -815,12 +824,12 @@ export class BoardView extends ItemView {
 			}
 		});
 		el.addEventListener("click", () => {
-			this.focusedPath = card.file.path;
-			void this.app.workspace.getLeaf("tab").openFile(card.file);
+			this.setFocus(card.file.path);
+			void this.openFromBoard(card.file);
 		});
 		el.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
-			this.focusedPath = card.file.path;
+			this.setFocus(card.file.path);
 			this.showCardMenu(e, card);
 		});
 	}
@@ -940,11 +949,11 @@ export class BoardView extends ItemView {
 					text: `no events in the next ${this.plugin.shared.meetings.calendarLookaheadDays} days`,
 				});
 			}
-			for (const event of events.slice(0, 6)) {
+			events.slice(0, 6).forEach((event, index) => {
 				const note = this.findMeetingNoteForEvent(event, meetings);
 				if (note) linkedPaths.add(note.file.path);
-				this.renderUpcomingRow(list, event, note);
-			}
+				this.renderUpcomingRow(list, event, note, index);
+			});
 			list.createEl("hr", { cls: "dispatch-meeting-divider" });
 		}
 
@@ -986,7 +995,8 @@ export class BoardView extends ItemView {
 	private renderUpcomingRow(
 		parent: HTMLElement,
 		event: { start: Date; title: string; allDay: boolean },
-		note: MeetingCard | undefined
+		note: MeetingCard | undefined,
+		index: number
 	): void {
 		const d = event.start;
 		const pad = (n: number) => String(n).padStart(2, "0");
@@ -1008,8 +1018,13 @@ export class BoardView extends ItemView {
 		if (note) {
 			badges.createSpan({ cls: "dispatch-badge dispatch-upcoming-agenda", text: "agenda ✓" });
 			el.setAttr("title", note.file.basename);
+			// Focusable like a meeting row, under its own key: two events can
+			// link the same note.
+			const key = upcomingCardKey(note.file.path, index);
+			el.setAttr("data-path", key);
 			el.addEventListener("click", () => {
-				void this.app.workspace.getLeaf("tab").openFile(note.file);
+				this.setFocus(key);
+				void this.openFromBoard(note.file);
 			});
 		} else {
 			badges.createSpan({
@@ -1101,8 +1116,8 @@ export class BoardView extends ItemView {
 		}
 
 		el.addEventListener("click", () => {
-			this.focusedPath = meeting.file.path;
-			void this.app.workspace.getLeaf("tab").openFile(meeting.file);
+			this.setFocus(meeting.file.path);
+			void this.openFromBoard(meeting.file);
 		});
 		el.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
@@ -1273,15 +1288,26 @@ export class BoardView extends ItemView {
 		meta.createSpan({ text: todo.source });
 		el.setAttr("title", "Open the note at this item — tick it there");
 		el.addEventListener("click", () => {
-			this.focusedPath = `${todo.file.path}#${todo.line}`;
-			void this.app.workspace
-				.getLeaf("tab")
-				.openFile(todo.file, { eState: { line: todo.line } });
+			this.setFocus(`${todo.file.path}#${todo.line}`);
+			void this.openFromBoard(todo.file, { line: todo.line });
 		});
 	}
 
 	// -------------------------------------------------------------- keyboard
 
+	/**
+	 * The one writer of `focusedPath`: the outline moves with it in the same
+	 * call, so it never sits on one card while keys act on another.
+	 */
+	private setFocus(path: string | null): void {
+		this.contentEl
+			.querySelectorAll(".dispatch-card-focused")
+			.forEach((c) => c.removeClass("dispatch-card-focused"));
+		this.focusedPath = path;
+		this.applyFocus();
+	}
+
+	/** Re-draws the outline after a render; never writes `focusedPath`. */
 	private applyFocus(): void {
 		if (!this.focusedPath) return;
 		const el = this.contentEl.querySelector<HTMLElement>(
@@ -1292,6 +1318,14 @@ export class BoardView extends ItemView {
 		el.scrollIntoView({ block: "nearest", inline: "nearest" });
 	}
 
+	/**
+	 * Opens a card's note in a new tab, in front. The card stays outlined, so
+	 * back on the board a key acts on the card that was opened.
+	 */
+	private async openFromBoard(file: TFile, eState?: Record<string, unknown>): Promise<void> {
+		await this.app.workspace.getLeaf("tab").openFile(file, { eState });
+	}
+
 	private onKey(e: KeyboardEvent): void {
 		if (
 			e.target instanceof HTMLInputElement ||
@@ -1299,103 +1333,65 @@ export class BoardView extends ItemView {
 			e.target instanceof HTMLSelectElement
 		)
 			return;
-		const columns = Array.from(this.contentEl.querySelectorAll<HTMLElement>(".dispatch-column"));
-		if (columns.length === 0) return;
-		const cardsOf = (col: HTMLElement) =>
-			Array.from(col.querySelectorAll<HTMLElement>(".dispatch-card"));
-
-		let colIdx = -1;
-		let cardIdx = -1;
-		outer: for (let i = 0; i < columns.length; i++) {
-			const cards = cardsOf(columns[i]);
-			for (let j = 0; j < cards.length; j++) {
-				if (cards[j].dataset.path === this.focusedPath) {
-					colIdx = i;
-					cardIdx = j;
-					break outer;
+		// The Meetings tab is one list, navigated as a single column.
+		const columnEls = Array.from(
+			this.contentEl.querySelectorAll<HTMLElement>(".dispatch-column, .dispatch-meeting-list")
+		);
+		if (columnEls.length === 0) return;
+		const pathsOf = (els: ArrayLike<HTMLElement>) =>
+			Array.from(els, (el) => el.dataset.path ?? "").filter((p) => p !== "");
+		const columns = columnEls.map((col) =>
+			pathsOf(col.querySelectorAll<HTMLElement>(".dispatch-card[data-path]"))
+		);
+		const outlined = pathsOf(this.contentEl.querySelectorAll<HTMLElement>(".dispatch-card-focused"));
+		const action = resolveKey(
+			{
+				columns,
+				target: focusTarget(outlined, this.focusedPath, columns),
+				movable: this.mode === "status" || this.mode === "milestone",
+			},
+			e.key
+		);
+		if (!action) return;
+		switch (action.kind) {
+			case "focus":
+				this.setFocus(action.path);
+				break;
+			case "open": {
+				const { path, line } = splitCardPath(action.path);
+				const file = this.app.vault.getAbstractFileByPath(path);
+				if (file instanceof TFile) {
+					void this.openFromBoard(file, line === undefined ? undefined : { line });
 				}
-			}
-		}
-
-		const focusAt = (ci: number, ri: number) => {
-			const cards = cardsOf(columns[ci]);
-			if (cards.length === 0) return false;
-			const el = cards[Math.max(0, Math.min(ri, cards.length - 1))];
-			this.focusedPath = el.dataset.path ?? null;
-			this.contentEl
-				.querySelectorAll(".dispatch-card-focused")
-				.forEach((c) => c.removeClass("dispatch-card-focused"));
-			this.applyFocus();
-			return true;
-		};
-		const nextColumnWithCards = (start: number, dir: number): number => {
-			for (let i = start + dir; i >= 0 && i < columns.length; i += dir) {
-				if (cardsOf(columns[i]).length > 0) return i;
-			}
-			return -1;
-		};
-
-		switch (e.key) {
-			case "ArrowDown":
-			case "ArrowUp": {
-				if (colIdx === -1) {
-					const first = nextColumnWithCards(-1, 1);
-					if (first !== -1) focusAt(first, 0);
-					break;
-				}
-				focusAt(colIdx, cardIdx + (e.key === "ArrowDown" ? 1 : -1));
 				break;
 			}
-			case "ArrowLeft":
-			case "ArrowRight": {
-				const dir = e.key === "ArrowRight" ? 1 : -1;
-				if (colIdx === -1) {
-					const first = nextColumnWithCards(-1, 1);
-					if (first !== -1) focusAt(first, 0);
-					break;
-				}
-				const target = nextColumnWithCards(colIdx, dir);
-				if (target !== -1) focusAt(target, cardIdx);
+			case "move":
+				this.moveFocusedTo(action.path, columnEls[action.column]);
 				break;
-			}
-			case "Enter":
-			case "o": {
-				if (!this.focusedPath) return;
-				const file = this.app.vault.getAbstractFileByPath(this.focusedPath);
-				if (file instanceof TFile) void this.app.workspace.getLeaf("tab").openFile(file);
-				break;
-			}
-			case "[":
-			case "]": {
-				if (colIdx === -1 || !this.focusedPath) return;
-				const dir = e.key === "]" ? 1 : -1;
-				const targetIdx = colIdx + dir;
-				if (targetIdx < 0 || targetIdx >= columns.length) return;
-				this.moveFocusedTo(columns[targetIdx]);
-				break;
-			}
-			default:
-				return;
 		}
 		e.preventDefault();
 	}
 
-	/** Move the focused card into the given column element (keyboard [ / ]). */
-	private moveFocusedTo(colEl: HTMLElement): void {
-		if (!this.focusedPath) return;
+	/** Move a card into the given column element (keyboard [ / ]). */
+	private moveFocusedTo(path: string, colEl: HTMLElement): void {
 		if (this.mode === "status") {
 			const status = colEl.dataset.col;
 			if (status === undefined) return;
-			void this.moveCard(this.focusedPath, status, Number.MAX_SAFE_INTEGER);
+			void this.moveCard(path, status, "end");
 		} else {
-			const { colKey, colWrite, colDisplay } = colEl.dataset;
+			const { colKey, colWrite, colDisplay, colLine } = colEl.dataset;
 			if (colKey === undefined) return;
-			void this.moveCardToVersion(this.focusedPath, {
-				key: colKey,
-				writeValue: colWrite ?? "",
-				display: colDisplay ?? colKey,
-				order: 0,
-			});
+			void this.moveCardToVersion(
+				path,
+				{
+					key: colKey,
+					writeValue: colWrite ?? "",
+					display: colDisplay ?? colKey,
+					order: 0,
+					...(colLine !== undefined ? { isPatch: true, line: colLine } : {}),
+				},
+				"end"
+			);
 		}
 	}
 
@@ -1441,13 +1437,13 @@ export class BoardView extends ItemView {
 			colEl.removeClass("dispatch-drop-active");
 			this.clearInsertMarkers(list);
 			const path = e.dataTransfer?.getData("text/plain");
-			if (path) void this.moveCard(path, status, this.insertionIndex(list, e.clientY));
+			if (path) void this.moveCard(path, status, this.dropAnchor(list, e.clientY));
 		});
 	}
 
-	private async moveCard(path: string, newStatus: string, insertIndex: number): Promise<void> {
+	private async moveCard(path: string, newStatus: string, anchor: DropAnchor): Promise<void> {
 		const board = this.plugin.shared.board;
-		const plan = planStatusDrop(this.collectCards(), path, newStatus, insertIndex, {
+		const plan = planStatusDrop(this.collectCards(), path, newStatus, anchor, {
 			statusProperty: board.statusProperty,
 			orderProperty: board.orderProperty,
 			automations: board.automations,
@@ -1470,32 +1466,223 @@ export class BoardView extends ItemView {
 
 	// ----------------------------------------------------- version drag&drop
 
-	private makeVersionDropTarget(colEl: HTMLElement, col: MilestoneColumn): void {
+	private makeVersionDropTarget(colEl: HTMLElement, list: HTMLElement, col: MilestoneColumn): void {
+		const ordered = () => this.plugin.shared.milestones.releaseOrderProperty !== "";
 		colEl.addEventListener("dragover", (e) => {
 			e.preventDefault();
 			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
 			colEl.addClass("dispatch-drop-active");
+			if (!ordered()) return;
+			this.clearInsertMarkers(list);
+			const index = this.insertionIndex(list, e.clientY);
+			const children = Array.from(list.children) as HTMLElement[];
+			if (index < children.length) children[index].addClass("dispatch-insert-before");
+			else list.addClass("dispatch-insert-end");
 		});
 		colEl.addEventListener("dragleave", (e) => {
 			if (e.relatedTarget instanceof Node && colEl.contains(e.relatedTarget)) return;
 			colEl.removeClass("dispatch-drop-active");
+			this.clearInsertMarkers(list);
 		});
 		colEl.addEventListener("drop", (e) => {
 			e.preventDefault();
 			colEl.removeClass("dispatch-drop-active");
+			this.clearInsertMarkers(list);
 			const path = e.dataTransfer?.getData("text/plain");
-			if (path) void this.moveCardToVersion(path, col);
+			if (path) void this.moveCardToVersion(path, col, this.dropAnchor(list, e.clientY));
 		});
 	}
 
-	private async moveCardToVersion(path: string, col: MilestoneColumn): Promise<void> {
-		const card = this.collectCards().find((c) => c.file.path === path);
-		if (!card) return;
-		const patch = planVersionDrop(card, col, this.plugin.shared.milestones.versionProperty);
-		// Same column — the raw value stays untouched (no format rewrite).
-		if (!patch) return;
-		await this.applyPatch(patch);
-		new Notice(`${card.file.basename}: ${versionKey(card.version) || "(no version)"} → ${col.display}`);
+	/**
+	 * The visible card a drop lands before — or after the last one — so the
+	 * planner positions it in the full column whatever a slice hides.
+	 */
+	private dropAnchor(list: HTMLElement, y: number): DropAnchor {
+		const children = Array.from(list.children) as HTMLElement[];
+		const index = this.insertionIndex(list, y);
+		const before = children[index]?.dataset.path;
+		if (before !== undefined) return { before };
+		const after = children[children.length - 1]?.dataset.path;
+		return after !== undefined ? { after } : "end";
+	}
+
+	private async moveCardToVersion(
+		path: string,
+		col: MilestoneColumn,
+		anchor: DropAnchor
+	): Promise<void> {
+		const ms = this.plugin.shared.milestones;
+		const cards = this.collectCards();
+		const plan = planReleaseDrop(cards, path, col, anchor, {
+			versionProperty: ms.versionProperty,
+			releaseOrderProperty: ms.releaseOrderProperty,
+		});
+		// Same spot, or same column with ordering off — nothing is written.
+		if (!plan) return;
+		for (const patch of plan.patches) await this.applyPatch(patch);
+		// A reorder is silent, like one on the Kanban tab; no automation runs.
+		if (plan.versionChanged) {
+			new Notice(
+				`${plan.moved.file.basename}: ${versionKey(plan.moved.version) || "(no version)"} → ${col.display}`
+			);
+		}
+	}
+
+	// ------------------------------------------------------ line retarget
+
+	/**
+	 * Move every card of a version line to another line (src/retarget.ts
+	 * decides every write). Finished cards are checked before the picker opens,
+	 * so nobody chooses a destination for an operation that cannot run.
+	 */
+	private retargetLine(sourceKey: string): void {
+		const cards = this.collectCards();
+		const blockers = retargetBlockers(cards, sourceKey);
+		if (blockers.length > 0) {
+			this.noticeRetargetRejected(sourceKey, { ok: false, reason: "protected", blockers });
+			return;
+		}
+		const ms = this.plugin.shared.milestones;
+		new RetargetSuggestModal(
+			this.app,
+			sourceKey,
+			retargetDestinations(ms.plannedVersions, cards, sourceKey),
+			ms.tags,
+			(destination) => this.confirmRetarget(sourceKey, destination)
+		).open();
+	}
+
+	private planRetarget(sourceKey: string, destination: string) {
+		const ms = this.plugin.shared.milestones;
+		return planRetarget({
+			cards: this.collectCards(),
+			sourceKey,
+			destination,
+			versionProperty: ms.versionProperty,
+			releaseOrderProperty: ms.releaseOrderProperty,
+			plannedVersions: ms.plannedVersions,
+			tags: ms.tags,
+		});
+	}
+
+	private confirmRetarget(sourceKey: string, destination: string): void {
+		const plan = this.planRetarget(sourceKey, destination);
+		if (!plan.ok) {
+			this.noticeRetargetRejected(sourceKey, plan);
+			return;
+		}
+		new RetargetConfirmModal(this.app, plan, () => void this.performRetarget(plan, destination)).open();
+	}
+
+	/**
+	 * Re-plan from fresh state, then write the notes and — only when every note
+	 * succeeded — the settings. Obsidian has no multi-file undo, so a partial
+	 * batch is made retryable instead of rolled back: the notes that moved are
+	 * off the source line, and a second run plans only the rest.
+	 */
+	private async performRetarget(confirmed: RetargetPlan<TFile>, destination: string): Promise<void> {
+		const plan = this.planRetarget(confirmed.sourceKey, destination);
+		if (!plan.ok || !sameRetarget(confirmed, plan)) {
+			new Notice("The board changed while the dialog was open. Nothing was written.", 8000);
+			return;
+		}
+		const route = `${plan.sourceKey} → ${plan.writeValue}`;
+		const failed: string[] = [];
+		for (const patch of plan.patches) {
+			try {
+				await this.applyPatch(patch);
+			} catch {
+				failed.push(patch.file.basename);
+			}
+		}
+		if (failed.length > 0) {
+			new Notice(
+				`Retarget ${route} stopped: ${failed.length} of ${plan.patches.length} notes could not be ` +
+					`written (${failed.join(", ")}). The ${plan.sourceKey} column and its tag were left ` +
+					`unchanged; run the retarget again to move the rest.`,
+				10000
+			);
+			return;
+		}
+		const ms = this.plugin.shared.milestones;
+		ms.plannedVersions = plan.plannedVersions;
+		ms.tags = plan.tags;
+		try {
+			await this.plugin.saveShared();
+		} catch (err) {
+			new Notice(
+				`Retarget ${route}: the tickets moved, but the board settings could not be saved ` +
+					`(${err instanceof Error ? err.message : String(err)}).`,
+				10000
+			);
+			return;
+		}
+		new Notice(`Retargeted ${ticketCount(plan.summary.cardCount)}: ${route}.`);
+	}
+
+	private noticeRetargetRejected(sourceKey: string, rejection: RetargetRejection<TFile>): void {
+		let text: string;
+		if (rejection.reason === "protected") {
+			const n = rejection.blockers.length;
+			const { titleProperty } = this.plugin.shared.board;
+			const ids = rejection.blockers
+				.map((c) => displayValue(c.raw[titleProperty]) || c.file.basename)
+				.join(", ");
+			text =
+				`Can't retarget ${sourceKey}: ${ticketCount(n)} ${n === 1 ? "is" : "are"} finished ` +
+				`(${ids}). Nothing was changed.`;
+		} else if (rejection.reason === "same-line") {
+			text =
+				`Can't retarget ${sourceKey} within its own line. Pick a different release line; ` +
+				`drag a single card to change its patch. Nothing was changed.`;
+		} else {
+			text =
+				`Can't retarget ${sourceKey}: the destination must be a version such as v0.6.0. ` +
+				`Nothing was changed.`;
+		}
+		new Notice(text, 8000);
+	}
+
+	// ------------------------------------------------- copy release order
+
+	private planCopyOrder(lineKey: string): CopyOrderPlan<TFile> {
+		return planCopyReleaseOrder(this.collectCards(), lineKey, this.plugin.shared.board.orderProperty);
+	}
+
+	/** Seed the Kanban order from a line's release order (src/release-order.ts decides every write). */
+	private copyReleaseOrder(lineKey: string): void {
+		const plan = this.planCopyOrder(lineKey);
+		if (plan.patches.length === 0) {
+			new Notice(`The Kanban order already follows ${lineKey}'s release order. Nothing was changed.`);
+			return;
+		}
+		new CopyOrderConfirmModal(this.app, plan, () => void this.performCopyOrder(plan)).open();
+	}
+
+	/** Re-plan from fresh state and write only what the dialog described. */
+	private async performCopyOrder(confirmed: CopyOrderPlan<TFile>): Promise<void> {
+		const plan = this.planCopyOrder(confirmed.lineKey);
+		if (!sameCopyPlan(confirmed, plan)) {
+			new Notice("The board changed while the dialog was open. Nothing was written.", 8000);
+			return;
+		}
+		const failed: string[] = [];
+		for (const patch of plan.patches) {
+			try {
+				await this.applyPatch(patch);
+			} catch {
+				failed.push(patch.file.basename);
+			}
+		}
+		if (failed.length > 0) {
+			new Notice(
+				`Copying ${plan.lineKey}'s release order stopped: ${failed.length} of ${plan.patches.length} ` +
+					`notes could not be written (${failed.join(", ")}). Run it again to finish.`,
+				10000
+			);
+			return;
+		}
+		new Notice(`The Kanban order now starts with ${plan.lineKey}'s release order.`);
 	}
 
 	// ------------------------------------------------------------------ misc
@@ -1550,6 +1737,176 @@ export class BoardView extends ItemView {
 			attr: { title: "Show board problems" },
 		});
 		badge.addEventListener("click", () => new ProblemsModal(this.app, problems).open());
+	}
+}
+
+function ticketCount(n: number): string {
+	return `${n} ticket${n === 1 ? "" : "s"}`;
+}
+
+interface RetargetChoice {
+	/** What the planner is handed: a line key or the typed text. */
+	destination: string;
+	label: string;
+	detail?: string;
+}
+
+/** The single destination control: existing lines, plus a typed new version. */
+class RetargetSuggestModal extends SuggestModal<RetargetChoice> {
+	constructor(
+		app: App,
+		private sourceKey: string,
+		private destinations: MilestoneColumn[],
+		private tags: Readonly<Record<string, string>>,
+		private onChoose: (destination: string) => void
+	) {
+		super(app);
+		this.setPlaceholder(`Move ${sourceKey} to… pick a release line or type a version`);
+		this.emptyStateText = "No matching release line. Type a version such as v0.6.0.";
+	}
+
+	getSuggestions(query: string): RetargetChoice[] {
+		const q = query.trim().toLowerCase();
+		const parsed = parseDestination(query);
+		const choices: RetargetChoice[] = this.destinations
+			.filter((c) =>
+				parsed
+					? c.key === parsed.key
+					: !q || c.key.includes(q) || (this.tags[c.key] ?? "").toLowerCase().includes(q)
+			)
+			.map((c) => {
+				const tag = this.tags[c.key];
+				return {
+					destination: c.key,
+					label: tag ? `${c.key} · ${tag}` : c.key,
+					detail: `Existing release: tickets get ${c.writeValue}`,
+				};
+			});
+		if (parsed && !this.destinations.some((c) => c.key === parsed.key)) {
+			const value = `v${parsed.key}.${parsed.patch ?? 0}`;
+			choices.unshift(
+				parsed.key === this.sourceKey
+					? { destination: query.trim(), label: value, detail: `Same line as ${this.sourceKey}` }
+					: { destination: query.trim(), label: `New release ${value}` }
+			);
+		}
+		return choices;
+	}
+
+	renderSuggestion(choice: RetargetChoice, el: HTMLElement): void {
+		el.createDiv({ text: choice.label });
+		if (choice.detail) el.createEl("small", { cls: "dispatch-retarget-detail", text: choice.detail });
+	}
+
+	onChooseSuggestion(choice: RetargetChoice): void {
+		this.onChoose(choice.destination);
+	}
+}
+
+/** Names what one click is about to write to N notes and the shared settings. */
+class RetargetConfirmModal extends Modal {
+	constructor(
+		app: App,
+		private plan: RetargetPlan<TFile>,
+		private onConfirm: () => void
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		const { plan } = this;
+		const s = plan.summary;
+		this.titleEl.setText(`Retarget ${plan.sourceKey}?`);
+		this.contentEl.createEl("p", {
+			text:
+				`Move ${ticketCount(s.cardCount)} from ${plan.sourceKey} to ${plan.writeValue} ` +
+				`and remove the ${plan.sourceKey} column?`,
+		});
+		const details: string[] = [];
+		if (plan.destinationExists) {
+			details.push(`${plan.destKey} already exists: its tickets and tag stay as they are.`);
+		}
+		if (s.destinationRenumbered !== undefined) {
+			details.push(
+				`The moved tickets follow ${plan.destKey}'s own in the release order; ` +
+					`${ticketCount(s.destinationRenumbered)} of ${plan.destKey} ${
+						s.destinationRenumbered === 1 ? "is" : "are"
+					} renumbered to make room.`
+			);
+		}
+		if (s.plannedReplaced) {
+			details.push(`Planned version ${s.plannedReplaced.from} becomes ${s.plannedReplaced.to}.`);
+		}
+		if (s.plannedRemoved.length > 0) {
+			details.push(`Planned version ${s.plannedRemoved.join(", ")} is removed.`);
+		}
+		if (s.tagMoved !== undefined) details.push(`Tag "${s.tagMoved}" moves to ${plan.destKey}.`);
+		if (s.tagKept !== undefined) {
+			details.push(`${plan.destKey} keeps the tag "${s.tagKept}" it already has.`);
+		}
+		if (s.tagRemoved !== undefined) {
+			details.push(`Tag "${s.tagRemoved}" of ${plan.sourceKey} is removed.`);
+		}
+		details.push("Board automations do not run for this change.");
+		const list = this.contentEl.createEl("ul", { cls: "dispatch-retarget-list" });
+		for (const line of details) list.createEl("li", { text: line });
+
+		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
+		const ok = row.createEl("button", { cls: "mod-cta", text: "Retarget" });
+		ok.addEventListener("click", () => {
+			this.close();
+			this.onConfirm();
+		});
+		const cancel = row.createEl("button", { text: "Cancel" });
+		cancel.addEventListener("click", () => this.close());
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
+/** Names what "Copy release order to Kanban" is about to write. */
+class CopyOrderConfirmModal extends Modal {
+	constructor(
+		app: App,
+		private plan: CopyOrderPlan<TFile>,
+		private onConfirm: () => void
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		const { plan } = this;
+		const n = plan.patches.length;
+		this.titleEl.setText(`Copy ${plan.lineKey}'s release order to Kanban?`);
+		this.contentEl.createEl("p", {
+			text:
+				`${plan.lineKey}'s tickets move to the top of ${plan.columns.join(", ")} on the Kanban tab, ` +
+				`in release order. Every other card keeps its order below them.`,
+		});
+		const list = this.contentEl.createEl("ul", { cls: "dispatch-retarget-list" });
+		for (const line of [
+			`Writes the Kanban order of ${n} ${n === 1 ? "note" : "notes"}; status and version stay as they are.`,
+			"There is no undo: the previous Kanban order is overwritten.",
+			"The two orders stay independent afterwards: a later release reorder does not copy again.",
+			"Board automations do not run for this change.",
+		]) {
+			list.createEl("li", { text: line });
+		}
+
+		const row = this.contentEl.createDiv({ cls: "modal-button-container" });
+		const ok = row.createEl("button", { cls: "mod-cta", text: "Copy order" });
+		ok.addEventListener("click", () => {
+			this.close();
+			this.onConfirm();
+		});
+		const cancel = row.createEl("button", { text: "Cancel" });
+		cancel.addEventListener("click", () => this.close());
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
 	}
 }
 

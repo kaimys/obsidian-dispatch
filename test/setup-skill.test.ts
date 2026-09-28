@@ -3,6 +3,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	renameSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
@@ -66,10 +67,9 @@ function fixture(): {
 	local.repos["my-app"] = repo;
 
 	write(join(repo, "dispatch", "invariants.md"), "# Invariants\n");
-	write(join(repo, "dispatch", "workflow", "refine.md"), "# Refine\nnode scripts/dispatch/validate.mjs\n");
-	write(join(repo, "scripts", "dispatch", "run-state.mjs"), "// hook\n");
-	mkdirSync(join(repo, "scripts", "dispatch"), { recursive: true });
-	copyFileSync(validator, join(repo, "scripts", "dispatch", "validate.mjs"));
+	write(join(repo, "dispatch", "workflow", "refine.md"), "# Refine\nnode dispatch/scripts/validate.mjs\n");
+	write(join(repo, "dispatch", "scripts", "run-state.mjs"), "// hook\n");
+	copyFileSync(validator, join(repo, "dispatch", "scripts", "validate.mjs"));
 	write(join(repo, "CLAUDE.md"), "Read dispatch/invariants.md\n");
 	write(join(repo, "AGENTS.md"), "Read dispatch/invariants.md\n");
 	write(join(repo, ".claude", "settings.json"), "{}\n");
@@ -157,12 +157,12 @@ describe("dispatch-setup multi-agent contract", () => {
 				join(f.vault, ".obsidian", "plugins", "dispatch", "data.json"),
 				JSON.stringify(shared)
 			);
-			rmSync(join(f.repo, "scripts", "dispatch", "validate.mjs"));
+			rmSync(join(f.repo, "dispatch", "scripts", "validate.mjs"));
 
 			write(join(f.repo, "dispatch", "workflow", "refine.md"), "# Refine\n");
 			write(
 				join(f.repo, "dispatch", "invariants.md"),
-				"# Invariants\nnode scripts/dispatch/validate.mjs\n"
+				"# Invariants\nnode dispatch/scripts/validate.mjs\n"
 			);
 
 			const result = run(f.repo, { device: f.device, vault: f.vault });
@@ -170,7 +170,24 @@ describe("dispatch-setup multi-agent contract", () => {
 			expect(result.output).toContain('tool codex needs promptPrefix "$"');
 			expect(result.output).toContain("multi-agent command chip refine (Codex) must omit tool");
 			expect(result.output).toContain("duplicate command-chip intent refine");
-			expect(result.output).toContain("missing " + join(f.repo, "scripts", "dispatch", "validate.mjs"));
+			expect(result.output).toContain("missing " + join(f.repo, "dispatch", "scripts", "validate.mjs"));
+		} finally {
+			rmSync(f.root, { recursive: true, force: true });
+		}
+	});
+
+	it("rejects the old scripts/dispatch/ layout and says how to migrate it (US00033)", () => {
+		const f = fixture();
+		try {
+			mkdirSync(join(f.repo, "scripts", "dispatch"), { recursive: true });
+			for (const name of ["run-state.mjs", "validate.mjs"]) {
+				renameSync(join(f.repo, "dispatch", "scripts", name), join(f.repo, "scripts", "dispatch", name));
+			}
+			const result = run(f.repo, { script: join(f.repo, "scripts", "dispatch", "validate.mjs") });
+			expect(result.status).toBe(1);
+			expect(result.output).toContain(
+				`old layout (scripts/dispatch/) in ${f.repo} — re-run dispatch-setup to migrate it`
+			);
 		} finally {
 			rmSync(f.root, { recursive: true, force: true });
 		}
@@ -205,7 +222,7 @@ describe("dispatch-setup multi-agent contract", () => {
 			write(join(f.repo, "AGENTS.md"), "Bit shift: `x << 2`\n");
 
 			const result = run(f.repo, {
-				script: join(f.repo, "scripts", "dispatch", "validate.mjs"),
+				script: join(f.repo, "dispatch", "scripts", "validate.mjs"),
 			});
 			expect(result.status).toBe(0);
 			expect(result.output).toContain("Dispatch setup valid (project only)");
@@ -226,7 +243,7 @@ describe("dispatch-setup multi-agent contract", () => {
 			write(f.device, JSON.stringify(local));
 
 			const result = run(f.repo, {
-				script: join(f.repo, "scripts", "dispatch", "validate.mjs"),
+				script: join(f.repo, "dispatch", "scripts", "validate.mjs"),
 				env: { DISPATCH_LOCAL_SETTINGS: f.device },
 			});
 			expect(result.status).toBe(0);
@@ -244,7 +261,7 @@ describe("dispatch-setup multi-agent contract", () => {
 			rmSync(join(f.repo, "dispatch", "invariants.md"));
 
 			const result = run(linkedRepo, {
-				script: join(linkedRepo, "scripts", "dispatch", "validate.mjs"),
+				script: join(linkedRepo, "dispatch", "scripts", "validate.mjs"),
 			});
 			expect(result.status).toBe(1);
 			expect(result.output).toContain("Dispatch setup validation failed");

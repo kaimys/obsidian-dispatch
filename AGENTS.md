@@ -32,7 +32,7 @@ title was set.
 
 ## Run-lifecycle hooks
 
-`.codex/hooks.json` wires four events to `scripts/dispatch/run-state.mjs`, which reports chip run
+`.codex/hooks.json` wires four events to `dispatch/scripts/run-state.mjs`, which reports chip run
 state back to the board and appends the run log to the note:
 
 | Event | State |
