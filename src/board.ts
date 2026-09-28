@@ -1377,7 +1377,7 @@ export class BoardView extends ItemView {
 		if (this.mode === "status") {
 			const status = colEl.dataset.col;
 			if (status === undefined) return;
-			void this.moveCard(path, status, Number.MAX_SAFE_INTEGER);
+			void this.moveCard(path, status, "end");
 		} else {
 			const { colKey, colWrite, colDisplay, colLine } = colEl.dataset;
 			if (colKey === undefined) return;
@@ -1437,13 +1437,13 @@ export class BoardView extends ItemView {
 			colEl.removeClass("dispatch-drop-active");
 			this.clearInsertMarkers(list);
 			const path = e.dataTransfer?.getData("text/plain");
-			if (path) void this.moveCard(path, status, this.insertionIndex(list, e.clientY));
+			if (path) void this.moveCard(path, status, this.dropAnchor(list, e.clientY));
 		});
 	}
 
-	private async moveCard(path: string, newStatus: string, insertIndex: number): Promise<void> {
+	private async moveCard(path: string, newStatus: string, anchor: DropAnchor): Promise<void> {
 		const board = this.plugin.shared.board;
-		const plan = planStatusDrop(this.collectCards(), path, newStatus, insertIndex, {
+		const plan = planStatusDrop(this.collectCards(), path, newStatus, anchor, {
 			statusProperty: board.statusProperty,
 			orderProperty: board.orderProperty,
 			automations: board.automations,

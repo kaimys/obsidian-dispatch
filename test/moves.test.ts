@@ -4,7 +4,7 @@
  * real files rather than just rendering badly.
  */
 import { describe, expect, it } from "vitest";
-import { buildCard } from "../src/cards";
+import { buildCard, sortByRank } from "../src/cards";
 import type { CardData, FileRef } from "../src/cards";
 import { buildLineColumns, buildPatchColumns } from "../src/milestones";
 import {
@@ -42,7 +42,7 @@ describe("planStatusDrop — the happy path touches one note", () => {
 
 	it("writes status and rank on the moved note only", () => {
 		const cards = [...column, card("x.md", "Todo", 1024)];
-		const plan = planStatusDrop(cards, "x.md", "Dev", 1, opts);
+		const plan = planStatusDrop(cards, "x.md", "Dev", { before: "b.md" }, opts);
 		expect(plan?.patches).toHaveLength(1);
 		expect(plan?.renormalized).toBe(false);
 		expect(plan?.patches[0].file.path).toBe("x.md");
@@ -53,21 +53,21 @@ describe("planStatusDrop — the happy path touches one note", () => {
 
 	it("appends past the end and prepends before the first", () => {
 		const cards = [...column, card("x.md", "Todo")];
-		expect(planStatusDrop(cards, "x.md", "Dev", 99, opts)?.patches[0].set[ORDER]).toBe(
+		expect(planStatusDrop(cards, "x.md", "Dev", { after: "c.md" }, opts)?.patches[0].set[ORDER]).toBe(
 			3072 + RANK_GAP
 		);
-		expect(planStatusDrop(cards, "x.md", "Dev", 0, opts)?.patches[0].set[ORDER]).toBe(
+		expect(planStatusDrop(cards, "x.md", "Dev", { before: "a.md" }, opts)?.patches[0].set[ORDER]).toBe(
 			1024 - RANK_GAP
 		);
 	});
 
 	it("gives the first card of an empty column the base rank", () => {
-		const plan = planStatusDrop([card("x.md", "Todo")], "x.md", "Dev", 0, opts);
+		const plan = planStatusDrop([card("x.md", "Todo")], "x.md", "Dev", "end", opts);
 		expect(plan?.patches[0].set[ORDER]).toBe(RANK_GAP);
 	});
 
 	it("reorders within a column without touching the status", () => {
-		const plan = planStatusDrop(column, "c.md", "Dev", 0, opts);
+		const plan = planStatusDrop(column, "c.md", "Dev", { before: "a.md" }, opts);
 		expect(plan?.statusChanged).toBe(false);
 		expect(plan?.patches).toHaveLength(1);
 		expect(plan?.patches[0].set[STATUS]).toBeUndefined();
@@ -79,23 +79,26 @@ describe("planStatusDrop — when it must write nothing", () => {
 	const column = [card("a.md", "Dev", 1024), card("b.md", "Dev", 2048)];
 
 	it("returns null for a card that is not on the board", () => {
-		expect(planStatusDrop(column, "ghost.md", "Dev", 0, opts)).toBeNull();
+		expect(planStatusDrop(column, "ghost.md", "Dev", { before: "a.md" }, opts)).toBeNull();
 	});
 
 	it("returns null when a card is dropped back where it already was", () => {
 		// An accidental nudge must not rewrite the note.
-		expect(planStatusDrop(column, "a.md", "Dev", 0, opts)).toBeNull();
-		expect(planStatusDrop(column, "b.md", "Dev", 1, opts)).toBeNull();
+		expect(planStatusDrop(column, "a.md", "Dev", { before: "a.md" }, opts)).toBeNull();
+		expect(planStatusDrop(column, "a.md", "Dev", { before: "b.md" }, opts)).toBeNull();
+		expect(planStatusDrop(column, "b.md", "Dev", { before: "b.md" }, opts)).toBeNull();
+		expect(planStatusDrop(column, "b.md", "Dev", { after: "a.md" }, opts)).toBeNull();
+		expect(planStatusDrop(column, "b.md", "Dev", { after: "b.md" }, opts)).toBeNull();
 	});
 
 	it("returns null for a same-status drop when ordering is disabled", () => {
 		expect(
-			planStatusDrop(column, "a.md", "Dev", 0, { statusProperty: STATUS, orderProperty: "" })
+			planStatusDrop(column, "a.md", "Dev", { before: "a.md" }, { statusProperty: STATUS, orderProperty: "" })
 		).toBeNull();
 	});
 
 	it("writes only the status when ordering is disabled", () => {
-		const plan = planStatusDrop(column, "a.md", "Done", 0, {
+		const plan = planStatusDrop(column, "a.md", "Done", "end", {
 			statusProperty: STATUS,
 			orderProperty: "",
 		});
@@ -111,7 +114,15 @@ describe("planStatusDrop — renormalizing a messy column", () => {
 		const cards = fixtureCards();
 		const target = cards.find((c) => c.file.basename.startsWith("US00005"));
 		expect(target).toBeDefined();
-		const plan = planStatusDrop(cards, target!.file.path, "Ready for Dev", 0, opts);
+		// Dropped above the column's first card, as displayed.
+		const first = sortByRank(cards.filter((c) => c.status === "Ready for Dev"))[0];
+		const plan = planStatusDrop(
+			cards,
+			target!.file.path,
+			"Ready for Dev",
+			{ before: first.file.path },
+			opts
+		);
 		expect(plan?.renormalized).toBe(true);
 		// 4 cards in the column afterwards; every one needs a new rank because
 		// none of them currently holds the value it should.
@@ -125,16 +136,73 @@ describe("planStatusDrop — renormalizing a messy column", () => {
 		// a.md already sits at 1024; only the arriving card and the displaced
 		// one need writing.
 		const cards = [card("a.md", "Dev", 1024), card("b.md", "Dev", 1024), card("x.md", "Todo")];
-		const plan = planStatusDrop(cards, "x.md", "Dev", 2, opts);
+		const plan = planStatusDrop(cards, "x.md", "Dev", { after: "b.md" }, opts);
 		expect(plan?.renormalized).toBe(true);
 		expect(plan?.patches.map((p) => p.file.path)).toEqual(["b.md", "x.md"]);
 	});
 
 	it("renormalizes when the gap between neighbours is exhausted", () => {
 		const cards = [card("a.md", "Dev", 1024), card("b.md", "Dev", 1025), card("x.md", "Todo")];
-		const plan = planStatusDrop(cards, "x.md", "Dev", 1, opts);
+		const plan = planStatusDrop(cards, "x.md", "Dev", { before: "b.md" }, opts);
 		expect(plan?.renormalized).toBe(true);
 		expect(plan?.patches.map((p) => p.set[ORDER])).toEqual([2048, 3072]);
+	});
+});
+
+describe("planStatusDrop — a sliced column (BUG00008, ADR-0037)", () => {
+	// A and B are Bob's, C, D and E are Kai's: an @Kai slice shows C, D, E.
+	const column = () => [
+		card("a.md", "Dev", 1024),
+		card("b.md", "Dev", 2048),
+		card("c.md", "Dev", 3072),
+		card("d.md", "Dev", 4096),
+		card("e.md", "Dev", 5120),
+	];
+	/** The column's order after applying a plan's rank writes. */
+	const orderAfter = (plan: ReturnType<typeof planStatusDrop>) => {
+		const ranks = new Map(column().map((c) => [c.file.path, c.rank ?? 0]));
+		for (const p of plan?.patches ?? []) ranks.set(p.file.path, p.set[ORDER] as number);
+		return [...ranks].sort((x, y) => x[1] - y[1]).map(([path]) => path.replace(".md", ""));
+	};
+
+	it("drops E above D, next to the visible card, whatever hides above", () => {
+		const plan = planStatusDrop(column(), "e.md", "Dev", { before: "d.md" }, opts);
+		expect(orderAfter(plan)).toEqual(["a", "b", "c", "e", "d"]);
+	});
+
+	it("drops C between D and E instead of writing nothing", () => {
+		const plan = planStatusDrop(column(), "c.md", "Dev", { before: "e.md" }, opts);
+		expect(orderAfter(plan)).toEqual(["a", "b", "d", "c", "e"]);
+		expect(plan?.patches).toHaveLength(1);
+	});
+
+	it("lands below the hidden cards above its anchor", () => {
+		// Visible C, E with hidden D between: dropping A before E goes after D.
+		const plan = planStatusDrop(column(), "a.md", "Dev", { before: "e.md" }, opts);
+		expect(orderAfter(plan)).toEqual(["b", "c", "d", "a", "e"]);
+	});
+
+	it("drops after the last visible card, ahead of hidden cards below it", () => {
+		// @Bob shows A, B: dropping A at the end of the list lands after B, above C.
+		const plan = planStatusDrop(column(), "a.md", "Dev", { after: "b.md" }, opts);
+		expect(orderAfter(plan)).toEqual(["b", "a", "c", "d", "e"]);
+	});
+
+	it("anchors a cross-column drop to the target column's visible neighbour", () => {
+		const cards = [...column(), card("x.md", "Todo", 1024)];
+		const plan = planStatusDrop(cards, "x.md", "Dev", { before: "d.md" }, opts);
+		expect(plan?.patches).toEqual([{ file: cards[5].file, set: { status: "Dev", rank: 3584 } }]);
+	});
+
+	it("appends a drop into an empty or fully hidden list to the full column", () => {
+		const cards = [...column(), card("x.md", "Todo", 1024)];
+		const plan = planStatusDrop(cards, "x.md", "Dev", "end", opts);
+		expect(plan?.patches[0].set[ORDER]).toBe(5120 + RANK_GAP);
+	});
+
+	it("appends when the anchor left the column during the drag", () => {
+		const plan = planStatusDrop(column(), "a.md", "Dev", { before: "gone.md" }, opts);
+		expect(orderAfter(plan)).toEqual(["b", "c", "d", "e", "a"]);
 	});
 });
 
@@ -201,7 +269,7 @@ describe("automation rules", () => {
 	const stampDeployed = [{ when: ["Deployed"], set: { deployed: "{{date}}" }, repo: "", command: "" }];
 
 	it("stamps the configured property when a card enters the status", () => {
-		const plan = planStatusDrop([card("a.md", "Dev", 1024)], "a.md", "Deployed", 0, {
+		const plan = planStatusDrop([card("a.md", "Dev", 1024)], "a.md", "Deployed", "end", {
 			...opts,
 			automations: stampDeployed,
 			now,
@@ -212,7 +280,7 @@ describe("automation rules", () => {
 	});
 
 	it("does not stamp a status the rule does not name", () => {
-		const plan = planStatusDrop([card("a.md", "Dev", 1024)], "a.md", "Done", 0, {
+		const plan = planStatusDrop([card("a.md", "Dev", 1024)], "a.md", "Done", "end", {
 			...opts,
 			automations: stampDeployed,
 			now,
@@ -222,7 +290,7 @@ describe("automation rules", () => {
 
 	it("does not stamp a reorder inside the same column", () => {
 		const cards = [card("a.md", "Deployed", 1024), card("b.md", "Deployed", 2048)];
-		const plan = planStatusDrop(cards, "b.md", "Deployed", 0, {
+		const plan = planStatusDrop(cards, "b.md", "Deployed", { before: "a.md" }, {
 			...opts,
 			automations: stampDeployed,
 			now,
