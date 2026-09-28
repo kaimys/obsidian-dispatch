@@ -12,6 +12,7 @@
 		"lint:vault": "node dispatch/scripts/lint-vault.mjs --vault Dispatch-Wiki",
 		"install:wiki": "node -e \"for (const f of ['main.js','manifest.json','styles.css']) require('fs').copyFileSync(f, 'dispatch/wiki/.obsidian/plugins/dispatch/' + f)\"",
 		"deploy": "npm run build && npm run install:wiki",
+		"deploy:reload": "npm run deploy && obsidian plugin:reload id=dispatch",
 		"test": "vitest run",
 		"test:watch": "vitest"
 	},
