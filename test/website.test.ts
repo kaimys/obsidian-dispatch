@@ -393,7 +393,7 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		expect(home).toContain("Read Getting started");
 		expect(home).toContain('A podcast about Dispatch <span class="ext" aria-hidden="true">&#8599;</span><span class="visually-hidden">(external)</span>');
 		expect(home).not.toContain('class="testimonials"');
-		expect(home).not.toContain("LinkedIn");
+		expect(home).toContain('<a href="https://www.linkedin.com/in/kaimysliwiec/">');
 		expect(home).toMatch(/class="logo" href="[^"]+" aria-current="page"/);
 		const article = html("articles/getting-started/index.html");
 		expect(article).toMatch(/href="[^"]*\/articles\/" aria-current="page">Articles/);

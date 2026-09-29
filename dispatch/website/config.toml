@@ -33,18 +33,18 @@ handle = "dispatch"
 
 [[extra.social]]
 label = "LinkedIn"
-url = ""
-handle = ""
+url = "https://www.linkedin.com/in/kaimysliwiec/"
+handle = "kaimysliwiec"
 
 [[extra.social]]
 label = "Bluesky"
-url = ""
-handle = ""
+url = "https://bsky.app/profile/kaimys.bsky.social"
+handle = "@kaimys.bsky.social"
 
 [[extra.social]]
 label = "X"
-url = ""
-handle = ""
+url = "https://x.com/kaimys"
+handle = "@kaimys"
 
 # Read by website.mjs, not by Zola.
 [extra.dispatch]
