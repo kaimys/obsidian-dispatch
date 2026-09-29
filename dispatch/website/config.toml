@@ -46,6 +46,11 @@ label = "X"
 url = "https://x.com/kaimys"
 handle = "@kaimys"
 
+[[extra.social]]
+label = "Homepage"
+url = "https://eightnine.de/"
+handle = "eightnine.de"
+
 # Read by website.mjs, not by Zola.
 [extra.dispatch]
 source = "10_Website"
