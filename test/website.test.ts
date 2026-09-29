@@ -208,6 +208,7 @@ describe("the clean fixture vault", () => {
 			"10_Website/Articles/No status.md (status: unset)",
 			"10_Website/FAQ.md (status: draft)",
 			"10_Website/Links/Unready.md (status: unset)",
+			"10_Website/Testimonials/Waiting for approval.md (status: draft)",
 			"08_Releases/Release 0.9.0.md (no GitHub release body)",
 		]);
 		expect(existsSync(join(staged.root, "content", "articles", "draft"))).toBe(false);
@@ -271,7 +272,7 @@ describe("the clean fixture vault", () => {
 		expect(content("_index.md")).toContain('insert_anchor_links = "right"');
 	});
 
-	it("writes an empty testimonial list when there is no testimonial note", () => {
+	it("writes an empty testimonial list when no testimonial is ready — an incomplete draft is no error", () => {
 		expect(JSON.parse(read(join(staged.root, "testimonials.json")))).toEqual([]);
 	});
 

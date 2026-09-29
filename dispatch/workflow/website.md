@@ -5,14 +5,14 @@
 > the caller passed — nothing, or `--check` to build without publishing.
 
 Publishes the project website from the vault (US00018). Editors run it after marking an article, the
-FAQ or a link ready, or after adding a testimonial; `/release` runs it after a release is published,
+FAQ, a link or a testimonial ready; `/release` runs it after a release is published,
 so Documentation and Releases follow the new tag. The pipeline is Dispatch-scope and lives in
 `dispatch/scripts/website.mjs`; the site's configuration and design live in `dispatch/website/`.
 
 **What gets published is decided by the vault, never by this workflow** (ADR-0039, ADR-0040): only
-notes in the website folder with `status: ready`, every testimonial and legal note, each released
+notes in the website folder with `status: ready`, the Home page and every legal note, each released
 version's `## GitHub release body`, and `docs/` at the newest release tag. Never mark a note ready,
-edit an article, or add a testimonial to make a build pass — those are the editor's decisions.
+edit an article, or mark a testimonial ready to make a build pass — those are the editor's decisions.
 
 ## Check
 

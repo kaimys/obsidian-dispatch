@@ -12,8 +12,8 @@
  * dependency-free ESM and reads only the project's `dispatch/website/config.toml`.
  *
  * What it publishes (ADR-0039, ADR-0040):
- *   - from `<source>/` in the vault: Articles/ and FAQ.md with `status: ready`, Links/ with
- *     `status: ready`, every Testimonials/ note (all four fields required), every Legal/ note;
+ *   - from `<source>/` in the vault: Articles/, FAQ.md, Links/ and Testimonials/ with
+ *     `status: ready` (a testimonial needs all four fields), Home page.md and every Legal/ note;
  *   - from the release notes: only the fenced `## GitHub release body` of a released version;
  *   - from the repository: `docs/*.md` and `docs/assets/` at the newest release tag, never the
  *     working tree.
@@ -350,8 +350,14 @@ export function collectVault(wikiRoot, settings) {
 		}
 		set.links.push(note);
 	}
+	// A testimonial publishes like an article: only with `status: ready`, so a quote can wait in
+	// the vault until the person approves it. A ready one needs all four fields.
 	for (const name of markdownFiles(join(root, "Testimonials"))) {
 		const note = read(`Testimonials/${name}`);
+		if (!isReady(note.data)) {
+			set.skipped.push(`${note.rel} (status: ${note.data.status || "unset"})`);
+			continue;
+		}
 		need(note, ["quote", "name", "role", "consent"]);
 		set.testimonials.push(note);
 	}
