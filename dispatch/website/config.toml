@@ -27,7 +27,7 @@ url = "https://github.com/kaimys/obsidian-dispatch"
 handle = "kaimys/obsidian-dispatch"
 
 [[extra.social]]
-label = "Obsidian plugin directory"
+label = "Obsidian"
 url = "https://community.obsidian.md/plugins/dispatch"
 handle = "dispatch"
 

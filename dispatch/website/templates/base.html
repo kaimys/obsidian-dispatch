@@ -6,6 +6,11 @@
 <title>{% block title %}{% if page.title %}{{ page.title }} — {{ config.title }}{% elif section.title and section.path != "/" %}{{ section.title }} — {{ config.title }}{% else %}{{ config.title }}{% endif %}{% endblock %}</title>
 <meta name="description" content="{% block description %}{% if page.description %}{{ page.description }}{% elif section.description %}{{ section.description }}{% else %}{{ config.description }}{% endif %}{% endblock %}">
 <meta name="color-scheme" content="light dark">
+{#- A page's images sit next to it and are linked relatively. Without a trailing slash in the
+    address (`/articles/x` rather than `/articles/x/`) they would resolve one folder too high;
+    the base makes them resolve against the page itself, however it was reached. #}
+{% if page.permalink %}<base href="{{ page.permalink | safe }}">
+{% endif %}
 {% if page.extra.robots %}<meta name="robots" content="{{ page.extra.robots }}">
 {% endif %}<link rel="stylesheet" href="{{ get_url(path='style.css') }}">
 <link rel="preload" href="{{ get_url(path='fonts/DispatchOCR.woff2') }}" as="font" type="font/woff2" crossorigin>

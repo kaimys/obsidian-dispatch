@@ -152,7 +152,8 @@ describe("Markdown conversion", () => {
 		const { markdown, diagrams } = convert("```mermaid\nflowchart TD\n    accTitle: Flow <1>\n    accDescr: A to B.\n    A --> B\n```");
 		expect(diagrams).toHaveLength(1);
 		expect(markdown).toContain('<img src="diagram-1.svg" alt="Flow &lt;1&gt;" aria-describedby="diagram-1-description">');
-		expect(markdown).toContain('<figcaption>Flow &lt;1&gt;. <a class="figure-desc" href="#diagram-1-description">Diagram description</a></figcaption>');
+		expect(markdown).toContain("<figcaption>Flow &lt;1&gt;</figcaption>");
+		expect(markdown).not.toContain("figure-desc");
 		expect(markdown).toContain('<details class="figure-long">\n<summary>Diagram description</summary>\n<p id="diagram-1-description">A to B.</p>\n</details>');
 	});
 
@@ -399,6 +400,7 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		expect(article).toMatch(/href="[^"]*\/articles\/" aria-current="page">Articles/);
 		expect(article).toContain('<a class="zola-anchor" href="#setup" aria-label="Anchor link for: setup">#</a>');
 		expect(article).not.toContain('<p class="description">');
+		expect(article).toContain('<base href="https://kaimys.github.io/obsidian-dispatch/articles/getting-started/">');
 		expect(html("articles/second-article/index.html")).toContain('<p class="description">The second one.</p>');
 		expect(html("articles/index.html")).toContain('<span class="teaser teaser-cover"><img src="https://kaimys.github.io/obsidian-dispatch/articles/second-article/pic.png"');
 		const newer = html("releases/1-0-0/index.html");

@@ -422,11 +422,11 @@ export function convertMarkdown(body, ctx) {
 				const n = diagrams.length + 1;
 				const id = `diagram-${n}-description`;
 				diagrams.push({ file: `diagram-${n}.svg`, source: part.inner, title, description });
-				// The caption links to the long description, which sits folded under the figure;
-				// a browser opens the <details> when the link targets something inside it.
+				// The caption is the title; the long description sits folded under the figure, and
+				// screen readers get it through aria-describedby.
 				out.push(
 					`<figure class="diagram">\n<img src="diagram-${n}.svg" alt="${escapeHtml(title)}" aria-describedby="${id}">\n` +
-						`<figcaption>${escapeHtml(title)}. <a class="figure-desc" href="#${id}">Diagram description</a></figcaption>\n</figure>\n` +
+						`<figcaption>${escapeHtml(title)}</figcaption>\n</figure>\n` +
 						`<details class="figure-long">\n<summary>Diagram description</summary>\n<p id="${id}">${escapeHtml(description)}</p>\n</details>`,
 				);
 			} else out.push(part.text);
