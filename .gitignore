@@ -18,3 +18,6 @@ Thumbs.db
 /dispatch/wiki
 # device-local Codex preferences (sandbox/approval policy) — never shared
 .codex/config.toml
+
+# website staging: converted vault content and built output, never committed (ADR-0039)
+/dispatch/website/.build/

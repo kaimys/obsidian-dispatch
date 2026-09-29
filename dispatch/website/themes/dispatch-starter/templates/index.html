@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ config.title }}</h1>
+<p class="lede">{{ config.description }}</p>
+
+{% set updates = load_data(path="updates.json") %}
+{% if updates | length > 0 %}
+<section aria-labelledby="updates">
+<h2 id="updates">Updates</h2>
+<ul class="updates">
+{% for item in updates %}
+<li>
+<span class="kind">{{ item.kind }}</span>
+<a href="{% if item.kind == 'link' %}{{ item.url }}{% else %}{{ get_url(path=item.url) }}{% endif %}">{{ item.title }}</a>
+<time datetime="{{ item.date }}">{{ item.date }}</time>
+{% if item.summary %}<p>{{ item.summary }}</p>{% endif %}
+</li>
+{% endfor %}
+</ul>
+</section>
+{% endif %}
+
+{% set testimonials = load_data(path="testimonials.json") %}
+{% if testimonials | length > 0 %}
+<section aria-labelledby="testimonials">
+<h2 id="testimonials">What people say</h2>
+{% for t in testimonials %}
+<figure class="testimonial">
+<blockquote><p>{{ t.quote }}</p></blockquote>
+<figcaption>{{ t.name }}, {{ t.role }}</figcaption>
+</figure>
+{% endfor %}
+</section>
+{% endif %}
+
+{% set social = config.extra.social %}
+<section aria-labelledby="elsewhere">
+<h2 id="elsewhere">Elsewhere</h2>
+<ul class="social">
+{% if social.directory %}<li><a href="{{ social.directory }}">Obsidian plugin directory</a></li>{% endif %}
+{% if social.github %}<li><a href="{{ social.github }}">GitHub</a></li>{% endif %}
+{% if social.linkedin %}<li><a href="{{ social.linkedin }}">LinkedIn</a></li>{% endif %}
+{% if social.x %}<li><a href="{{ social.x }}">X</a></li>{% endif %}
+{% if social.bluesky %}<li><a href="{{ social.bluesky }}">Bluesky</a></li>{% endif %}
+</ul>
+</section>
+{% endblock %}
