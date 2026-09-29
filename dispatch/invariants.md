@@ -23,6 +23,15 @@ npm test        # vitest
 
 `npm run build && npm run lint && npm test` is the minimum verification for every change.
 
+```bash
+npm run website:build     # vault + docs at the newest release tag → dispatch/website/.build/public
+npm run website:serve     # the same, served locally at http://127.0.0.1:1111/
+npm run website:publish   # build and push to gh-pages — only through the website workflow
+```
+
+The website scripts need the `dispatch/wiki` link and Zola on PATH; `publish -- --dry-run` stops
+before the push.
+
 ## Architecture
 
 - `src/main.ts` — plugin entry; loads/saves both settings layers, registers view/command/processor/settings tab
