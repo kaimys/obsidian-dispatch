@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+{%- if page.components.0 == "articles" %}
+<article class="wrap">
+  <header class="page-head">
+    <p class="breadcrumb"><a href="{{ get_url(path='@/articles/_index.md') }}">Articles</a></p>
+    <h1>{{ page.title }}</h1>
+    {% if page.extra.lead %}<p class="description">{{ page.description }}</p>{% endif %}
+    <p class="meta"><time datetime="{{ page.date }}">{{ page.date }}</time>{% if page.extra.author %} · {{ page.extra.author }}{% endif %}</p>
+  </header>
+  {%- if page.extra.teaser %}
+  <figure class="teaser article-teaser{% if page.extra.teaser_cover %} teaser-cover{% endif %}"><img src="{{ page.extra.teaser }}" alt=""></figure>
+  {%- endif %}
+  <div class="prose">
+{{ page.content | safe }}
+  </div>
+  <footer class="article-foot">
+    <a href="{{ get_url(path='@/articles/_index.md') }}">&larr; All articles</a>
+    <a href="{{ config.extra.feedback | safe }}">Give feedback on GitHub</a>
+  </footer>
+</article>
+{%- else %}
+<div class="wrap">
+  <header class="page-head"><h1>{{ page.title }}</h1>{% if page.description %}<p class="description">{{ page.description }}</p>{% endif %}</header>
+  <div class="prose">
+{{ page.content | safe }}
+  </div>
+</div>
+{%- endif %}
+{% endblock %}

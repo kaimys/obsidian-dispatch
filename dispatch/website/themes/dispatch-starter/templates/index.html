@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ config.title }}</h1>
-<p class="lede">{{ config.description }}</p>
+{% set home = load_data(path="home.json") %}
+<h1>{% if home.title %}{{ home.title }}{% else %}{{ config.title }}{% endif %}</h1>
+<p class="lede">{% if home.lede %}{{ home.lede }}{% else %}{{ config.description }}{% endif %}</p>
 
 {% set updates = load_data(path="updates.json") %}
 {% if updates | length > 0 %}
@@ -33,15 +34,10 @@
 </section>
 {% endif %}
 
-{% set social = config.extra.social %}
 <section aria-labelledby="elsewhere">
 <h2 id="elsewhere">Elsewhere</h2>
 <ul class="social">
-{% if social.directory %}<li><a href="{{ social.directory }}">Obsidian plugin directory</a></li>{% endif %}
-{% if social.github %}<li><a href="{{ social.github }}">GitHub</a></li>{% endif %}
-{% if social.linkedin %}<li><a href="{{ social.linkedin }}">LinkedIn</a></li>{% endif %}
-{% if social.x %}<li><a href="{{ social.x }}">X</a></li>{% endif %}
-{% if social.bluesky %}<li><a href="{{ social.bluesky }}">Bluesky</a></li>{% endif %}
+{% for link in config.extra.social %}{% if link.url %}<li><a href="{{ link.url }}">{{ link.label }}</a></li>{% endif %}{% endfor %}
 </ul>
 </section>
 {% endblock %}

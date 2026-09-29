@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="wrap">
+  <header class="page-head"><h1>{{ section.title }}</h1><p class="description">Every published version, newest first. Downloads are on <a href="{{ config.extra.repository | safe }}/releases">GitHub</a>.</p></header>
+  <ul class="release-list">
+    {%- for p in section.pages %}
+    <li><a href="{{ p.permalink | safe }}"><span class="ver">{{ p.title }}</span><span class="date"><time datetime="{{ p.date }}">{{ p.date }}</time></span>{% if p.description %}<p>{{ p.description }}</p>{% endif %}</a></li>
+    {%- endfor %}
+  </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="{% if page.extra.lang %}{{ page.extra.lang }}{% else %}{{ lang }}{% endif %}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% if page.title %}{{ page.title }} — {{ config.title }}{% elif section.title and section.path != "/" %}{{ section.title }} — {{ config.title }}{% else %}{{ config.title }}{% endif %}{% endblock %}</title>
+<meta name="description" content="{% block description %}{% if page.description %}{{ page.description }}{% elif section.description %}{{ section.description }}{% else %}{{ config.description }}{% endif %}{% endblock %}">
+<meta name="color-scheme" content="light dark">
+{% if page.extra.robots %}<meta name="robots" content="{{ page.extra.robots }}">
+{% endif %}<link rel="stylesheet" href="{{ get_url(path='style.css') }}">
+<link rel="preload" href="{{ get_url(path='fonts/DispatchOCR.woff2') }}" as="font" type="font/woff2" crossorigin>
+</head>
+<body>
+{#- The 404 page has no current_path; every other page does. #}
+{%- set here = current_path | default(value="") -%}
+{%- set root = get_section(path="_index.md") -%}
+{%- set faq = root.pages | filter(attribute="slug", value="faq") -%}
+{%- set docs = get_section(path="docs/_index.md") -%}
+{%- set legal = get_section(path="legal/_index.md") -%}
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="{{ get_url(path='@/_index.md') }}"{% if here == "/" %} aria-current="page"{% endif %}><span>{{ config.title }}</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="{{ get_url(path='@/articles/_index.md') }}"{% if here is starting_with("/articles/") %} aria-current="page"{% endif %}>Articles</a></li>
+        {%- if docs.pages | length > 0 %}
+        <li><a href="{{ docs.pages[0].permalink | safe }}"{% if here is starting_with("/docs/") %} aria-current="page"{% endif %}>Documentation</a></li>
+        {%- endif %}
+        <li><a href="{{ get_url(path='@/releases/_index.md') }}"{% if here is starting_with("/releases/") %} aria-current="page"{% endif %}>Releases</a></li>
+        {%- if faq | length > 0 %}
+        <li><a href="{{ faq[0].permalink | safe }}"{% if here is starting_with("/faq/") %} aria-current="page"{% endif %}>FAQ</a></li>
+        {%- endif %}
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+{% block content %}{% endblock %}
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>{{ config.extra.footer }}</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        {%- for p in legal.pages %}
+        <li><a href="{{ p.permalink | safe }}"{% if p.extra.lang %} hreflang="{{ p.extra.lang }}"{% endif %}>{{ p.title }}</a></li>
+        {%- endfor %}
+        <li><a href="{{ config.extra.repository | safe }}">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

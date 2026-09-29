@@ -258,7 +258,7 @@ export function titleAndBody(data, body) {
 }
 
 /** First prose paragraph as plain text, for summaries. */
-export function summaryOf(body, limit = 200) {
+export function summaryOf(body, limit = 160) {
 	for (const part of segments(body)) {
 		if (part.code) continue;
 		for (const para of part.text.split(/\n\s*\n/)) {
@@ -268,7 +268,11 @@ export function summaryOf(body, limit = 200) {
 				.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2")
 				.replace(/\[\[([^\]]+)\]\]/g, "$1")
 				.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-				.replace(/[*_`]/g, "")
+				.replace(/`/g, "")
+				// Emphasis markers only: `node_modules` keeps its underscore.
+				.replace(/(\*\*|__)(.+?)\1/g, "$2")
+				.replace(/(^|[^\w*])[*_](?=\S)(.+?)(?<=\S)[*_](?![\w*])/g, "$1$2")
+				.replace(/https?:\/\//g, "")
 				.replace(/\s+/g, " ");
 			return plain.length > limit ? `${plain.slice(0, limit - 1).replace(/\s+\S*$/, "")}…` : plain;
 		}
@@ -284,7 +288,9 @@ export function collectVault(wikiRoot, settings) {
 	const root = join(wikiRoot, settings.source);
 	if (!existsSync(root)) throw new Error(`website source ${settings.source}/ not found in the vault`);
 	const read = (rel) => ({ rel: `${settings.source}/${rel}`, ...parseNote(readFileSync(join(root, rel), "utf8")) });
-	const set = { articles: [], faq: null, links: [], testimonials: [], legal: [], releases: [], skipped: [], errors: [] };
+	const set = { home: null, articles: [], faq: null, links: [], testimonials: [], legal: [], releases: [], skipped: [], errors: [] };
+	// An optional `slug:` sets the page's URL segment; otherwise the file name does.
+	const slugOf = (note, name) => slugify(note.data.slug || name.replace(/\.md$/, ""));
 	const need = (note, fields) => {
 		const missing = fields.filter((f) => !String(note.data[f] ?? "").trim());
 		if (missing.length) set.errors.push(`${note.rel}:1: missing ${missing.join(", ")}`);
@@ -293,6 +299,14 @@ export function collectVault(wikiRoot, settings) {
 		}
 		return missing.length === 0;
 	};
+
+	// Home's pitch is editorial too, so it lives in the vault; it is published by existing.
+	if (existsSync(join(root, "Home page.md"))) {
+		const note = read("Home page.md");
+		const { title } = titleAndBody(note.data, note.body);
+		set.home = { eyebrow: note.data.eyebrow || "", title, lede: note.data.description || "", requirements: note.data.requirements || "", readMore: note.data.read_more || "" };
+		if (!title) set.errors.push(`${note.rel}:1: missing title (no title: and no # heading)`);
+	}
 
 	for (const name of markdownFiles(join(root, "Articles"))) {
 		const note = read(`Articles/${name}`);
@@ -305,10 +319,18 @@ export function collectVault(wikiRoot, settings) {
 		note.content = body;
 		if (!title) set.errors.push(`${note.rel}:1: missing title (no title: and no # heading)`);
 		need(note, ["date"]);
-		note.slug = slugify(name.replace(/\.md$/, ""));
+		note.slug = slugOf(note, name);
 		note.dir = "Articles";
 		set.articles.push(note);
 	}
+	// Home's second button names an article; it shows only while that article is published.
+	if (set.home) {
+		const name = String(set.home.readMore).replace(/^\[\[|\]\]$/g, "").trim().toLowerCase();
+		const article = set.articles.find((a) => basename(a.rel, ".md").toLowerCase() === name);
+		set.home.read_more = article ? { url: `articles/${article.slug}/`, title: article.title } : undefined;
+		delete set.home.readMore;
+	}
+
 	if (existsSync(join(root, "FAQ.md"))) {
 		const note = read("FAQ.md");
 		if (isReady(note.data)) {
@@ -336,9 +358,12 @@ export function collectVault(wikiRoot, settings) {
 	for (const name of markdownFiles(join(root, "Legal"))) {
 		const note = read(`Legal/${name}`);
 		const { title, body } = titleAndBody(note.data, note.body);
-		Object.assign(note, { title: title || name.replace(/\.md$/, ""), content: body, slug: slugify(name.replace(/\.md$/, "")), dir: "Legal" });
+		Object.assign(note, { title: title || name.replace(/\.md$/, ""), content: body, slug: slugOf(note, name), dir: "Legal" });
 		set.legal.push(note);
 	}
+	// An optional `weight:` orders the legal pages; unweighted ones follow, by file name.
+	const weightOf = (note) => (/^\d+$/.test(String(note.data.weight ?? "")) ? Number(note.data.weight) : Infinity);
+	set.legal.sort((a, b) => weightOf(a) - weightOf(b));
 
 	const releaseDir = join(wikiRoot, settings.releases);
 	for (const name of markdownFiles(releaseDir)) {
@@ -357,7 +382,7 @@ export function collectVault(wikiRoot, settings) {
 		}
 		const bodyAt = note.body.indexOf(content.trimEnd().split("\n")[0]);
 		const bodyLine = note.bodyLine + (bodyAt < 0 ? 0 : lineOf(note.body, bodyAt) - 1);
-		set.releases.push({ rel, data: note.data, version, date: note.data.date, title: `Dispatch ${version}`, content, bodyLine, slug: slugify(version), dir: "Releases" });
+		set.releases.push({ rel, data: note.data, version, date: note.data.date, title: `v${version}`, content, bodyLine, slug: slugify(version), dir: "Releases" });
 	}
 	set.releases.sort((a, b) => compareVersions(b.version, a.version));
 	set.assets = listFiles(root).filter((path) => !path.endsWith(".md"));
@@ -395,10 +420,14 @@ export function convertMarkdown(body, ctx) {
 					continue;
 				}
 				const n = diagrams.length + 1;
+				const id = `diagram-${n}-description`;
 				diagrams.push({ file: `diagram-${n}.svg`, source: part.inner, title, description });
+				// The caption links to the long description, which sits folded under the figure;
+				// a browser opens the <details> when the link targets something inside it.
 				out.push(
-					`<figure class="diagram">\n<img src="diagram-${n}.svg" alt="${escapeHtml(title)}" aria-describedby="diagram-${n}-description">\n` +
-						`<figcaption id="diagram-${n}-description">${escapeHtml(description)}</figcaption>\n</figure>`,
+					`<figure class="diagram">\n<img src="diagram-${n}.svg" alt="${escapeHtml(title)}" aria-describedby="${id}">\n` +
+						`<figcaption>${escapeHtml(title)}. <a class="figure-desc" href="#${id}">Diagram description</a></figcaption>\n</figure>\n` +
+						`<details class="figure-long">\n<summary>Diagram description</summary>\n<p id="${id}">${escapeHtml(description)}</p>\n</details>`,
 				);
 			} else out.push(part.text);
 			continue;
@@ -434,6 +463,7 @@ export function convertMarkdown(body, ctx) {
 	function convertLine(line, lineNo) {
 		const masked = blankInlineCode(line);
 		const edits = [];
+		const widths = new Map();
 		const at = (index) => lineNo + lineOf(masked, index) - 1;
 		const replace = (m, value) => edits.push({ start: m.index, end: m.index + m[0].length, value });
 
@@ -459,7 +489,10 @@ export function convertMarkdown(body, ctx) {
 					const alt = rest.map((s) => s.trim()).filter((s) => s && !/^\d+(x\d+)?$/.test(s)).join(" ");
 					if (!alt) fail(at(m.index), `image ${name} has no alt text (write ![[${name}|Alt text]])`);
 					assets.add(asset);
-					replace(m, `![${alt}](${encodeURI(basename(asset))})`);
+					const url = encodeURI(basename(asset));
+					const width = rest.map((s) => s.trim()).find((s) => /^\d+$/.test(s));
+					if (width) widths.set(url, width);
+					replace(m, `![${alt}](${url})`);
 				} else {
 					const [name, heading] = target.split("#");
 					const page = ctx.notes.get(name.trim().toLowerCase());
@@ -508,9 +541,21 @@ export function convertMarkdown(body, ctx) {
 			const found = target(attr[2], m.index);
 			if (!found.keep) replace(m, tag.replace(attr[0], ` ${attr[1]}="${found.url}"`));
 		}
+		// A bare URL is a link on GitHub and in Obsidian, but plain text to Zola. It shows without
+		// its scheme; trailing sentence punctuation stays outside the link.
+		for (const m of masked.matchAll(/(?<![(<"'=[\]\w/])https?:\/\/[^\s<>()[\]]+/g)) {
+			const url = m[0].replace(/[.,;:!?]+$/, "");
+			replace({ index: m.index, 0: url }, `[${url.replace(/^https?:\/\//, "")}](${url})`);
+		}
 		edits.sort((a, b) => b.start - a.start);
 		let result = line;
 		for (const edit of edits) result = result.slice(0, edit.start) + edit.value + result.slice(edit.end);
+		// An image alone on its line is a figure, as the design sets it; an embed keeps its width.
+		const only = /^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(result);
+		if (only) {
+			const width = widths.get(only[2]);
+			return `<figure>\n<img src="${only[2]}" alt="${escapeHtml(only[1])}"${width ? ` width="${width}"` : ""}>\n</figure>`;
+		}
 		return result;
 	}
 }
@@ -538,7 +583,7 @@ export function frontMatter(fields) {
 			continue;
 		}
 		if (key === "date") lines.push(`date = ${value}`);
-		else if (typeof value === "number") lines.push(`${key} = ${value}`);
+		else if (typeof value === "number" || typeof value === "boolean") lines.push(`${key} = ${value}`);
 		else lines.push(`${key} = ${JSON.stringify(String(value))}`);
 	}
 	if (extra.length) lines.push("[extra]", ...extra);
@@ -609,7 +654,11 @@ export function guardOutput(pages, baseUrl, exists) {
 		}
 		const dir = posix.dirname(`/${page.path}`);
 		for (const m of page.html.matchAll(/\s(?:href|src)="([^"]*)"/g)) {
-			const url = m[1].replace(/&amp;/g, "&");
+			// Tera escapes data-driven URLs (`https:&#x2F;&#x2F;…`); browsers decode them, so do we.
+			const url = m[1]
+				.replace(/&#x([0-9a-f]+);/gi, (e, hex) => String.fromCodePoint(parseInt(hex, 16)))
+				.replace(/&#(\d+);/g, (e, dec) => String.fromCodePoint(Number(dec)))
+				.replace(/&amp;/g, "&");
 			if (!url || /^(#|mailto:|data:|tel:)/i.test(url)) continue;
 			let path;
 			if (url.startsWith(`${base}/`) || url === base) path = url.slice(base.length) || "/";
@@ -719,18 +768,33 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 		return result.markdown;
 	};
 
-	mkdirSync(content, { recursive: true });
-	writeFileSync(join(content, "_index.md"), frontMatter({ title: "Home" }));
+	// Every section names the templates it renders with. The starter theme provides each one, so
+	// a project's design may override any of them and needs none.
+	const section = (dir, fields) => {
+		mkdirSync(join(content, dir), { recursive: true });
+		writeFileSync(join(content, dir, "_index.md"), frontMatter({ ...fields, insert_anchor_links: "right" }));
+	};
+	section("", { title: "Home" });
 
-	mkdirSync(join(content, "articles"), { recursive: true });
-	writeFileSync(join(content, "articles", "_index.md"), frontMatter({ title: "Articles", sort_by: "date" }));
+	section("articles", { title: "Articles", sort_by: "date" });
 	for (const a of set.articles) {
 		const md = convertNote(a, `articles/${a.slug}`);
-		writePage(content, `articles/${a.slug}`, { title: a.title, date: a.data.date, description: a.data.description || summaryOf(a.content), extra: { author: [].concat(a.data.author || []).join(", ") } }, md);
+		// An optional teaser image, a published asset copied next to the article.
+		let teaser;
+		if (a.data.teaser) {
+			const asset = assets.get(basename(String(a.data.teaser)).toLowerCase());
+			if (asset) {
+				teaser = basename(asset);
+				cpSync(join(sourceRoot, asset), join(content, "articles", a.slug, teaser));
+			} else errors.push(`${a.rel}:1: teaser ${a.data.teaser} is not a file in the published set`);
+		}
+		// `lead` marks a written description; a generated one serves lists and the meta tag, but
+		// shown above the text it would only repeat the first paragraph.
+		const extra = { author: [].concat(a.data.author || []).join(", "), teaser, teaser_cover: a.data.teaser_cover === "true" || undefined, lead: Boolean(a.data.description) || undefined };
+		writePage(content, `articles/${a.slug}`, { title: a.title, date: a.data.date, description: a.data.description || summaryOf(a.content), extra }, md);
 	}
 
-	mkdirSync(join(content, "legal"), { recursive: true });
-	writeFileSync(join(content, "legal", "_index.md"), frontMatter({ title: "Legal", sort_by: "weight" }));
+	section("legal", { title: "Legal", sort_by: "weight", page_template: "legal.html" });
 	set.legal.forEach((l, i) => {
 		const md = convertNote(l, `legal/${l.slug}`);
 		writePage(content, `legal/${l.slug}`, { title: l.title, weight: i + 1, description: l.data.description, extra: { effective: l.data.effective, lang: l.data.lang, robots: l.data.robots } }, md);
@@ -738,19 +802,19 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 
 	if (set.faq) writePage(content, "faq", { title: set.faq.title }, convertNote(set.faq, "faq"));
 
-	mkdirSync(join(content, "releases"), { recursive: true });
-	writeFileSync(join(content, "releases", "_index.md"), frontMatter({ title: "Releases", sort_by: "date" }));
-	for (const r of set.releases) {
+	// Releases sort by weight, newest first, so two versions shipped on one day keep their order;
+	// in a template `page.lower` is then the newer release and `page.higher` the older one.
+	section("releases", { title: "Releases", sort_by: "weight", template: "releases.html", page_template: "release.html" });
+	set.releases.forEach((r, i) => {
 		errors.push(...scanPaths(r.content, r.bodyLine).map((f) => `${r.rel}:${f.line}: ${f.message}`));
 		const result = convertMarkdown(r.content, { notes: new Map(), assets: new Map(), dir: "", file: r.rel, line: r.bodyLine });
 		errors.push(...result.errors);
-		writePage(content, `releases/${r.slug}`, { title: r.title, date: r.date, description: summaryOf(r.content), extra: { version: r.version } }, result.markdown);
+		writePage(content, `releases/${r.slug}`, { title: r.title, date: r.date, weight: i + 1, description: summaryOf(r.content), extra: { version: r.version } }, result.markdown);
 		vaultPages.push(`releases/${r.slug}`);
-	}
+	});
 
 	const docsSource = docs ?? readDocsAtTag(settings.docs);
-	mkdirSync(join(content, "docs"), { recursive: true });
-	writeFileSync(join(content, "docs", "_index.md"), frontMatter({ title: "Documentation", sort_by: "weight", extra: { release: docsSource.tag } }));
+	section("docs", { title: "Documentation", sort_by: "weight", page_template: "docs-page.html", extra: { release: docsSource.tag } });
 	const docPages = [...docsSource.files.keys()].filter((p) => p.endsWith(".md")).map((p) => p.replace(/\.md$/, ""));
 	const order = [...settings.docs_order.filter((n) => docPages.includes(n)), ...docPages.filter((n) => !settings.docs_order.includes(n)).sort()];
 	const docNotes = new Map(order.map((n) => [`path:${n.toLowerCase()}.md`, `@/docs/${slugify(n)}/index.md`]));
@@ -768,6 +832,7 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 		writePage(content, dir, { title: title || name, weight: i + 1, description: summaryOf(body) }, result.markdown);
 	});
 
+	writeFileSync(join(root, "home.json"), JSON.stringify(set.home ?? {}, null, "\t"));
 	writeFileSync(join(root, "updates.json"), JSON.stringify(buildUpdates(set), null, "\t"));
 	writeFileSync(join(root, "testimonials.json"), JSON.stringify(buildTestimonials(set), null, "\t"));
 

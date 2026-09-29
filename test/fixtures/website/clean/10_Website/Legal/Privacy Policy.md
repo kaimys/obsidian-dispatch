@@ -1,5 +1,7 @@
 ---
 title: Privacy Policy
+slug: privacy
+weight: 1
 description: What we do not collect.
 effective: 2026-09-02
 ---

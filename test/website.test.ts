@@ -38,12 +38,14 @@ const docs = {
 	]),
 };
 
-/** A site root with the real starter theme and a config pointing at the fixture layout. */
-function fixtureSite() {
+/** A site root with the real starter theme — and, with `design`, the project's own templates and
+ * static files — and a config pointing at the fixture layout. */
+function fixtureSite({ design = false } = {}) {
 	const dir = mkdtempSync(join(tmpdir(), "dispatch-website-test-"));
 	const site = join(dir, "site");
 	mkdirSync(site);
 	cpSync("dispatch/website/themes", join(site, "themes"), { recursive: true });
+	if (design) for (const part of ["templates", "static"]) cpSync(`dispatch/website/${part}`, join(site, part), { recursive: true });
 	writeFileSync(
 		join(site, "config.toml"),
 		read("dispatch/website/config.toml").replace('releases = "08_Delivery_and QA/Releases"', 'releases = "08_Releases"'),
@@ -72,7 +74,8 @@ describe("reading notes and settings", () => {
 	it("reads the [extra.dispatch] table and nothing else", () => {
 		const settings = readSiteSettings(read("dispatch/website/config.toml"));
 		expect(settings).toMatchObject({ source: "10_Website", releases: "08_Delivery_and QA/Releases", docs: "docs" });
-		expect(settings.docs_order).toEqual(["overview", "wiki-structure", "page-types", "skills", "installation"]);
+		expect(settings.docs_order).toEqual(["overview", "installation", "page-types", "skills", "wiki-structure"]);
+		expect(readSiteSettings("[extra]\n[[extra.social]]\nlabel = \"X\"\n[extra.dispatch]\nsource = \"W\"\n").source).toBe("W");
 		expect(() => readSiteSettings("[extra.dispatch]\nsource = 10\n")).toThrow("string");
 	});
 
@@ -84,6 +87,7 @@ describe("reading notes and settings", () => {
 
 	it("summarises the first prose paragraph as plain text", () => {
 		expect(summaryOf("## Heading\n\n![img](x.png)\n\nA [link](u) and [[Note|label]] with **bold**.\n\nSecond.")).toBe("A link and label with bold.");
+		expect(summaryOf("No `node_modules`, *stress* and _this_; see https://github.com/x/y.")).toBe("No node_modules, stress and this; see github.com/x/y.");
 		expect(summaryOf("word ".repeat(80), 20).endsWith("…")).toBe(true);
 	});
 });
@@ -114,7 +118,7 @@ describe("Markdown conversion", () => {
 		);
 		expect(errors).toEqual([]);
 		expect(markdown).toContain("[Other](@/articles/other/index.md) and [there](@/articles/other/index.md#some-heading)");
-		expect(markdown).toContain("![Alt text](pic.png)");
+		expect(markdown).toContain('<figure>\n<img src="pic.png" alt="Alt text" width="300">\n</figure>');
 		expect(markdown).toContain("![Rel](pic.png) [Other](@/articles/other/index.md)");
 		expect(markdown).toContain("<mark>hi</mark>");
 		expect(markdown).not.toContain("hidden");
@@ -148,7 +152,18 @@ describe("Markdown conversion", () => {
 		const { markdown, diagrams } = convert("```mermaid\nflowchart TD\n    accTitle: Flow <1>\n    accDescr: A to B.\n    A --> B\n```");
 		expect(diagrams).toHaveLength(1);
 		expect(markdown).toContain('<img src="diagram-1.svg" alt="Flow &lt;1&gt;" aria-describedby="diagram-1-description">');
-		expect(markdown).toContain('<figcaption id="diagram-1-description">A to B.</figcaption>');
+		expect(markdown).toContain('<figcaption>Flow &lt;1&gt;. <a class="figure-desc" href="#diagram-1-description">Diagram description</a></figcaption>');
+		expect(markdown).toContain('<details class="figure-long">\n<summary>Diagram description</summary>\n<p id="diagram-1-description">A to B.</p>\n</details>');
+	});
+
+	it("sets an image alone on its line as a figure, and one inside text as an image", () => {
+		expect(convert("![A picture](../assets/pic.png)").markdown).toBe('<figure>\n<img src="pic.png" alt="A picture">\n</figure>');
+		expect(convert("Text ![A picture](../assets/pic.png) more").markdown).toBe("Text ![A picture](pic.png) more");
+	});
+
+	it("links a bare URL, shown without its scheme, and leaves every other URL alone", () => {
+		expect(convert("See https://github.com/x/y/issues/5.").markdown).toBe("See [github.com/x/y/issues/5](https://github.com/x/y/issues/5).");
+		for (const kept of ["[t](https://a.b/c)", "<https://a.b/c>", '<a href="https://a.b/c">t</a>', "`https://a.b/c`"]) expect(convert(kept).markdown).toBe(kept);
 	});
 
 	it("rewrites raw HTML images and requires their alt text", () => {
@@ -209,7 +224,8 @@ describe("the clean fixture vault", () => {
 		const dir = join(staged.root, "content", "articles", "getting-started");
 		expect(existsSync(join(dir, "pic.png"))).toBe(true);
 		expect(existsSync(join(dir, "diagram-1.svg"))).toBe(true);
-		expect(existsSync(join(staged.root, "content", "articles", "second-article", "pic.png"))).toBe(false);
+		expect(existsSync(join(staged.root, "content", "articles", "second-article", "diagram-1.svg"))).toBe(false);
+		expect(existsSync(join(staged.root, "content", "articles", "second-article", "secret.png"))).toBe(false);
 	});
 
 	it("publishes a released note's GitHub body only, and skips planned notes and notes without one", () => {
@@ -222,9 +238,36 @@ describe("the clean fixture vault", () => {
 
 	it("lists updates newest first, the newer release first on a shared date, links included", () => {
 		const updates = JSON.parse(read(join(staged.root, "updates.json")));
-		expect(updates.map((u: { title: string }) => u.title)).toEqual(["Second article", "A podcast about Dispatch", "Getting started", "Dispatch 1.0.1", "Dispatch 1.0.0"]);
+		expect(updates.map((u: { title: string }) => u.title)).toEqual(["Second article", "A podcast about Dispatch", "Getting started", "v1.0.1", "v1.0.0"]);
 		expect(updates[1]).toEqual({ kind: "link", title: "A podcast about Dispatch", url: "https://example.com/podcast", date: "2026-09-21", summary: "" });
 		expect(updates[0]).toMatchObject({ kind: "article", url: "articles/second-article/", summary: "The second one." });
+	});
+
+	it("takes Home's pitch from the Home note, and its button only while the article is published", () => {
+		expect(JSON.parse(read(join(staged.root, "home.json")))).toEqual({
+			eyebrow: "Obsidian plugin",
+			title: "A pitch in one line",
+			lede: "The lede: it says what Dispatch does.",
+			requirements: "Desktop only.",
+			read_more: { url: "articles/getting-started/", title: "Getting started" },
+		});
+	});
+
+	it("copies an article's teaser next to it and names it in the page's extra", () => {
+		expect(existsSync(join(staged.root, "content", "articles", "second-article", "pic.png"))).toBe(true);
+		expect(content("articles/second-article/index.md")).toContain('teaser = "pic.png"\nteaser_cover = true');
+	});
+
+	it("orders legal pages by weight, then file name, and honours slug", () => {
+		expect(staged.set.legal.map((l: { slug: string }) => l.slug)).toEqual(["privacy", "impressum"]);
+		expect(content("legal/_index.md")).toContain('page_template = "legal.html"');
+	});
+
+	it("names each section's templates and turns on heading anchors", () => {
+		expect(content("releases/_index.md")).toContain('sort_by = "weight"\ntemplate = "releases.html"\npage_template = "release.html"\ninsert_anchor_links = "right"');
+		expect(content("releases/1-0-1/index.md")).toContain("weight = 1");
+		expect(content("releases/1-0-0/index.md")).toContain("weight = 2");
+		expect(content("_index.md")).toContain('insert_anchor_links = "right"');
 	});
 
 	it("writes an empty testimonial list when there is no testimonial note", () => {
@@ -263,6 +306,7 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		"08_Releases/Release 2.0.0.md:17: [[Release 1.9.0]] links to a page that is not published",
 		"08_Releases/Release 2.0.0.md:17: a path into the vault (dispatch/wiki/…): dispatch/wiki/08_Releases/x.md.",
 		"08_Releases/Release 2.1.0.md:1: a released note needs version: vX.Y.Z and date: YYYY-MM-DD",
+		"10_Website/Articles/Missing teaser.md:1: teaser nowhere.png is not a file in the published set",
 	];
 	for (const finding of expected) it(finding.replace(/:\d+: .*/, "") + " — " + finding.split(/:\d+: /)[1], () => expect(errors).toContain(finding));
 	it("reports nothing else", () => expect([...errors].sort()).toEqual([...expected].sort()));
@@ -275,6 +319,11 @@ describe("the output guard", () => {
 
 	it("passes internal links under the subpath, relative assets, anchors and external links", () => {
 		expect(guard(`<a href="${base}/">h</a><a href="${base}/articles/a/">a</a><img src="pic.png" alt="x"><a href="#top">t</a><a href="https://example.com">e</a><link href="${base}/starter.css">`)).toEqual([]);
+	});
+
+	it("decodes entity-escaped URLs before judging them", () => {
+		expect(guard(`<a href="https:&#x2F;&#x2F;example.com&#x2F;x">e</a><a href="${base.replaceAll("/", "&#x2F;")}&#x2F;articles&#x2F;a&#x2F;">a</a>`)).toEqual([]);
+		expect(guard(`<a href="${base.replaceAll("/", "&#x2F;")}&#x2F;gone&#x2F;">g</a>`)).toHaveLength(1);
 	});
 
 	it("fails a broken internal link, a root-relative URL and a missing asset", () => {
@@ -333,5 +382,29 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		expect(html("articles/getting-started/index.html")).toContain('href="https://kaimys.github.io/obsidian-dispatch/articles/second-article/#details"');
 		expect(html("legal/impressum/index.html")).toContain('<meta name="robots" content="noindex">');
 		expect(html("docs/installation/index.html")).toContain('id="the-google-block--optional-import"');
+	});
+
+	it("builds with the project's design, and the output guard passes over every page", () => {
+		const { site, buildDir } = fixtureSite({ design: true });
+		const result = build({ wikiRoot: join(FIXTURES, "clean"), siteDir: site, buildDir, docs, renderDiagram: fakeDiagram });
+		const html = (path: string) => read(join(result.output, path));
+		const home = html("index.html");
+		expect(home).toContain('<h1 id="pitch">A pitch in one line');
+		expect(home).toContain("Read Getting started");
+		expect(home).toContain('A podcast about Dispatch <span class="ext" aria-hidden="true">&#8599;</span><span class="visually-hidden">(external)</span>');
+		expect(home).not.toContain('class="testimonials"');
+		expect(home).not.toContain("LinkedIn");
+		expect(home).toMatch(/class="logo" href="[^"]+" aria-current="page"/);
+		const article = html("articles/getting-started/index.html");
+		expect(article).toMatch(/href="[^"]*\/articles\/" aria-current="page">Articles/);
+		expect(article).toContain('<a class="zola-anchor" href="#setup" aria-label="Anchor link for: setup">#</a>');
+		expect(article).not.toContain('<p class="description">');
+		expect(html("articles/second-article/index.html")).toContain('<p class="description">The second one.</p>');
+		expect(html("articles/index.html")).toContain('<span class="teaser teaser-cover"><img src="https://kaimys.github.io/obsidian-dispatch/articles/second-article/pic.png"');
+		const newer = html("releases/1-0-0/index.html");
+		expect(newer).toMatch(/<a href="[^"]*\/releases\/1-0-1\/">v1.0.1 &rarr;<\/a>/);
+		expect(html("docs/overview/index.html")).toMatch(/class="next" href="[^"]*\/docs\/installation\/"/);
+		expect(html("legal/impressum/index.html")).toContain('<html lang="de">');
+		expect(html("legal/impressum/index.html")).toContain('hreflang="en">Privacy Policy</a>');
 	});
 });
