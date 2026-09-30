@@ -13,6 +13,8 @@ A first paragraph that becomes the summary. See [[Second article]] and [[Second 
 
 ![Relative picture](../assets/pic.png)
 
+A <img src='../assets/pic.png' alt='Single-quoted picture'> in a sentence.
+
 > [!tip] Remember
 > Keep the **vault** private.
 

@@ -171,12 +171,85 @@ export function blankInlineCode(text) {
 	return String(text).replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, (m) => m.replace(/[^\n]/g, " "));
 }
 
+/**
+ * Removes Obsidian `%%comments%%` in one pass over the whole note, as Obsidian hides them: a
+ * comment may span lines, and a code fence *inside* a comment is hidden with it rather than
+ * splitting it. Outside a comment, a fenced block or an inline code span shows `%%` literally, so
+ * a comment example in code stays. Line breaks are kept, so every later finding names the same
+ * line as the source. Everything derived from a note — title, summary, body, leak guard — reads
+ * this result, never the raw text.
+ */
+export function blankComments(body) {
+	let inComment = false;
+	let closer = null;
+	return String(body)
+		.split("\n")
+		.map((line) => {
+			if (!inComment && closer) {
+				if (closer.test(line)) closer = null;
+				return line;
+			}
+			if (!inComment) {
+				const open = FENCE.exec(line);
+				if (open) {
+					closer = new RegExp(`^\\s{0,3}${open[2][0] === "`" ? "`" : "~"}{${open[2].length},}\\s*$`);
+					return line;
+				}
+			}
+			const masked = blankInlineCode(line);
+			let out = "";
+			let i = 0;
+			while (i < line.length) {
+				if (inComment) {
+					const end = line.indexOf("%%", i);
+					if (end < 0) break;
+					inComment = false;
+					i = end + 2;
+				} else {
+					const start = masked.indexOf("%%", i);
+					if (start < 0) {
+						out += line.slice(i);
+						break;
+					}
+					out += line.slice(i, start);
+					inComment = true;
+					i = start + 2;
+				}
+			}
+			return out;
+		})
+		.join("\n");
+}
+
 const lineOf = (text, index) => text.slice(0, index).split("\n").length;
+
+/**
+ * Every URL-carrying attribute (`href`, `src`, `xlink:href`) inside a tag of HTML or SVG markup,
+ * quoted with `"`, `'` or not at all — all three are valid, so all three must be checked. One
+ * reader for the source, the built pages and SVG files, so no quoting style slips past one of them.
+ * Returns `{ start, end, name, raw, quote }`, with `start`/`end` the attribute's offsets in `markup`.
+ */
+export function resourceAttributes(markup) {
+	const found = [];
+	const text = String(markup);
+	for (const tag of text.matchAll(/<[a-zA-Z][\w:-]*(?:\s[^<>]*)?>/g)) {
+		for (const a of tag[0].matchAll(/(?<=\s)((?:xlink:)?href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi)) {
+			const quote = a[2] !== undefined ? '"' : a[3] !== undefined ? "'" : "";
+			const start = tag.index + a.index;
+			found.push({ start, end: start + a[0].length, name: a[1], raw: a[2] ?? a[3] ?? a[4], quote });
+		}
+	}
+	return found;
+}
+
+/** A reference that stays on the web or inside the file itself: never a local dependency. */
+const isExternal = (url) => /^(https?:|mailto:|tel:|data:|#)/i.test(url) || url.startsWith("//");
 
 // In order of precedence: where two rules match the same text (`file:///C:/Users/…`), the first
 // one names it and the others stay quiet.
 const PATH_RULES = [
-	{ re: /file:\/\/[^\s"'<>)]+/g, message: "a file:// URL" },
+	// `file:///x`, `file://host/x` and `file:/x` are all local; a bare "file:" in prose is not.
+	{ re: /file:\/[^\s"'<>)]*/g, message: "a file:// URL" },
 	{ re: /dispatch\/wiki\/[^\s"'<>)`]*/g, message: "a path into the vault (dispatch/wiki/…)" },
 	{ re: /\b[A-Za-z]:\\+(?:[^\\\s"'<>|]+\\+)*[^\\\s"'<>|]*/g, message: "a local filesystem path" },
 	{ re: /(?<![\w/])[A-Za-z]:\/(?!\/)[^\s"'<>)]+/g, message: "a local filesystem path" },
@@ -269,15 +342,8 @@ export function titleAndBody(data, body) {
 	return { title: heading ? heading[1].trim() : "", body: stripped };
 }
 
-/**
- * The body with Obsidian `%%comments%%` removed from prose — code blocks keep theirs, as in the
- * body converter. Everything derived from a note's text (summaries, descriptions) goes through it.
- */
-export function withoutComments(body) {
-	return segments(body)
-		.map((part) => (part.code ? part.text : part.text.replace(/%%[\s\S]*?%%/g, "")))
-		.join("\n");
-}
+/** The body without Obsidian comments; the same single pass as `blankComments`. */
+export const withoutComments = blankComments;
 
 /** First prose paragraph as plain text, for summaries. Comments never reach it. */
 export function summaryOf(body, limit = 160) {
@@ -309,7 +375,12 @@ export function summaryOf(body, limit = 160) {
 export function collectVault(wikiRoot, settings) {
 	const root = join(wikiRoot, settings.source);
 	if (!existsSync(root)) throw new Error(`website source ${settings.source}/ not found in the vault`);
-	const read = (rel) => ({ rel: `${settings.source}/${rel}`, ...parseNote(readFileSync(join(root, rel), "utf8")) });
+	// Comments go first, before anything reads the body: a commented-out `# heading` must not
+	// become the title, nor a hidden paragraph the summary.
+	const read = (rel) => {
+		const note = parseNote(readFileSync(join(root, rel), "utf8"));
+		return { rel: `${settings.source}/${rel}`, ...note, body: blankComments(note.body) };
+	};
 	const set = { home: null, articles: [], faq: null, links: [], testimonials: [], legal: [], releases: [], skipped: [], errors: [] };
 	// An optional `slug:` sets the page's URL segment; otherwise the file name does.
 	const slugOf = (note, name) => slugify(note.data.slug || name.replace(/\.md$/, ""));
@@ -417,7 +488,8 @@ export function collectVault(wikiRoot, settings) {
 	const releaseDir = join(wikiRoot, settings.releases);
 	for (const name of markdownFiles(releaseDir)) {
 		const rel = `${settings.releases}/${name}`;
-		const note = { rel, ...parseNote(readFileSync(join(releaseDir, name), "utf8")) };
+		const parsed = parseNote(readFileSync(join(releaseDir, name), "utf8"));
+		const note = { rel, ...parsed, body: blankComments(parsed.body) };
 		if (note.data.status !== "released") continue;
 		let content;
 		try {
@@ -479,7 +551,9 @@ export function routeCollisions(pages) {
  * ctx.line    the line the body starts on
  * ctx.github  true for docs: GitHub Markdown, where `[[…]]` is literal text, not a link
  */
-export function convertMarkdown(body, ctx) {
+export function convertMarkdown(source, ctx) {
+	// The one comment pass (idempotent, so a body collectVault already cleaned is unchanged).
+	const body = ctx.github ? source : blankComments(source);
 	const errors = [];
 	const assets = new Set();
 	const diagrams = [];
@@ -515,10 +589,7 @@ export function convertMarkdown(body, ctx) {
 	return { markdown: out.join("\n"), errors, assets: [...assets], diagrams };
 
 	function convertProse(text, first) {
-		// Obsidian comments may span lines; blank them but keep the line breaks, so findings
-		// after a comment still name the right line.
-		const uncommented = ctx.github ? text : text.replace(/%%[\s\S]*?%%/g, (m) => m.replace(/[^\n]/g, ""));
-		const lines = uncommented.split("\n");
+		const lines = text.split("\n");
 		const done = [];
 		for (let i = 0; i < lines.length; i++) {
 			const callout = /^>\s*\[!(\w+)\][-+]?\s*(.*)$/.exec(lines[i]);
@@ -617,13 +688,19 @@ export function convertMarkdown(body, ctx) {
 			if (m[1] && !text.trim()) fail(at(m.index), `image ${url} has no alt text`);
 			replace(m, `${m[1]}[${text}](${found.url})`);
 		}
-		for (const m of masked.matchAll(/<(img|a)\b[^>]*>/gi)) {
-			const tag = line.slice(m.index, m.index + m[0].length);
-			const attr = /\s(src|href)="([^"]*)"/i.exec(tag);
-			if (!attr) continue;
-			if (m[1].toLowerCase() === "img" && !/\salt="[^"]+"/i.test(tag)) fail(at(m.index), `image ${attr[2]} has no alt text`);
-			const found = target(attr[2], m.index);
-			if (!found.keep) replace(m, tag.replace(attr[0], ` ${attr[1]}="${found.url}"`));
+		// Raw HTML in a note: every URL attribute of every tag, in any quoting, goes through the same
+		// resolution as a Markdown link, and keeps its own quote style when rewritten.
+		for (const tag of line.matchAll(/<img\b[^<>]*>/gi)) {
+			if (masked.slice(tag.index, tag.index + tag[0].length).trim() === "") continue; // inside inline code
+			if (!/\salt\s*=\s*("[^"]+"|'[^']+'|[^\s"'=<>`]+)/i.test(tag[0])) {
+				const src = resourceAttributes(tag[0])[0];
+				fail(at(tag.index), `image ${src ? src.raw : "(no src)"} has no alt text`);
+			}
+		}
+		for (const a of resourceAttributes(line)) {
+			if (masked.slice(a.start, a.end).trim() === "") continue; // inside inline code
+			const found = target(a.raw, a.start);
+			if (!found.keep) edits.push({ start: a.start, end: a.end, value: `${a.name}=${a.quote}${found.url}${a.quote}` });
 		}
 		// A bare URL is a link on GitHub and in Obsidian, but plain text to Zola. It shows without
 		// its scheme; trailing sentence punctuation stays outside the link.
@@ -744,24 +821,14 @@ export function decodeEntities(text) {
 export function guardOutput(pages, baseUrl, exists) {
 	const errors = [];
 	const base = baseUrl.replace(/\/+$/, "");
-	for (const page of pages) {
-		if (page.text !== undefined) {
-			const text = decodeEntities(page.text);
-			for (const { line, message } of scanPaths(text)) errors.push(`${page.path}:${line}: ${message}`);
-			if (page.fromVault) for (const m of text.matchAll(/!?\[\[[^\]]*\]\]/g)) errors.push(`${page.path}:${lineOf(text, m.index)}: unconverted wikilink ${m[0]}`);
-			continue;
-		}
-		const prose = decodeEntities(withoutCode(page.html).replace(/<[^>]+>/g, (m) => m.replace(/[^\n]/g, " ")));
-		for (const { line, message } of scanPaths(prose)) errors.push(`${page.path}:${line}: ${message}`);
-		if (page.fromVault) {
-			for (const m of prose.matchAll(/!?\[\[[^\]]*\]\]/g)) errors.push(`${page.path}:${lineOf(prose, m.index)}: unconverted wikilink ${m[0]}`);
-		}
+	// Every URL attribute of a page or an SVG, in any quoting: decoded first — Tera escapes
+	// data-driven URLs (`https:&#x2F;&#x2F;…`) and browsers decode them, and an encoded `file:` URL
+	// is still a local path — then either external, or a file that exists in the output.
+	const checkUrls = (page, markup) => {
 		const dir = posix.dirname(`/${page.path}`);
-		for (const m of page.html.matchAll(/\s(?:href|src)="([^"]*)"/g)) {
-			// Tera escapes data-driven URLs (`https:&#x2F;&#x2F;…`); browsers decode them, so do we,
-			// before any scheme is allowed — an encoded `file:` URL is still a local path.
-			const url = decodeEntities(m[1]);
-			const at = lineOf(page.html, m.index);
+		for (const a of resourceAttributes(markup)) {
+			const url = decodeEntities(a.raw).trim();
+			const at = lineOf(markup, a.start);
 			const leaks = scanPaths(url);
 			if (leaks.length) {
 				errors.push(...leaks.map((f) => `${page.path}:${at}: ${f.message}`));
@@ -776,15 +843,30 @@ export function guardOutput(pages, baseUrl, exists) {
 			if (url.startsWith(`${base}/`) || url === base) path = url.slice(base.length) || "/";
 			else if (/^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith("//")) continue;
 			else if (url.startsWith("/")) {
-				errors.push(`${page.path}:${lineOf(page.html, m.index)}: root-relative URL ${url} breaks under the site's subpath`);
+				errors.push(`${page.path}:${at}: root-relative URL ${url} breaks under the site's subpath`);
 				continue;
 			} else path = posix.normalize(posix.join(dir, url));
 			path = decodeURIComponent(path.split(/[?#]/)[0]);
 			const candidates = path.endsWith("/") ? [`${path}index.html`] : [path, `${path}/index.html`];
-			if (!candidates.some((c) => exists(c.replace(/^\/+/, "")))) errors.push(`${page.path}:${at}: broken link ${m[1]}`);
+			if (!candidates.some((c) => exists(c.replace(/^\/+/, "")))) errors.push(`${page.path}:${at}: broken link ${a.raw}`);
 		}
+	};
+	for (const page of pages) {
+		if (page.text !== undefined) {
+			const text = decodeEntities(page.text);
+			for (const { line, message } of scanPaths(text)) errors.push(`${page.path}:${line}: ${message}`);
+			if (page.fromVault) for (const m of text.matchAll(/!?\[\[[^\]]*\]\]/g)) errors.push(`${page.path}:${lineOf(text, m.index)}: unconverted wikilink ${m[0]}`);
+			checkUrls(page, page.text);
+			continue;
+		}
+		const prose = decodeEntities(withoutCode(page.html).replace(/<[^>]+>/g, (m) => m.replace(/[^\n]/g, " ")));
+		for (const { line, message } of scanPaths(prose)) errors.push(`${page.path}:${line}: ${message}`);
+		if (page.fromVault) {
+			for (const m of prose.matchAll(/!?\[\[[^\]]*\]\]/g)) errors.push(`${page.path}:${lineOf(prose, m.index)}: unconverted wikilink ${m[0]}`);
+		}
+		checkUrls(page, page.html);
 	}
-	return errors;
+	return [...new Set(errors)];
 }
 
 // ─── Placeholder rule ───────────────────────────────────────────────────────
@@ -923,6 +1005,13 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 		const rel = `${settings.source}/${asset}`;
 		errors.push(...scanPaths(text).map((f) => `${rel}:${f.line}: ${f.message}`));
 		for (const m of text.matchAll(/!?\[\[[^\]]*\]\]/g)) errors.push(`${rel}:${lineOf(text, m.index)}: contains ${m[0]}, which cannot be published`);
+		// An asset is copied as it is, without its own dependencies: anything it references locally
+		// would be missing on the site, or reach outside the published set. Embed it instead.
+		const raw = readFileSync(join(sourceRoot, asset), "utf8");
+		for (const a of resourceAttributes(raw)) {
+			const url = decodeEntities(a.raw).trim();
+			if (url && !isExternal(url) && !/^file:/i.test(url)) errors.push(`${rel}:${lineOf(raw, a.start)}: references ${url}, a local file an asset cannot bring along; embed it instead`);
+		}
 	};
 
 	const convertNote = (note, outDir) => {

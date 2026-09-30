@@ -20,6 +20,7 @@ import {
 	parseNote,
 	publishedTags,
 	readSiteSettings,
+	resourceAttributes,
 	repositoryOf,
 	routeCollisions,
 	scanPaths,
@@ -240,7 +241,7 @@ describe("the clean fixture vault", () => {
 	it("stages with no finding", () => expect(staged.errors).toEqual([]));
 
 	it("publishes the ready articles only, and says what it skipped and why", () => {
-		expect(staged.set.articles.map((a: { slug: string }) => a.slug)).toEqual(["commented", "getting-started", "second-article"]);
+		expect(staged.set.articles.map((a: { slug: string }) => a.slug)).toEqual(["comment-around-code", "commented", "getting-started", "hidden-heading", "second-article"]);
 		expect(staged.set.skipped).toEqual([
 			"10_Website/Articles/Capital ready.md (status: Ready)",
 			"10_Website/Articles/Draft.md (status: draft)",
@@ -283,7 +284,7 @@ describe("the clean fixture vault", () => {
 
 	it("lists updates newest first, the newer release first on a shared date, links included", () => {
 		const updates = JSON.parse(read(join(staged.root, "updates.json")));
-		expect(updates.map((u: { title: string }) => u.title)).toEqual(["Second article", "A podcast about Dispatch", "Getting started", "Commented", "v1.0.1", "v1.0.0"]);
+		expect(updates.map((u: { title: string }) => u.title)).toEqual(["Second article", "A podcast about Dispatch", "Getting started", "Commented", "Public article", "Comment around code", "v1.0.1", "v1.0.0"]);
 		expect(updates[1]).toEqual({ kind: "link", title: "A podcast about Dispatch", url: "https://example.com/podcast", date: "2026-09-21", summary: "" });
 		expect(updates[0]).toMatchObject({ kind: "article", url: "articles/second-article/", summary: "The second one." });
 	});
@@ -296,6 +297,24 @@ describe("the clean fixture vault", () => {
 		expect(page).not.toContain("inline-secret-marker");
 		expect(page).toContain("%% a comment shown as an example stays in code %%");
 		expect(withoutComments("a %%x%% b\n```\n%%y%%\n```")).toBe("a  b\n```\n%%y%%\n```");
+	});
+
+	it("removes comments before anything reads the note: a hidden heading is never the title, and a fence inside a comment is hidden with it", () => {
+		const hidden = staged.set.articles.find((a: { slug: string }) => a.slug === "hidden-heading");
+		expect(hidden.title).toBe("Public article");
+		const around = content("articles/comment-around-code/index.md");
+		for (const marker of ["PRIVATE-FENCE-MARKER", "PRIVATE-AFTER-FENCE-MARKER"]) expect(around).not.toContain(marker);
+		expect(around).toContain("The public paragraph after the hidden draft.");
+		expect(content("articles/hidden-heading/index.md")).not.toContain("PRIVATE-HEADING-MARKER");
+		const summaries = JSON.parse(read(join(staged.root, "updates.json"))).map((u: { summary: string }) => u.summary).join(" ");
+		expect(summaries).not.toMatch(/PRIVATE-/);
+		// One pass, line breaks kept, code outside a comment keeps its literal %%.
+		expect(withoutComments("a\n%% x\n```\ny\n```\nz %% b\n```\n%%kept%%\n```")).toBe("a\n\n\n\n\n b\n```\n%%kept%%\n```");
+		expect(withoutComments("`%%literal%%` and %%gone%% text")).toBe("`%%literal%%` and  text");
+	});
+
+	it("resolves a single-quoted image like a double-quoted one, keeping its quote style", () => {
+		expect(content("articles/getting-started/index.md")).toContain("A <img src='pic.png' alt='Single-quoted picture'> in a sentence.");
 	});
 
 	it("takes Home's pitch from the Home note, and its button only while the article is published", () => {
@@ -377,6 +396,11 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		"10_Website/Articles/Same one.md:1: articles/same/ is also the address of 10_Website/Articles/Same two.md; give one of them its own slug:",
 		"10_Website/Articles/A B.md:1: articles/a-b/ is also the address of 10_Website/Articles/A-B.md; give one of them its own slug:",
 		"10_Website/Articles/日本.md:1: its name gives an empty page address; set slug: to a Latin name",
+		// Any attribute quoting, and a file: URL in its single-slash form.
+		"10_Website/Articles/Single-quoted file link.md:7: a file:// URL: file:/tmp/private.txt",
+		"10_Website/Articles/Single-quoted private link.md:7: link ../../02_Private/Private-note.md points outside the published set",
+		// A copied SVG may not depend on a local file it cannot bring along.
+		"10_Website/assets/refs.svg:2: references ../../02_Private/secret.png, a local file an asset cannot bring along; embed it instead",
 	];
 	for (const finding of expected) it(finding.replace(/:\d+: .*/, "") + " — " + finding.split(/:\d+: /)[1], () => expect(errors).toContain(finding));
 	it("reports nothing else", () => expect([...errors].sort()).toEqual([...expected].sort()));
@@ -409,6 +433,19 @@ describe("the output guard", () => {
 		expect(guard('<a href="file:&#x2F;&#x2F;&#x2F;home&#x2F;kai&#x2F;x">a</a>')).toEqual(["articles/a/index.html:1: a file:// URL: file:///home/kai/x"]);
 		expect(guard("<p>see file:&#x2F;&#x2F;&#x2F;C:&#x2F;x</p>")).toEqual(["articles/a/index.html:1: a file:// URL: file:///C:/x"]);
 		expect(decodeEntities("a&#x2F;b&#47;c&amp;d")).toBe("a/b/c&d");
+	});
+
+	it("reads URL attributes in every quoting, in pages and in SVG files", () => {
+		expect(resourceAttributes(`<a href='x'>a</a><img src=y alt=z><use xlink:href="#q"/><p>href="not-a-tag"</p>`).map((a: { name: string; raw: string; quote: string }) => `${a.name}=${a.quote}${a.raw}${a.quote}`)).toEqual([
+			"href='x'",
+			"src=y",
+			'xlink:href="#q"',
+		]);
+		expect(guard("<a href='file:/tmp/private.txt'>x</a>")).toEqual(["articles/a/index.html:1: a file:// URL: file:/tmp/private.txt"]);
+		expect(guard("<a href='../../02_Private/p.md'>x</a>")).toEqual(["articles/a/index.html:1: broken link ../../02_Private/p.md"]);
+		expect(guard("<img src='pic.png' alt='ok'>")).toEqual([]);
+		const svg = { path: "articles/a/d.svg", text: `<svg><image href="../../02_Private/secret.png"/><use xlink:href="#in"/><a href='https://x.y/'>t</a></svg>`, fromVault: true };
+		expect(guardOutput([svg], base, (p: string) => files.has(p))).toEqual(["articles/a/d.svg:1: broken link ../../02_Private/secret.png"]);
 	});
 
 	it("checks emitted text assets such as SVG, not only pages", () => {
@@ -510,8 +547,11 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		// No comment and no unpublished release reaches any emitted file: pages, feeds, metadata.
 		for (const file of listOutput(result.output)) {
 			const text = readFileSync(join(result.output, file)).toString("utf8");
-			for (const marker of ["INTERNAL-COMMENT-MARKER", "inline-secret-marker", "CANDIDATE-RELEASE-MARKER"]) expect(text, `${marker} in ${file}`).not.toContain(marker);
+			for (const marker of ["INTERNAL-COMMENT-MARKER", "inline-secret-marker", "CANDIDATE-RELEASE-MARKER", "PRIVATE-HEADING-MARKER", "PRIVATE-FENCE-MARKER", "PRIVATE-AFTER-FENCE-MARKER"]) {
+				expect(text, `${marker} in ${file}`).not.toContain(marker);
+			}
 		}
+		expect(home).toContain("Public article");
 		expect(home).toContain("The public introduction. It says what the article is about.");
 		expect(html("legal/impressum/index.html")).toContain('<html lang="de">');
 		expect(html("legal/impressum/index.html")).toContain('hreflang="en">Privacy Policy</a>');

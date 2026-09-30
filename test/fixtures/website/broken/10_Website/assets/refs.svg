@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="10" height="10">
+<image href="../../02_Private/secret.png" width="10" height="10" />
+<use xlink:href="#inside" />
+<a href='https://example.com/'><text>ok</text></a>
+</svg>
