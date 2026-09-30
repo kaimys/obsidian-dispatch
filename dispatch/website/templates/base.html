@@ -14,6 +14,11 @@
 {% if page.extra.robots %}<meta name="robots" content="{{ page.extra.robots }}">
 {% endif %}<link rel="stylesheet" href="{{ get_url(path='style.css') }}">
 <link rel="preload" href="{{ get_url(path='fonts/DispatchOCR.woff2') }}" as="font" type="font/woff2" crossorigin>
+{#- Declared, not left to the browser: its default /favicon.ico is the host's root, which is not
+    this site under its subpath. sizes="32x32" on the ICO keeps browsers that read SVG on the SVG. #}
+<link rel="icon" href="{{ get_url(path='favicon.ico') }}" sizes="32x32">
+<link rel="icon" href="{{ get_url(path='favicon.svg') }}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{{ get_url(path='apple-touch-icon.png') }}">
 </head>
 <body>
 {#- The 404 page has no current_path; every other page does. #}

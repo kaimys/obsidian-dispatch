@@ -1,4 +1,6 @@
-Icons: Lucide (https://lucide.dev) — used inline: arrow-up-right.
+Icons: Lucide (https://lucide.dev) — used inline: arrow-up-right. The favicon
+(favicon.svg, favicon.ico, apple-touch-icon.png) is Lucide's play, stroked at
+DispatchOCR's weight.
 
 ISC License
 
