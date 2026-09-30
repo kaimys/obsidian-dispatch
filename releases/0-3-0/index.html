@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v0.3.0 — Dispatch releases</title>
+<meta name="description" content="Version 0.3.0 substantially improved release planning. The develop branch is now the standard, and the &#x2F;release skill merges it back to the main branch. It…">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/releases/0-3-0/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/" aria-current="page">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+
+<article class="wrap">
+  <header class="page-head">
+    <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></p>
+    <h1>v0.3.0</h1>
+    <p class="meta"><time datetime="2026-09-28">2026-09-28</time> · <a href="https://github.com/kaimys/obsidian-dispatch/releases/tag/0.3.0">GitHub release</a></p>
+  </header>
+  <div class="prose">
+<h2 id="better-release-planning">Better Release Planning<a class="zola-anchor" href="#better-release-planning" aria-label="Anchor link for: better-release-planning">#</a></h2>
+<p>Version 0.3.0 substantially improved release planning. The <code>develop</code> branch is now the standard, and the <code>/release</code> skill merges it back to the main branch. It also performs other release steps, such as bumping the version, closing tickets, writing release notes, tagging the release on GitHub, and moving all tickets from "Done" to the "Released" column.</p>
+<p>The release board has also been upgraded. You can now change the release target for an entire column, thereby moving all tickets from release v0.4.0 to v0.5.0, for example. You can also reorder the cards on the release board.</p>
+<p>Finally, the <code>dispatch/</code> folder contains the Dispatch workflow scripts, the wiki link, and the canonical skills. Now, the Dispatch setup is collected in one folder.</p>
+<h3 id="order-a-release-by-hand">Order a release by hand<a class="zola-anchor" href="#order-a-release-by-hand" aria-label="Anchor link for: order-a-release-by-hand">#</a></h3>
+<p>Cards can now be dragged into build order inside a version column on the Release Plan tab. The order lives in its own frontmatter property, so it never fights the Kanban tab's order, and it is <strong>off by default</strong>: set <em>Release order property</em> (e.g. <code>release_rank</code>) in the board settings to turn it on. A version line's header also offers <em>Copy release order to Kanban</em>, which seeds the Kanban order once from the release order.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/48">github.com/kaimys/obsidian-dispatch/issues/48</a></p>
+<h3 id="slip-a-whole-release-from-its-header">Slip a whole release from its header<a class="zola-anchor" href="#slip-a-whole-release-from-its-header" aria-label="Anchor link for: slip-a-whole-release-from-its-header">#</a></h3>
+<p>Right-click a version line's header and choose <em>Retarget release…</em> to move every open card of that line to another version in one step, instead of editing <code>version_target</code> note by note. If any card of the line is already Done or Released, nothing is changed.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/63">github.com/kaimys/obsidian-dispatch/issues/63</a></p>
+<h3 id="version-columns-write-one-spelling">Version columns write one spelling<a class="zola-anchor" href="#version-columns-write-one-spelling" aria-label="Anchor link for: version-columns-write-one-spelling">#</a></h3>
+<p>A drop on a version line now writes its highest known patch as <code>vMAJOR.MINOR.PATCH</code>, whether the line came from your planned versions or was discovered from the cards. Before, a discovered line wrote <code>0.4</code>, which created a second GitHub milestone beside <code>v0.4.0</code>. Existing values are left as they are.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/53">github.com/kaimys/obsidian-dispatch/issues/53</a></p>
+<h3 id="drops-and-keys-go-where-you-aimed">Drops and keys go where you aimed<a class="zola-anchor" href="#drops-and-keys-go-where-you-aimed" aria-label="Anchor link for: drops-and-keys-go-where-you-aimed">#</a></h3>
+<ul>
+<li><strong>A sliced drop lands next to the card you dropped it on.</strong> With a slice active, a Kanban drop was positioned by counting only the visible cards, so it landed somewhere else in the full column, or did not move at all. Both tabs now position a drop by the visible card it lands next to.
+<a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/79">github.com/kaimys/obsidian-dispatch/issues/79</a></li>
+<li><strong>A click sets the keyboard focus.</strong> Clicking a card now outlines it and keeps the board focused, and <code>[</code> / <code>]</code> only move the card that is visibly outlined. Before, a key could move a card you could not see was selected.
+<a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/73">github.com/kaimys/obsidian-dispatch/issues/73</a></li>
+</ul>
+<h3 id="finished-is-not-shipped">Finished is not shipped<a class="zola-anchor" href="#finished-is-not-shipped" aria-label="Anchor link for: finished-is-not-shipped">#</a></h3>
+<p>A <code>Released</code> column after <code>Done</code> separates <em>the test plan is signed off</em> from <em>a version carrying it has shipped</em>. <code>Released</code> counts as complete in a version's progress, rather than being excluded from it.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/43">github.com/kaimys/obsidian-dispatch/issues/43</a></p>
+<h3 id="one-folder-for-a-projects-setup">One folder for a project's setup<a class="zola-anchor" href="#one-folder-for-a-projects-setup" aria-label="Anchor link for: one-folder-for-a-projects-setup">#</a></h3>
+<p><code>dispatch-setup</code> 0.6.0 gathers a project's shared Dispatch setup into one <code>dispatch/</code> folder: the workflow files, the repo-side scripts, the project settings and a git-ignored link to the vault. Re-running setup on an older project migrates it, and it never removes the old vault link before the new one exists.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/37">github.com/kaimys/obsidian-dispatch/issues/37</a></p>
+<p>Behind the scenes, this project's own wiki is now checked for dead links and property drift with the Obsidian CLI. That is tooling for this repository and changes nothing in the plugin.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/38">github.com/kaimys/obsidian-dispatch/issues/38</a></p>
+<h3 id="upgrading">Upgrading<a class="zola-anchor" href="#upgrading" aria-label="Anchor link for: upgrading">#</a></h3>
+<p>No migration of your notes and no configuration change is required. <code>minAppVersion</code> stays at <strong>1.7.2</strong>.</p>
+<p>Download <code>main.js</code>, <code>manifest.json</code> and <code>styles.css</code> below into <code>&lt;vault&gt;/.obsidian/plugins/dispatch/</code>, or install <strong>Dispatch</strong> from Obsidian's community plugin directory. Desktop only.</p>
+<p><strong>Full changelog:</strong> <a rel="external" href="https://github.com/kaimys/obsidian-dispatch/compare/0.2.5...0.3.0">github.com/kaimys/obsidian-dispatch/compare/0.2.5...0.3.0</a></p>
+
+  </div>
+  <footer class="article-foot">
+    <a href="https://kaimys.github.io/obsidian-dispatch/releases/0-2-5/">&larr; v0.2.5</a>
+    <a href="https://kaimys.github.io/obsidian-dispatch/releases/0-3-1/">v0.3.1 &rarr;</a>
+  </footer>
+</article>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

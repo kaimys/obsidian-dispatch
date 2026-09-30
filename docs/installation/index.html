@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Installation &amp; configuration — Dispatch</title>
+<meta name="description" content="Node is the only thing Dispatch asks of your repository, and it asks for the runtime alone: the scripts it ships are dependency-free ESM, so there is no…">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/docs/installation/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/" aria-current="page">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+<div class="wrap docs">
+  <details class="docs-nav" open>
+    <summary>Documentation</summary>
+    <div class="inner">
+      <nav aria-label="Documentation">
+        <h2>Documentation</h2>
+        <ol>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Overview</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/" aria-current="page">Installation &amp; configuration</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/">Page types</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/skills/">Workflow skills</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/wiki-structure/">Wiki structure</a></li>
+        </ol>
+      </nav>
+      <nav class="toc-block" aria-label="On this page">
+        <h2>On this page</h2>
+        <ol class="toc">
+          <li><a href="#requirements">Requirements</a></li>
+          <li><a href="#install">Install</a></li>
+          <li class="sub"><a href="#guided-setup">Guided setup</a></li>
+          <li><a href="#the-two-configuration-layers">The two configuration layers</a></li>
+          <li class="sub"><a href="#the-dispatch-folder-in-your-repository">The Dispatch folder in your repository</a></li>
+          <li><a href="#board-settings">Board settings</a></li>
+          <li><a href="#chips">Chips</a></li>
+          <li class="sub"><a href="#tool-commands">Tool commands</a></li>
+          <li class="sub"><a href="#run-lifecycle">Run lifecycle</a></li>
+          <li><a href="#automations">Automations</a></li>
+          <li><a href="#the-config-files-on-disk">The config files on disk</a></li>
+          <li class="sub"><a href="#obsidianpluginsdispatchdatajson--shared">&lt;vault&gt;&#x2F;.obsidian&#x2F;plugins&#x2F;dispatch&#x2F;data.json — shared</a></li>
+          <li class="sub"><a href="#dispatch-json--this-device">~&#x2F;.dispatch&#x2F;&lt;vault&gt;-&lt;hash&gt;.json — this device</a></li>
+          <li class="sub"><a href="#the-google-block--optional-meet-transcript-import">The google block — optional Meet transcript import</a></li>
+          <li><a href="#security-model">Security model</a></li>
+          <li class="sub"><a href="#disclosures">Disclosures</a></li>
+          <li><a href="#building-from-source">Building from source</a></li>
+        </ol>
+      </nav>
+    </div>
+  </details>
+  <article>
+    <header class="page-head">
+      <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></p>
+      <h1>Installation &amp; configuration</h1>
+    </header>
+    <div class="prose">
+<h2 id="requirements">Requirements<a class="zola-anchor" href="#requirements" aria-label="Anchor link for: requirements">#</a></h2>
+<table><thead><tr><th></th><th></th></tr></thead><tbody>
+<tr><td><strong>Obsidian</strong></td><td>Desktop, 1.7.2 or newer. Chips and automations spawn local processes, so there is no mobile version.</td></tr>
+<tr><td><strong>A coding agent CLI</strong></td><td>On your PATH — <a rel="external" href="https://claude.com/claude-code">Claude Code</a>, <a rel="external" href="https://learn.chatgpt.com/docs/codex/cli">Codex</a>, or whichever one you point a <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/#tool-commands">tool command</a> at. The boards render without one; the chips have nothing to launch.</td></tr>
+<tr><td><strong>Node.js 18 or newer</strong></td><td>On your PATH, for the <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/#run-lifecycle">run lifecycle</a> hooks and any <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/#automations">automation</a> you wire up. The plugin itself never shells out to it — it runs inside Obsidian.</td></tr>
+</tbody></table>
+<p>Node is the only thing Dispatch asks of your repository, and it asks for the runtime alone: the scripts it ships are dependency-free ESM, so there is no <code>package.json</code>, no lockfile, no <code>node_modules</code> and no build step. Adopting Dispatch does not turn a Python or Rust repository into a JavaScript one.</p>
+<p>The 18 floor comes from the optional <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/#the-google-block--optional-meet-transcript-import">Meet transcript import</a>, which uses the global <code>fetch</code>. <code>run-state.mjs</code> and a typical automation script use nothing newer than the built-in <code>fs</code> and <code>child_process</code> modules and run on far older versions — one floor for all of them is simpler to state than three.</p>
+<p>Anything past this is your project's choice rather than Dispatch's. This repository's own tracker sync shells out to <code>gh</code>; a project tracking work in Asana or Jira writes a different script with a different dependency, and Dispatch neither ships nor configures it.</p>
+<h2 id="install">Install<a class="zola-anchor" href="#install" aria-label="Anchor link for: install">#</a></h2>
+<p>Open <em>Settings → Community plugins → Browse</em> in Obsidian, search for <strong>Dispatch</strong>, then install and enable it. The <a rel="external" href="https://community.obsidian.md/plugins/dispatch">directory listing</a> is the same plugin.</p>
+<h3 id="guided-setup">Guided setup<a class="zola-anchor" href="#guided-setup" aria-label="Anchor link for: guided-setup">#</a></h3>
+<p>Integrating Dispatch into a project — boards, device config, chips, tracker sync, agent hooks — is itself agent-guided, in <a rel="external" href="https://claude.com/claude-code">Claude Code</a> or Codex. Install the setup skill into the agent you run.</p>
+<p>Claude Code:</p>
+<pre><code>/plugin marketplace add kaimys/obsidian-dispatch
+/plugin install dispatch-setup
+</code></pre>
+<p>Codex:</p>
+<pre><code>codex plugin marketplace add kaimys/obsidian-dispatch
+codex plugin add dispatch-setup@dispatch
+</code></pre>
+<p>Then say "set up Dispatch for this project" in your repo — or let the board start it. An unconfigured board offers a setup button for every agent this device has a <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/#tool-commands">launch command</a> for: <strong>Set up with Claude</strong> or <strong>Set up with Codex</strong> when there is one, <strong>Set up with an agent</strong> when there are several (the confirmation dialog asks which; with <em>Confirm before running</em> off, the button names the agent a click starts). With no launch command it is disabled, and <strong>Copy the prompt</strong> hands the same prompt to an agent you already have open. The prompt names both install routes, so an agent that does not have the skill yet tells you how to install it and to start a new session.</p>
+<p>The skill scans an existing vault (ticket folders, status vocabulary, frontmatter fill rates) and turns the interview into a confirmation of pre-filled suggestions — or scaffolds a <a href="https://kaimys.github.io/obsidian-dispatch/docs/wiki-structure/">wiki structure</a> if there isn't one yet, and proposes the <a href="https://kaimys.github.io/obsidian-dispatch/docs/skills/">workflow skills</a> for your code repo.</p>
+<p>The setup is complete only after its verification gate and one live chip have passed for every selected agent. In a multi-agent setup, the skill creates one neutral chip per workflow intent and keeps the agent-specific <code>/</code> or <code>$</code> prefix in the device-local tool configuration, so the same menu entry can launch either agent.</p>
+<p>Neither agent? The skill is a plain markdown checklist: <code>plugins/dispatch-setup/skills/dispatch-setup/SKILL.md</code>.</p>
+<h2 id="the-two-configuration-layers">The two configuration layers<a class="zola-anchor" href="#the-two-configuration-layers" aria-label="Anchor link for: the-two-configuration-layers">#</a></h2>
+<p>Dispatch splits its settings so a vault can be shared across a team without leaking machine-specific paths:</p>
+<table><thead><tr><th>Layer</th><th>Stored in</th><th>Synced?</th><th>Contains</th></tr></thead><tbody>
+<tr><td><strong>Shared</strong></td><td><code>data.json</code> (normal plugin settings)</td><td>yes, with the vault</td><td>folders, properties, columns, chip templates, automation rules, default tool</td></tr>
+<tr><td><strong>This device</strong></td><td><code>~/.dispatch/&lt;vault&gt;-&lt;hash&gt;.json</code> (user profile, <strong>outside the vault</strong>)</td><td>never</td><td>repo alias → absolute path, tool command templates, calendar URL, opt-in toggles</td></tr>
+</tbody></table>
+<p>Notes and shared settings never contain absolute paths. They reference repositories by <strong>alias</strong> (e.g. <code>my-project</code>), and each team member maps that alias to a local path once in <em>Settings → Dispatch → This device</em>.</p>
+<p>Because the device layer lives outside the vault (Windows: <code>%USERPROFILE%\.dispatch\</code>), it works with <strong>any</strong> sync — Obsidian Sync, Google Drive, git — without exclusion rules, and teammates can never overwrite each other's device config. The exact path is shown in the settings tab. A <code>local.json</code> from older versions found next to the plugin is migrated there and removed from the vault automatically.</p>
+<p>Scripts Dispatch ships — currently the Meet transcript import — keep their settings in that same per-vault file rather than one of their own, under a <code>google</code> key. A script the <em>project</em> chooses, such as a tracker sync, is configured by the project and Dispatch never writes it.</p>
+<h3 id="the-dispatch-folder-in-your-repository">The Dispatch folder in your repository<a class="zola-anchor" href="#the-dispatch-folder-in-your-repository" aria-label="Anchor link for: the-dispatch-folder-in-your-repository">#</a></h3>
+<p>Everything Dispatch adds to a code repository sits in one folder, <code>dispatch/</code>: the workflow files (<code>workflow/</code>), the repo-side scripts (<code>scripts/</code>), the shared project invariants (<code>invariants.md</code>) and <code>wiki</code>, a git-ignored link to the vault. The folder also has room for project-level settings in <code>settings.yaml</code>; this repository keeps its tracker repository there, but the setup skill does not create the file yet and still writes the tracker into each workflow. It is committed and shared like the rest of the repository, so it never holds an absolute path, a secret or device state; those stay in <code>~/.dispatch/</code>. The page templates stay in the vault, where Obsidian's Templates plugin can read them.</p>
+<p><strong>Set up before v0.3.0?</strong> Your project keeps its older layout (<code>scripts/dispatch/</code>, a root <code>wiki</code> link), and it keeps working after a plugin update: the plugin reads no path from your repository. Re-running the setup skill migrates it.</p>
+<p>The sections below describe both layers as the <strong>settings UI</strong> presents them. If you (or an agent) write the files directly, read <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/#the-config-files-on-disk">The config files on disk</a> — the stored JSON does not have the same shape as the UI's compact input forms.</p>
+<h2 id="board-settings">Board settings<a class="zola-anchor" href="#board-settings" aria-label="Anchor link for: board-settings">#</a></h2>
+<ul>
+<li><strong>Source folders</strong> — vault folders scanned for cards (one per line)</li>
+<li><strong>Status property</strong> — the frontmatter property holding the column value (default <code>status</code>)</li>
+<li><strong>Order property</strong> — where the manual position within a column is stored (default <code>rank</code>; empty disables manual ordering)</li>
+<li><strong>Columns</strong> — ordered, one per line. Four segments: <code>value | Display label | progress | WIP limit</code>
+<ul>
+<li><em>progress</em> (0–100) is the weight used by the Release Plan's progress bar; <code>-</code> excludes the status entirely (e.g. Rejected)</li>
+<li><em>WIP limit</em> makes the header show <code>count/limit</code> and outlines the column amber at the limit, red above</li>
+<li>Statuses found in notes but not configured appear as extra columns at the end</li>
+</ul>
+</li>
+<li><strong>Title / badge properties</strong> — what each card shows (e.g. <code>id</code> as title prefix, <code>priority</code> and <code>type</code> as badges)</li>
+<li><strong>Assignee property</strong> — shown as an accent-outlined <code>@Name</code> badge, always first in the slice-by bar</li>
+<li><strong>Open-questions property</strong> — numeric counter rendered as the <code>? N</code> badge (amber → green at 0)</li>
+<li><strong>Open-tests property</strong> — numeric counter rendered as the <code>✓ N</code> badge (purple → green at 0); open items in the manual test plan. Leave the property empty until the plan has been written — empty renders no badge, <code>0</code> claims a plan exists and every item is ticked</li>
+<li><strong>Open-findings property</strong> — numeric counter rendered as the <code>⚠ N</code> badge (red → green at 0); blocking findings from the latest code review. Leave the property empty on a note nothing has reviewed — empty renders no badge, <code>0</code> claims the review found nothing</li>
+<li><strong>Discussion property</strong> — a thread URL rendered as a chat icon in the card title</li>
+<li><strong>Required properties</strong> — drives the ⚠ problems panel (typically <code>id, status, updated</code>)</li>
+</ul>
+<p><strong>Milestones</strong> (the Release Plan tab): version property, planned versions, per-version tags, release order property, size property, completed property, velocity look-back window, minimum completions, release-notes folder.</p>
+<ul>
+<li><strong>Release order property</strong> — where the manual build order inside a version column is stored (e.g. <code>release_rank</code>; empty, the default, keeps the columns sorted by status and turns off <em>Copy release order to Kanban</em>). Separate from the order property, so the Kanban and Release Plan orders never reorder each other.</li>
+</ul>
+<p>The forecast's velocity comes from the completions inside the look-back window. The earliest must be the only one on its UTC calendar date: it is the baseline and adds no weight. The sizes of all later completions are divided by the whole UTC days from the baseline's date through the last completion's, both ends counted — Monday to Thursday is 4 days, which is the <em>over N days</em> in the header tooltip. Gaps between completions stay in that span; days since the last completion do not. Fewer completions than <em>Minimum completions</em> (default <code>4</code>, at least <code>2</code>, since the baseline alone gives no rate) or a tie on the earliest date shows no forecast.</p>
+<p><strong>Meetings</strong> and <strong>Todos</strong>: the meetings folder (root only), calendar filter and look-ahead; the todo folders, allowlisted section names, the assignee list and the fallback owner. Each tab appears once its folder is configured.</p>
+<h2 id="chips">Chips<a class="zola-anchor" href="#chips" aria-label="Anchor link for: chips">#</a></h2>
+<p>Chips launch an agent (or any CLI) with a templated prompt, in the right repository. Two forms:</p>
+<p><strong>Virtual chips</strong> — recommended for recurring workflows. Defined once in settings as <code>label | tool | repo | prompt</code>, they appear on every card's right-click menu and in the note's file menu. Nothing to paste into notes, and a regenerated document can't lose them:</p>
+<pre><code>Refine              | claude | my-project | /refine {{id}}
+Update ticket       | claude | my-project | /update-ticket {{id}}
+Implementation plan | claude | my-project | /implementation-plan {{id}}
+</code></pre>
+<p>Variables: <code>{{id}}</code>, <code>{{status}}</code>, <code>{{file}}</code>, <code>{{title}}</code>. Column-header chips add <code>{{ids}}</code>, <code>{{status}}</code>, <code>{{count}}</code> for batch runs; meeting and calendar chips add <code>{{date}}</code> and <code>{{title}}</code>.</p>
+<p><strong>Block chips</strong> — for one-offs and generated reports. A fenced block anywhere in a note, carrying <strong>no commands and no paths</strong> — only a prompt, a tool name and a repo alias:</p>
+<pre><code data-lang="markdown">```dispatch
+label: Refine this ticket
+tool: claude
+repo: my-project
+prompt: |
+  Refine {{file}}: read the spec, check open questions,
+  and propose acceptance criteria.
+```
+</code></pre>
+<ul>
+<li><code>prompt</code> (required) — supports <code>{{file}}</code> (vault-relative path), <code>{{title}}</code> (basename), <code>{{vault}}</code> (vault path on this machine)</li>
+<li><code>tool</code> (optional) — defaults to the shared <em>Default tool</em></li>
+<li><code>repo</code> (optional) — working-directory alias; defaults to the vault folder</li>
+<li><code>label</code> (optional) — button text</li>
+</ul>
+<p>A chip refuses to launch when a variable it references is empty — a ticket with no <code>id</code> would otherwise send a bare <code>/refine</code> to an agent.</p>
+<h3 id="tool-commands">Tool commands<a class="zola-anchor" href="#tool-commands" aria-label="Anchor link for: tool-commands">#</a></h3>
+<p>Tools are defined <strong>per device</strong> as command templates:</p>
+<pre><code>claude = start &quot;Dispatch&quot; /d {{cwd}} cmd /k claude {{prompt}}
+codex  = start &quot;Dispatch&quot; /d {{cwd}} cmd /k codex {{prompt}}
+</code></pre>
+<p>With more than one tool configured, clicking a chip offers <strong>one button per tool</strong> — <em>Run with Claude</em>, <em>Run with Codex</em>, <em>Cancel</em> — and the command preview follows whichever button is focused. With one tool the dialog is unchanged. The picker lives in the confirmation dialog only: with <em>Confirm before running</em> off, a chip runs its own tool (or the shared default) exactly as before.</p>
+<p><strong>Tool prompt prefix.</strong> Agents invoke a workflow with different characters — Claude <code>/refine US42</code>, Codex <code>$refine US42</code>. Set the character once per tool rather than a prompt per chip:</p>
+<pre><code>claude = /
+codex  = $
+</code></pre>
+<p>A chip prompt that <em>starts</em> with <code>/</code> has that one character swapped for this tool. Prompts that are not commands — the column chips, which read "Work through these tickets…" — are never rewritten.</p>
+<p><strong>Tool prompts</strong> is the escape hatch for the case a prefix cannot express: a skill installed under a different <em>name</em>. One line per tool and chip, keyed <code>tool.intent</code> — give the chip an intent by suffixing its label in the chip-template row (<code>Refine #refine</code>), so the key survives renaming the button; without one the chip's label is the key:</p>
+<pre><code>codex.refine = $ticket-refine {{id}}
+</code></pre>
+<p>An explicit prompt wins over the prefix, and the chip's own prompt is used for anything neither names — so a device that configures nothing keeps working.</p>
+<p>macOS:</p>
+<pre><code>claude = osascript -e &#39;tell app &quot;Terminal&quot; to do script &quot;cd &quot; &amp; quoted form of {{cwd}} &amp; &quot; &amp;&amp; claude &quot; &amp; quoted form of {{prompt}}&#39;
+codex  = osascript -e &#39;tell app &quot;Terminal&quot; to do script &quot;cd &quot; &amp; quoted form of {{cwd}} &amp; &quot; &amp;&amp; codex &quot; &amp; quoted form of {{prompt}}&#39;
+</code></pre>
+<p>The two differ only in the binary: both agents take the prompt as one positional argument, and neither needs a flag. On macOS <code>codex</code> is on <code>PATH</code> from the installer, as it is on Windows — no hashed path is involved on either platform.</p>
+<p>Variables: <code>{{cwd}}</code>, <code>{{prompt}}</code>, <code>{{promptFile}}</code> (the prompt written to a temp file — use it for long or multiline prompts). All expand as quoted arguments; append <code>Raw</code> for unquoted (there is deliberately <strong>no</strong> <code>{{promptRaw}}</code>).</p>
+<blockquote>
+<p><strong>Windows:</strong> avoid launching through <code>wt.exe</code> directly — Windows Terminal parses <code>;</code> in its command line as a <em>tab separator even inside quotes</em>, so any prompt containing a semicolon breaks. <code>start</code> opens the user's default terminal (usually Windows Terminal anyway) without that parsing.</p>
+</blockquote>
+<h3 id="run-lifecycle">Run lifecycle<a class="zola-anchor" href="#run-lifecycle" aria-label="Anchor link for: run-lifecycle">#</a></h3>
+<p>When a chip launches a tool, Dispatch records the run in a machine-local file (<code>~/.dispatch/runs/…jsonl</code>) and passes <code>DISPATCH_RUN_ID</code>, <code>DISPATCH_RUNS_FILE</code>, <code>DISPATCH_NOTE</code>, <code>DISPATCH_LABEL</code> and <code>DISPATCH_STARTED</code> into the process.</p>
+<p>Lifecycle hooks in the target repo — <code>SessionStart</code>/<code>UserPromptSubmit</code>/<code>Stop</code>/<code>SessionEnd</code> calling a small script — append records back. A ready-to-copy implementation ships with the setup plugin: <a rel="external" href="https://github.com/kaimys/obsidian-dispatch/blob/main/plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs"><code>plugins/dispatch-setup/skills/dispatch-setup/assets/run-state.mjs</code></a> — drop it into the target repo as <code>dispatch/scripts/run-state.mjs</code> and wire the four events for each agent you run:</p>
+<table><thead><tr><th>Agent</th><th>Where the hooks are wired</th></tr></thead><tbody>
+<tr><td>Claude Code</td><td><code>.claude/settings.json</code>, under <code>hooks</code></td></tr>
+<tr><td>Codex</td><td><code>.codex/hooks.json</code>, under a top-level <code>hooks</code> map keyed by event</td></tr>
+</tbody></table>
+<p>One script serves both: it prefers the final message the agent hands it on the hook payload and otherwise reads that agent's transcript, so the run-log excerpt works either way.</p>
+<p>The board then shows a live badge on the card: <strong>started → running ⇄ waiting → done</strong>, where <em>waiting</em> means the agent finished its turn and the session needs you. Done fades after 24 h; clicking a badge clears a ghost run. On completion the hook appends a run-log line to the note's <code>## Dispatch runs</code> section, naming the agent that ran.</p>
+<p><strong>Codex only — hooks must be trusted, and trust is per entry.</strong> A correct <code>.codex/hooks.json</code> does nothing until you run <code>codex</code> interactively once in the repo and accept the prompt; until then every badge sits at <code>started</code> with nothing in the terminal to explain it. Trust is recorded per hook entry and hashed, so <strong>editing the file silently un-trusts what you changed</strong> — re-accept, then confirm a badge actually moves. A hooks file at the wrong path warns about nothing at all, and a malformed one only warns while the session runs on, so never take a clean start as proof the hooks are live.</p>
+<p>The plugin only <em>observes</em>: live state stays on the machine running the agent, durable outcomes land in the note and sync with the vault.</p>
+<p><strong>One agent per working tree.</strong> Launching a chip into a repo that already has an active run offers <strong>Queue</strong> (starts when the blocking session ends), <strong>Run anyway</strong>, or cancel. The queue is in-memory; staleness caps (2 h launched, 24 h running) keep a killed terminal from blocking a repo forever. In a monorepo, define one alias per package if you want parallel sessions.</p>
+<h2 id="automations">Automations<a class="zola-anchor" href="#automations" aria-label="Anchor link for: automations">#</a></h2>
+<p>Rules evaluated when a card <strong>enters a column</strong> (settings → Automations, JSON):</p>
+<pre><code data-lang="json">[
+  { &quot;when&quot;: [&quot;Deployed&quot;], &quot;set&quot;: { &quot;deployed&quot;: &quot;{{date}}&quot; }, &quot;repo&quot;: &quot;&quot;, &quot;command&quot;: &quot;&quot; },
+  { &quot;when&quot;: [], &quot;set&quot;: {},
+    &quot;repo&quot;: &quot;my-project&quot;,
+    &quot;command&quot;: &quot;node dispatch/scripts/move-ticket.mjs {{file}} {{from}} {{to}}&quot; }
+]
+</code></pre>
+<ul>
+<li><code>when</code> — statuses that trigger the rule; empty = every status change.</li>
+<li><code>set</code> — frontmatter assignments written <strong>atomically with the status change</strong> (<code>{{date}}</code>, <code>{{datetime}}</code>, <code>{{from}}</code>, <code>{{to}}</code>). This is how <code>deployed:</code> gets stamped, which in turn feeds the release forecast.</li>
+<li><code>command</code> — optional shell command run in the <code>repo</code> alias, e.g. to mirror the move into your tracker. Variables: <code>{{file}}</code>, <code>{{from}}</code>, <code>{{to}}</code>, <code>{{cwd}}</code> (quoted; append <code>Raw</code> for unquoted). Commands are <strong>shared</strong> config but run only on devices that opt in (<em>This device → Enable automation commands</em>); <code>set</code> assignments always apply.</li>
+</ul>
+<h2 id="the-config-files-on-disk">The config files on disk<a class="zola-anchor" href="#the-config-files-on-disk" aria-label="Anchor link for: the-config-files-on-disk">#</a></h2>
+<p>Everything in the settings tab is stored as JSON. The UI's compact forms — pipe-delimited column lines, <code>tool = command</code> lines — are <strong>input conveniences</strong>; on disk the shapes differ. This matters when an agent or a script writes the files directly. After editing either file outside Obsidian, click the board's ↻ reload button.</p>
+<h3 id="obsidianpluginsdispatchdatajson--shared"><code>&lt;vault&gt;/.obsidian/plugins/dispatch/data.json</code> — shared<a class="zola-anchor" href="#obsidianpluginsdispatchdatajson--shared" aria-label="Anchor link for: obsidianpluginsdispatchdatajson--shared">#</a></h3>
+<p>Missing keys fall back to the defaults in <code>src/settings.ts</code>, but writing the full object keeps the file readable and diffable:</p>
+<pre><code data-lang="json">{
+  &quot;board&quot;: {
+    &quot;sourceFolders&quot;: [&quot;05_Requirements/Tickets&quot;],
+    &quot;statusProperty&quot;: &quot;status&quot;,
+    &quot;orderProperty&quot;: &quot;rank&quot;,
+    &quot;columns&quot;: [
+      { &quot;value&quot;: &quot;draft&quot;, &quot;label&quot;: &quot;Draft&quot;, &quot;progress&quot;: 0 },
+      { &quot;value&quot;: &quot;Ready for Refinement&quot;, &quot;progress&quot;: 20 },
+      { &quot;value&quot;: &quot;Refinement&quot;, &quot;progress&quot;: 44, &quot;wip&quot;: 5 },
+      { &quot;value&quot;: &quot;Ready for Dev&quot;, &quot;progress&quot;: 55 },
+      { &quot;value&quot;: &quot;Development&quot;, &quot;progress&quot;: 63, &quot;wip&quot;: 4 },
+      { &quot;value&quot;: &quot;Ready for Review&quot;, &quot;progress&quot;: 86, &quot;wip&quot;: 8 },
+      { &quot;value&quot;: &quot;Deployed&quot;, &quot;progress&quot;: 100 },
+      { &quot;value&quot;: &quot;Rejected&quot;, &quot;excluded&quot;: true }
+    ],
+    &quot;titleProperty&quot;: &quot;id&quot;,
+    &quot;assigneeProperty&quot;: &quot;assignee&quot;,
+    &quot;badgeProperties&quot;: [&quot;type&quot;, &quot;priority&quot;, &quot;version_target&quot;],
+    &quot;questionsProperty&quot;: &quot;open_questions&quot;,
+    &quot;testsProperty&quot;: &quot;open_tests&quot;,
+    &quot;findingsProperty&quot;: &quot;open_findings&quot;,
+    &quot;discussionProperty&quot;: &quot;discussion&quot;,
+    &quot;requiredProperties&quot;: [&quot;id&quot;, &quot;status&quot;, &quot;updated&quot;],
+    &quot;automations&quot;: [
+      { &quot;when&quot;: [&quot;Deployed&quot;], &quot;set&quot;: { &quot;deployed&quot;: &quot;{{date}}&quot; }, &quot;repo&quot;: &quot;&quot;, &quot;command&quot;: &quot;&quot; },
+      { &quot;when&quot;: [], &quot;set&quot;: {}, &quot;repo&quot;: &quot;my-app&quot;, &quot;command&quot;: &quot;node dispatch/scripts/move-ticket.mjs {{file}} {{from}} {{to}}&quot; }
+    ]
+  },
+  &quot;milestones&quot;: {
+    &quot;versionProperty&quot;: &quot;version_target&quot;,
+    &quot;plannedVersions&quot;: [&quot;v1.1.0&quot;, &quot;v1.2.0&quot;, &quot;v1.3.0&quot;],
+    &quot;tags&quot;: { &quot;1.2&quot;: &quot;Beta&quot; },
+    &quot;releaseOrderProperty&quot;: &quot;release_rank&quot;,
+    &quot;sizeProperty&quot;: &quot;size&quot;,
+    &quot;completedProperty&quot;: &quot;deployed&quot;,
+    &quot;velocityWindowDays&quot;: 28,
+    &quot;velocityMinimumCompletions&quot;: 4,
+    &quot;releaseNotesFolder&quot;: &quot;08_Delivery-and-QA/Releases&quot;
+  },
+  &quot;meetings&quot;: {
+    &quot;folder&quot;: &quot;09_Meetings&quot;,
+    &quot;dateProperty&quot;: &quot;meeting_date&quot;,
+    &quot;participantsProperty&quot;: &quot;participants&quot;,
+    &quot;actionsProperty&quot;: &quot;open_actions&quot;,
+    &quot;templates&quot;: [
+      { &quot;label&quot;: &quot;Write meeting report&quot;, &quot;intent&quot;: &quot;meeting-report&quot;, &quot;repo&quot;: &quot;my-app&quot;, &quot;prompt&quot;: &quot;/meeting report {{title}}&quot; }
+    ],
+    &quot;calendarFilter&quot;: &quot;&quot;,
+    &quot;calendarLookaheadDays&quot;: 14,
+    &quot;calendarChips&quot;: [
+      { &quot;label&quot;: &quot;Prepare agenda&quot;, &quot;intent&quot;: &quot;meeting-agenda&quot;, &quot;repo&quot;: &quot;my-app&quot;, &quot;prompt&quot;: &quot;/meeting agenda {{date}} {{title}}&quot; }
+    ]
+  },
+  &quot;todos&quot;: {
+    &quot;folders&quot;: [&quot;09_Meetings&quot;, &quot;05_Requirements/Tickets&quot;],
+    &quot;sections&quot;: [&quot;Action items&quot;, &quot;Open action items&quot;],
+    &quot;assignees&quot;: [&quot;Alex&quot;, &quot;Robin&quot;],
+    &quot;fallbackAssignee&quot;: &quot;Team&quot;
+  },
+  &quot;chips&quot;: {
+    &quot;defaultTool&quot;: &quot;claude&quot;,
+    &quot;templates&quot;: [
+      { &quot;label&quot;: &quot;Start refinement&quot;, &quot;intent&quot;: &quot;refine&quot;, &quot;repo&quot;: &quot;my-app&quot;, &quot;prompt&quot;: &quot;/refine {{id}}&quot; },
+      { &quot;label&quot;: &quot;Start development&quot;, &quot;intent&quot;: &quot;develop&quot;, &quot;repo&quot;: &quot;my-app&quot;, &quot;prompt&quot;: &quot;/develop {{id}}&quot; }
+    ],
+    &quot;columnTemplates&quot;: [
+      { &quot;label&quot;: &quot;Refine all tickets&quot;, &quot;repo&quot;: &quot;my-app&quot;, &quot;prompt&quot;: &quot;Work through these tickets sequentially with the full /refine workflow: {{ids}}.&quot; }
+    ]
+  }
+}
+</code></pre>
+<p>Where the stored shape differs from the settings UI:</p>
+<ul>
+<li><strong>Columns are objects, not <code>value | Label | progress | WIP</code> strings.</strong> <code>label</code> may be omitted (the <code>value</code> is then displayed), an omitted <code>wip</code> means no limit, and the UI's <code>-</code> progress becomes <code>"excluded": true</code> — <em>not</em> <code>"progress": "-"</code>.</li>
+<li><strong><code>chips.templates</code> and <code>chips.columnTemplates</code> are separate lists</strong> — card chips vs. batch chips on a column header. Both use <code>label</code>, <code>repo</code> and <code>prompt</code>; command chips should also have a stable <code>intent</code>, while <code>tool</code> is optional and should be omitted when the same chip must offer every configured agent. Only column prompts get <code>{{ids}}</code>, <code>{{status}}</code> and <code>{{count}}</code>.</li>
+<li><strong>Empty means off, and hides the tab.</strong> <code>meetings.folder: ""</code> hides the Meetings tab, <code>todos.folders: []</code> hides Todos, <code>milestones.completedProperty: ""</code> turns the forecast off, <code>board.orderProperty: ""</code> disables manual ordering, <code>milestones.releaseOrderProperty: ""</code> keeps the Release Plan sorted by status, and an empty <code>assigneeProperty</code>/<code>questionsProperty</code>/<code>testsProperty</code>/<code>findingsProperty</code>/<code>discussionProperty</code> drops that badge.</li>
+<li><strong>The forecast numbers are read as whole numbers when the plugin loads.</strong> <code>milestones.velocityWindowDays</code> and <code>milestones.velocityMinimumCompletions</code> may be stored as numbers or numeric strings; fractions are rounded down. A value that is not a number or is below its floor (<code>1</code> day, <code>2</code> completions) is replaced by the default (<code>28</code>, <code>4</code>), which is what the settings tab then shows.</li>
+<li><strong><code>milestones.tags</code> is keyed by normalized <code>major.minor</code></strong> (<code>"1.2": "Beta"</code>), while <code>plannedVersions</code> only decides which columns exist, empty ones included. <strong>A drop on a version line writes that line's highest known patch</strong> — across its planned entries and its cards — in canonical <code>vMAJOR.MINOR.PATCH</code> form, a missing patch counting as <code>.0</code>: planned <code>"v1.2.0"</code> plus a card on <code>1.2.3</code> writes <code>"v1.2.3"</code>. An expanded patch column writes its own patch (<code>"v1.2.1"</code>), a non-version label (<code>"Icebox"</code>) is written as listed, and a card dropped back on the line it is already in is never rewritten. So the list is optional: a version a card already carries gets its column, and writes the same value, without it.</li>
+<li><strong>Automation rules always carry all four keys.</strong> A <code>set</code>-only rule keeps <code>"repo": ""</code> and <code>"command": ""</code>; an empty <code>when</code> means every status change.</li>
+</ul>
+<h3 id="dispatch-json--this-device"><code>~/.dispatch/&lt;vault&gt;-&lt;hash&gt;.json</code> — this device<a class="zola-anchor" href="#dispatch-json--this-device" aria-label="Anchor link for: dispatch-json--this-device">#</a></h3>
+<pre><code data-lang="json">{
+  &quot;repos&quot;: {
+    &quot;my-app&quot;: &quot;C:\\Users\\me\\Workspace\\my-app&quot;
+  },
+  &quot;tools&quot;: {
+    &quot;claude&quot;: {
+      &quot;command&quot;: &quot;start \&quot;Dispatch Claude\&quot; /d {{cwd}} cmd /k claude {{prompt}}&quot;,
+      &quot;promptPrefix&quot;: &quot;/&quot;
+    },
+    &quot;codex&quot;: {
+      &quot;command&quot;: &quot;start \&quot;Dispatch Codex\&quot; /d {{cwd}} cmd /k codex {{prompt}}&quot;,
+      &quot;promptPrefix&quot;: &quot;$&quot;,
+      &quot;prompts&quot;: { &quot;refine&quot;: &quot;$ticket-refine {{id}}&quot; }
+    }
+  },
+  &quot;calendarUrl&quot;: &quot;&quot;,
+  &quot;enableHooks&quot;: false,
+  &quot;confirmBeforeRun&quot;: true
+}
+</code></pre>
+<ul>
+<li><strong><code>tools</code> maps a name to an <em>object</em>, not to a string</strong> — <code>{"claude": {"command": "…"}}</code>. A bare string is not a valid tool entry. <code>promptPrefix</code> and <code>prompts</code> are optional in the schema; guided multi-agent setup writes an explicit prefix for each selected command-oriented agent so one neutral chip resolves correctly through every tool.</li>
+<li><code>repos</code> is the only place absolute paths may appear anywhere in Dispatch's configuration.</li>
+<li><code>enableHooks</code> gates automation <strong>commands</strong> on this machine; the <code>set</code> assignments of an automation rule always apply.</li>
+</ul>
+<p>The filename is <code>&lt;vault name&gt;-&lt;hash&gt;.json</code>: the vault name with every run of non-<code>[\w.-]</code> characters replaced by <code>_</code>, and a djb2 hash of the vault's <strong>absolute path</strong> (backslashes included on Windows) as unsigned 32-bit hex:</p>
+<pre><code data-lang="js">let hash = 5381;
+for (let i = 0; i &lt; vaultPath.length; i++) hash = ((hash &lt;&lt; 5) + hash + vaultPath.charCodeAt(i)) &gt;&gt;&gt; 0;
+const filename = `${vaultName}-${hash.toString(16)}.json`;
+</code></pre>
+<p><em>Settings → Dispatch → This device</em> prints the resolved path — prefer reading it there; the derivation above is for headless setup. The runs file that lifecycle hooks append to sits beside it, under the same basename: <code>~/.dispatch/runs/&lt;vault&gt;-&lt;hash&gt;.jsonl</code>.</p>
+<h3 id="the-google-block--optional-meet-transcript-import">The <code>google</code> block — optional Meet transcript import<a class="zola-anchor" href="#the-google-block--optional-meet-transcript-import" aria-label="Anchor link for: the-google-block--optional-meet-transcript-import">#</a></h3>
+<blockquote>
+<p><strong>You almost certainly do not need this.</strong> The normal way to get a meeting transcript into your vault is to open the Gemini document in Google Docs and use <strong>File → Download → Markdown</strong> for both tabs, saving into your transcripts folder. <code>/meeting report</code> reads whatever is in that folder; it does not care how the file arrived, and nothing below is required for it to work.</p>
+<p>What this section adds is skipping that download. It costs a Google Cloud project of your own, an OAuth consent screen on <strong>a domain you have verified in Search Console</strong>, and a published app — perhaps twenty minutes if you have done it before, and an afternoon if you have not. That is worth it if you run recurring meetings, or are setting Dispatch up for a team who should not each be exporting documents by hand. For one meeting a fortnight, download the file.</p>
+</blockquote>
+<p><code>dispatch/scripts/meet-fetch.mjs</code> imports a Google Meet meeting's Gemini document into the vault. It is a <strong>Dispatch-scope</strong> script — Dispatch ships it and it does the same thing for everyone — so its settings are ordinary device settings and live in the same per-vault file as everything else above, under a <code>google</code> key. (A script the <em>project</em> chooses, like a tracker sync, is configured by the project instead; that split is the whole of ADR-0027.)</p>
+<p>It also <strong>ships in this repository rather than in the plugin bundle</strong>, so the import is available to people working from a clone. Installing Dispatch from the community directory does not put the script on your machine.</p>
+<p>Paste the OAuth client JSON the Google Cloud Console gives you <strong>unchanged</strong> under <code>google</code> — the nested <code>installed</code> block is understood as-is. <code>account</code> is optional and only pre-selects the right identity on the consent screen; <code>refresh_token</code> is written by the script after consent, never by hand:</p>
+<pre><code data-lang="json">{
+  &quot;repos&quot;: { &quot;my-project&quot;: &quot;C:\\Users\\me\\Workspace\\my-project&quot; },
+  &quot;calendarUrl&quot;: &quot;https://calendar.google.com/calendar/ical/…/basic.ics&quot;,
+  &quot;google&quot;: {
+    &quot;installed&quot;: {
+      &quot;client_id&quot;: &quot;….apps.googleusercontent.com&quot;,
+      &quot;client_secret&quot;: &quot;…&quot;
+    },
+    &quot;account&quot;: &quot;you@example.com&quot;
+  }
+}
+</code></pre>
+<p>The script reads <code>calendarUrl</code> from the same file: the calendar feed carries each meeting's document as an <code>ATTACH</code> property, which is how it finds a transcript without any Drive permission at all.</p>
+<p><strong>Finding the file from a shell.</strong> The script must work with no Obsidian running, so it looks in three places: <code>--config &lt;path&gt;</code>, then the <code>DISPATCH_LOCAL_SETTINGS</code> environment variable Dispatch sets when it launches the script, then the single <code>~/.dispatch/&lt;vault&gt;-&lt;hash&gt;.json</code> on the machine. With more than one vault it stops and asks for <code>--config</code> rather than guessing — <em>Settings → Dispatch → This device</em> prints the exact path.</p>
+<blockquote>
+<p>⚠️ <strong>This file now holds a client secret and a refresh token.</strong> It always lived outside the vault and never syncs, but it used to contain only paths and command templates. Treat it as you would an SSH key, and note that anything copying it — including Dispatch's own "adopt settings" prompt when a vault moves — is copying credentials.</p>
+</blockquote>
+<p><strong>One-time setup in the Google Cloud Console</strong>, signed in as the account that holds the meetings:</p>
+<ol>
+<li>
+<p><strong>APIs &amp; Services → Library</strong> — enable the <strong>Google Docs API</strong>. Nothing else; the Drive API is not used.</p>
+</li>
+<li>
+<p><strong>Google Auth Platform → Branding</strong> — an app home page, privacy policy and terms of service, all on a domain you have verified in <a rel="external" href="https://search.google.com/search-console">Search Console</a>. Google rejects URLs on a domain you do not own, so a GitHub or plugin-directory page will not do.</p>
+</li>
+<li>
+<p><strong>Data Access → Add or remove scopes</strong> — add <strong>one</strong>, pasting it into <em>Manually add scopes</em> if the picker does not list it:</p>
+<ul>
+<li><code>https://www.googleapis.com/auth/documents.readonly</code> — reads the meeting document. That is all the script needs: the calendar feed tells it <em>which</em> document, so nothing has to search your Drive.</li>
+</ul>
+<p>That is the entire list. Dispatch asks for <strong>no Google Drive access of any kind</strong> — a Drive scope is <em>restricted</em>, meaning an app verified on one needs an annual third-party security assessment, and the calendar feed makes it unnecessary.</p>
+</li>
+<li>
+<p><strong>Audience → Publish app</strong> so the status is <strong>In production</strong>. In <em>Testing</em>, Google expires the refresh token after <strong>7 days</strong> and you re-authorise every week. You do not need to submit for verification: an unverified production client works for its owner and for up to 100 consenting accounts, which is far more than a team. (Verification would be a consent-screen review rather than the annual third-party CASA assessment a Drive scope would need — Dispatch asks for no Drive scope.)</p>
+</li>
+<li>
+<p><strong>Credentials → Create credentials → OAuth client ID → Desktop app.</strong> Desktop clients accept a loopback redirect with no registered URI, which is what the script uses.</p>
+</li>
+</ol>
+<p>Then, once per machine:</p>
+<pre><code data-lang="bash">node dispatch/scripts/meet-fetch.mjs --auth
+</code></pre>
+<p>An <strong>"unverified app"</strong> screen is expected — <em>Advanced → Go to … (unsafe)</em>. That is the consequence of step 4, not a fault. The refresh token is written back into the same device file, under <code>google</code>, and every later run is non-interactive. Re-run <code>--auth</code> if the script ever reports the token as no longer valid; Google revokes them on a password change.</p>
+<p>Editing that file by hand while Obsidian is open is safe in both directions: the plugin re-reads the <code>google</code> block before saving its own settings, so it never writes over a token or a client you just put there.</p>
+<p><strong>Setting this up for a team.</strong> One person does the Console setup once; everyone else runs <code>--auth</code> against the same client and consents with their own Google account. Each teammate's refresh token stays on their own machine, in their own device file, and grants access only to documents <em>they</em> can already open. What is shared is the OAuth client, not the access. Anyone who would rather not is unaffected — they download the document and <code>/meeting report</code> reads it either way.</p>
+<h2 id="security-model">Security model<a class="zola-anchor" href="#security-model" aria-label="Anchor link for: security-model">#</a></h2>
+<p>Vault content is data, not code. Because notes sync across a team, Dispatch is built so that a note can never execute an arbitrary command:</p>
+<ul>
+<li>Chip blocks only <em>reference</em> tools and repos by name; the actual commands and paths live in device-local settings.</li>
+<li>Prompts are inserted as a single quoted argument (quotes and backslashes escaped, newlines flattened). For untrusted vaults, prefer <code>{{promptFile}}</code> in your tool templates.</li>
+<li>Every chip click shows a confirmation dialog with the exact command by default; automation commands are off per device until enabled.</li>
+</ul>
+<p>Caveat: commands run through your system shell. On Windows (<code>cmd.exe</code>), <code>%VAR%</code> sequences inside arguments are still expanded by the shell — another reason to keep the confirmation dialog on in shared vaults.</p>
+<h3 id="disclosures">Disclosures<a class="zola-anchor" href="#disclosures" aria-label="Anchor link for: disclosures">#</a></h3>
+<ul>
+<li><strong>Executes local processes</strong> — but only commands <em>you</em> configure on <em>your</em> device. Note content can never introduce a command; the confirmation dialog is on by default.</li>
+<li><strong>Reads/writes outside the vault</strong> — device settings at <code>~/.dispatch/&lt;vault&gt;-&lt;hash&gt;.json</code> and run records at <code>~/.dispatch/runs/…jsonl</code>, deliberately outside the vault so machine paths never sync.</li>
+<li><strong>One network request type</strong> — if (and only if) you configure a calendar ICS URL, the plugin fetches that feed read-only (cached 15 min) for the Meetings tab. Nothing else leaves your machine; no telemetry. Commands you configure act under your own credentials.</li>
+<li><strong>The plugin makes no Google requests.</strong> <code>dispatch/scripts/meet-fetch.mjs</code> does, when you run it — read-only, with credentials you supply. It ships in this repository, not in the plugin bundle; the plugin stores its settings and never uses them. See the <a rel="external" href="https://eightnine.de/dispatch/privacy.html">privacy policy</a> for what those scopes cover.</li>
+</ul>
+<h2 id="building-from-source">Building from source<a class="zola-anchor" href="#building-from-source" aria-label="Anchor link for: building-from-source">#</a></h2>
+<pre><code data-lang="bash">npm install
+npm run dev     # watch build (main.js with inline sourcemap)
+npm run build   # type-check + production build
+npm test        # vitest suite against the fixture wiki in test/vault
+npm run lint    # Obsidian&#39;s own plugin ruleset (what the directory review runs)
+</code></pre>
+<p>Symlink or copy the repo folder into a test vault's <code>.obsidian/plugins/dispatch/</code>, then use Obsidian's "Reload app without saving" command after a build.</p>
+
+    </div>
+    <nav class="docs-pager" aria-label="Previous and next page">
+      <a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/"><span class="dir">&larr; Previous</span>Overview</a>
+      <a class="next" href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/"><span class="dir">Next &rarr;</span>Page types</a>
+    </nav>
+  </article>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

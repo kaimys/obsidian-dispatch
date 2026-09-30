@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elternkraft: the origins of Dispatch — Dispatch</title>
+<meta name="description" content="A team of three took a parenting app from its first commit to the App Store and Google Play in 130 days, with an LLM Wiki as the backbone. Dispatch grew out of that project.">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/articles/elternkraft/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/" aria-current="page">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+
+<article class="wrap">
+  <header class="page-head">
+    <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></p>
+    <h1>Elternkraft: the origins of Dispatch</h1>
+    <p class="description">A team of three took a parenting app from its first commit to the App Store and Google Play in 130 days, with an LLM Wiki as the backbone. Dispatch grew out of that project.</p>
+    <p class="meta"><time datetime="2026-09-30">2026-09-30</time> · Kai Mysliwiec</p>
+  </header>
+  <div class="prose">
+<p>Dispatch was not planned as a product. It started as a helper for a real project with a real deadline: <strong>Elternkraft</strong>, a mobile app for expectant and new parents. This article covers what we built, how the team worked, and which parts of that way of working ended up in Dispatch.</p>
+<h2 id="the-project">The project<a class="zola-anchor" href="#the-project" aria-label="Anchor link for: the-project">#</a></h2>
+<p><a rel="external" href="https://elternkraft.ai/">Elternkraft</a> is made by Elternkraft GmbH in Berlin. It supports couples through pregnancy and the first years with a child. Two AI companions share a family context. <strong>Constanze</strong> accompanies the mother and <strong>Charles</strong> the father. The app also has a shared family area, a feed for moments and tasks, and small everyday helpers such as a contraction timer, a breastfeeding tracker and a meal planner. The data is processed on servers in Frankfurt. The app says clearly that it gives coaching and orientation, not medical advice.</p>
+<p>The team had three people: the CEO as product owner, a part-time interaction designer, and me as the only developer. We met once a week. There was no QA department, no project manager and no second developer, so Claude Code had to take on a lot of that work.</p>
+<h2 id="the-timeline">The timeline<a class="zola-anchor" href="#the-timeline" aria-label="Anchor link for: the-timeline">#</a></h2>
+<ul>
+<li><strong>30 March 2026</strong>: first commit to the app repository.</li>
+<li><strong>2 April</strong>: the first internal release, v1.0.0 <em>Basic Chat</em>.</li>
+<li><strong>4 April</strong>: Andrej Karpathy publishes his <a rel="external" href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f">LLM Wiki gist</a>. We were still discussing which AI tools to use, and the gist settled it.</li>
+<li><strong>15 April</strong>: the project wiki gets its <code>index.md</code> and its append-only <code>log.md</code>, set up the way the gist describes.</li>
+<li><strong>11 August</strong>: v1.4.5 goes live in the <a rel="external" href="https://apps.apple.com/de/app/elternkraft/id6761455196">App Store</a> and on <a rel="external" href="https://play.google.com/store/apps/details?id=com.elternkraft.famos">Google Play</a>. That was <strong>134 days after the first commit</strong>.</li>
+</ul>
+<p>The launch version was the project's 18th release, and Claude wrote the release note for every one of them.</p>
+<h2 id="the-wiki-became-the-backbone">The wiki became the backbone<a class="zola-anchor" href="#the-wiki-became-the-backbone" aria-label="Anchor link for: the-wiki-became-the-backbone">#</a></h2>
+<p>We set up the wiki as an Obsidian vault on Google Drive and linked it into the code repository. The whole team could read and edit it in Obsidian, and the coding agent could read and edit it as plain Markdown. Requirements, UX notes, engineering docs, legal texts, meeting notes and release notes all lived in the same place.</p>
+<p>The ticket tracker, Asana, was connected over MCP and followed the wiki. The rule was simple: <strong>the wiki decides and the tracker follows.</strong> It sounds bureaucratic, but it was the reason the agent had enough context to get things right on the first attempt.</p>
+<p>Today the Elternkraft wiki holds more than 500 notes:</p>
+<ul>
+<li>114 user stories and 40 bug tickets</li>
+<li>71 Architecture Decision Records</li>
+<li>21 release notes</li>
+<li>about 50 generated reports, such as MVP gap analyses, inconsistency checks, industry news digests and production user reports</li>
+<li>a log with more than 480 entries of what the agent changed and why</li>
+</ul>
+<p>Almost none of it was written by hand. Claude did the bookkeeping, and we made the decisions.</p>
+<h2 id="refinement-moved-into-the-chat">Refinement moved into the chat<a class="zola-anchor" href="#refinement-moved-into-the-chat" aria-label="Anchor link for: refinement-moved-into-the-chat">#</a></h2>
+<p>Meeting once a week meant that open questions could hold up a ticket for days. So we connected Slack as well. Refinement of a ticket now starts with a Slack post in which Claude lists the ticket's open questions. The team answers in the thread when they have time. After a day or two Claude sums up the thread, writes the answers into the ticket and counts the questions that are still open.</p>
+<figure>
+<img src="card-with-open-questions.png" alt="A Dispatch card whose amber badge shows two open questions">
+</figure>
+<p>That count became the badge on the card. <strong>Amber means there are still open questions and green means the ticket can go into development.</strong> The CEO and the designer no longer had to read a ticket to see whether it was blocked. They could see it on the board.</p>
+<h2 id="decisions-got-written-down">Decisions got written down<a class="zola-anchor" href="#decisions-got-written-down" aria-label="Anchor link for: decisions-got-written-down">#</a></h2>
+<p>During development, Claude started to pull Architecture Decision Records out of the tickets. I had used ADRs in earlier projects, but this time the agent asked for them. Reading every old ticket to work out which decisions were still in force was too much work. The ADRs became the project's rules, including the ones that say <em>we deliberately do not do X</em>.</p>
+<p>We also froze a ticket's contract once code had been built against it. After the freeze, new information is added as a dated note and nothing is rewritten. Otherwise nobody could later tell whether the code was wrong or the spec had changed.</p>
+<h2 id="meetings-fed-back-into-the-tickets">Meetings fed back into the tickets<a class="zola-anchor" href="#meetings-fed-back-into-the-tickets" aria-label="Anchor link for: meetings-fed-back-into-the-tickets">#</a></h2>
+<p>The biggest surprise was the meeting notetaker. Gemini's own summaries of our Google Meet calls were only somewhat useful, because Gemini did not know the project. When Claude imported the full transcript into the wiki, it could link each topic to a ticket ID, fold the decisions into the affected tickets and collect the action items, grouped by person.</p>
+<p>It could even correct the transcript. In one session the recording tool put all of one speaker's words under another person's name. Claude noticed because the dialogue did not make sense that way, and it fixed the attribution in the meeting note.</p>
+<h2 id="a-board-on-top-of-the-wiki">A board on top of the wiki<a class="zola-anchor" href="#a-board-on-top-of-the-wiki" aria-label="Anchor link for: a-board-on-top-of-the-wiki">#</a></h2>
+<p>By early summer the process worked, but it only existed as notes and commands. I wanted to see the tickets as a Kanban board, start the next skill from a card instead of typing it, and plan releases by dragging cards onto a version. So I built an Obsidian plugin for our own vault. That plugin became Dispatch.</p>
+<p>Every step of the process became a skill that you start from a chip on a card:</p>
+<p><code>/create-ticket</code> → <code>/refine</code> → <code>/implementation-plan</code> → <code>/develop</code> → <code>/test-plan</code> → <code>/release</code></p>
+<p>Around these steps, <code>/meeting</code> prepares the agenda and turns the transcript into a report. A weekly maintenance run checks the backend for drift and writes the reports listed above.</p>
+<h2 id="the-real-test-the-project-without-its-developer">The real test: the project without its developer<a class="zola-anchor" href="#the-real-test-the-project-without-its-developer" aria-label="Anchor link for: the-real-test-the-project-without-its-developer">#</a></h2>
+<p>I left Elternkraft at the beginning of September because of the budget. Before leaving, I asked Claude to write a handover note. It listed every credential, gate and machine-local path that depended on me, and every claim in it pointed to the file and line it came from. I also went through my agent's private memory files and moved the notes that would help others into the wiki.</p>
+<p>On 1 September I introduced Dispatch to the CEO and the designer. We agreed on an interim split: the CEO takes a ticket through refinement to <em>Ready for Dev</em>, and the designer starts development from there.</p>
+<p>Three releases have shipped since then: v1.4.7 on 10 September, v1.4.9 on 18 September and v1.5.0 on 24 September. They added dark mode, partner invitations, partner challenges, a meal planner and a reworked chat. The CEO now runs development with Claude through the board's chips, and there is no developer on the team. The wiki still records every step. Its latest log entries show a ticket that was refined, planned, built and moved to <em>Ready for Build</em> on the same day.</p>
+<h2 id="what-we-learned">What we learned<a class="zola-anchor" href="#what-we-learned" aria-label="Anchor link for: what-we-learned">#</a></h2>
+<ul>
+<li><strong>The bottleneck is the clerical work, not the code.</strong> Once the agent writes the code, what holds a ticket up is unanswered questions, stale specs and decisions nobody wrote down. The LLM Wiki keeps those up to date.</li>
+<li><strong>Refinement belongs where the team already talks.</strong> Connecting Slack was a late addition, and it was the step that made the whole workflow function.</li>
+<li><strong>Write the important documents yourself.</strong> The agent maintains the wiki well, but the vision, the priorities and the decisions have to come from people.</li>
+<li><strong>A wiki pays off as soon as there is a team.</strong> A solo developer on one app can manage without it. With meetings, stakeholders and outside communication, the wiki becomes the shared memory.</li>
+</ul>
+<p>If you want to try this way of working in your own project, <a href="https://kaimys.github.io/obsidian-dispatch/articles/dispatch-101/">Dispatch 101</a> describes the workflow step by step.</p>
+
+  </div>
+  <footer class="article-foot">
+    <a href="https://kaimys.github.io/obsidian-dispatch/articles/">&larr; All articles</a>
+    <a href="https://github.com/kaimys/obsidian-dispatch/issues">Give feedback on GitHub</a>
+  </footer>
+</article>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

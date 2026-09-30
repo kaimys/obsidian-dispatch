@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dispatch 101 — Dispatch</title>
+<meta name="description" content="How Dispatch connects your Obsidian wiki, your repository and your coding agent — the setup, the ticket workflow and the skills that carry a ticket from refinement to release.">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/articles/dispatch-101/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/" aria-current="page">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+
+<article class="wrap">
+  <header class="page-head">
+    <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></p>
+    <h1>Dispatch 101</h1>
+    <p class="description">How Dispatch connects your Obsidian wiki, your repository and your coding agent — the setup, the ticket workflow and the skills that carry a ticket from refinement to release.</p>
+    <p class="meta"><time datetime="2026-09-24">2026-09-24</time> · Kai Mysliwiec</p>
+  </header>
+  <div class="prose">
+<h2 id="overview">Overview<a class="zola-anchor" href="#overview" aria-label="Anchor link for: overview">#</a></h2>
+<p>The optimal setup for Dispatch is shown below. Your LLM, such as Claude Code or Codex, is connected to your repository, which contains a set of skills. The LLM Wiki is symlinked to your repository, enabling the LLM to easily access it via a defined path. Typically, your AGENTS.md or CLAUDE.md will mention the most important files in your Wiki using this path.</p>
+<p>You can read and write these files using Obsidian and your IDE. You can also start the LLM skills directly from your Obsidian Kanban board.</p>
+<figure>
+<img src="Dispatch-Setup.drawio.svg" alt="Team setup: the coding agent and its skills sit in the Git repository, linked both ways to the LLM Wiki, which syncs through cloud storage and is opened in Obsidian with Dispatch. Dispatch launches the skills. The agent reaches chat, the ticket system and the meeting platform through MCP, and the repository syncs with a cloud repository." width="633">
+</figure>
+<p>The LLM Wiki is connected to your co-workers via your cloud storage. You can use Google Drive, iCloud, GitHub or Obsidian Sync. If you have users working with Windows, I wouldn't recommend using iCloud because it constantly duplicates your Markdown files in order to resolve concurrent writes.</p>
+<p>The next step is to connect your communication platforms for chatting, ticketing and meetings. The chat is very valuable during refinement, because the LLM can ask your stakeholders the most important open questions right where the team already talks. Importing meeting transcripts created by agentic notetakers, such as Google Gemini, also saves a lot of time. The <code>/meeting</code> skill turns a transcript into a meeting report, cross-references it with the relevant ticket IDs and folds the decisions into those tickets — which also resolves open questions on tickets still in refinement. You can drop the transcript into your wiki yourself, or configure an automated import. Your ticketing system can be connected via MCP or a CLI such as <code>gh</code>; the skills then read its comments and keep the tickets up to date. All of these integrations are optional: without a chat you answer the agent directly, and without a tracker the ticket notes in your wiki are your ticketing system.</p>
+<h2 id="solo-mode">Solo Mode<a class="zola-anchor" href="#solo-mode" aria-label="Anchor link for: solo-mode">#</a></h2>
+<p>The minimal setup looks similar to this. This is basically how I develop Dispatch myself. I use the <a rel="external" href="https://cli.github.com/">gh-CLI</a> to synchronise the tickets with GitHub Issues, but this is optional.</p>
+<figure>
+<img src="Dispatch-solo-mode.svg" alt="Solo setup: Claude Code and its skills in a Git repository, linked both ways to the LLM Wiki, which is opened in Obsidian with Dispatch. Dispatch launches the skills, and tickets optionally mirror to GitHub." width="667">
+</figure>
+<h2 id="setup-your-repo">Setup your Repo<a class="zola-anchor" href="#setup-your-repo" aria-label="Anchor link for: setup-your-repo">#</a></h2>
+<p>The entire Dispatch setup resides in a single <code>dispatch/</code> folder in your repository. Most importantly, it contains a symbolic link to your wiki folder, which is synchronized by your cloud storage service and therefore Git-ignored.</p>
+<p>The scripts and your skills live in the <code>scripts/</code> and <code>workflow/</code> folders. Each workflow exists exactly once, and every coding agent reads it through a small stub in its own format: <code>.claude/commands/</code> for Claude Code and <code>.codex/skills/</code> for Codex. Claude Code invokes <code>/refine US00042</code>, Codex invokes <code>$refine US00042</code>; the examples below use the Claude prefix. If you only use one coding agent, you only need its stubs — but it makes sense to use a different model for the code review than for development. Also, the pricing of the most advanced frontier models changes regularly or you may exceed your usage limits, making a quick change of coding agent very convenient.</p>
+<pre><code>dispatch/
+  wiki/             the git-ignored symlink to the vault
+  scripts/          move-ticket, run-state, meet-fetch
+  workflow/         one canonical file per workflow
+  invariants.md     shared project invariants (Dispatch&#39;s AGENTS.md or CLAUDE.md)
+  settings.yaml     project-level settings
+
+.claude/commands/   Claude&#39;s skills pointing to dispatch/workflow/
+.codex/skills/      same thing for Codex
+</code></pre>
+<p>Your ticket templates and your <a href="https://kaimys.github.io/obsidian-dispatch/articles/dispatch-101/#adr">ADRs</a> (Architecture Decision Records) live in the wiki. The ADRs are the most important implementation guidelines for your LLM, and the templates contain the workflow-relevant structure and instructions as Markdown comments.</p>
+<h2 id="ticket-workflow-and-skills">Ticket Workflow and Skills<a class="zola-anchor" href="#ticket-workflow-and-skills" aria-label="Anchor link for: ticket-workflow-and-skills">#</a></h2>
+<p>Dispatch follows the typical workflow and conventions of agile teams and speeds up the process with skills which automate the clerical tasks like refinements, reviews, meetings and more. The typical Kanban board in Dispatch has the following columns: <strong>Backlog</strong>, <strong>Refinement</strong>, <strong>In progress</strong>, <strong>Review</strong>, <strong>Done</strong> and <strong>Released</strong>.</p>
+<figure class="diagram">
+<img src="diagram-1.svg" alt="The Dispatch board columns" aria-describedby="diagram-1-description">
+<figcaption>The Dispatch board columns</figcaption>
+</figure>
+<details class="figure-long">
+<summary>Diagram description</summary>
+<p id="diagram-1-description">A ticket starts in Backlog and moves to Refinement, then In progress, then Review. A failed review sends it back to In progress; a successful one moves it to Done. The /release skill moves it from Done to Released.</p>
+</details>
+<p>The skills facilitating this workflow are <code>/create-ticket</code>, <code>/refine</code>, <code>/update-ticket</code>, <code>/implementation-plan</code>, <code>/develop</code>, <code>/code-review</code>, <code>/test-plan</code> and <code>/release</code>. The benefit of this classic set is that we all know and understand this workflow, which reduces friction and misunderstandings.</p>
+<h2 id="refinement-workflow">Refinement Workflow<a class="zola-anchor" href="#refinement-workflow" aria-label="Anchor link for: refinement-workflow">#</a></h2>
+<p>The refinement process usually begins by invoking the <code>/refine</code> skill on a ticket, for example, <code>/refine US00042</code>. The LLM will then read through the ticket and any referenced files and add any missing sections from your ticket template.</p>
+<figure>
+<img src="card-with-open-questions.png" alt="A ticket card on the board with an orange badge counting its open questions" width="240">
+</figure>
+<p>Most importantly, it updates the <strong>Open Questions</strong> section and writes the number of questions your team has to answer to the <a href="https://kaimys.github.io/obsidian-dispatch/articles/dispatch-101/#frontmatter">frontmatter</a> property <code>open_questions</code>. This number appears on your ticket card as an orange badge. If you have connected a chat, the <code>/refine</code> skill will also post a brief summary there, enabling your team to answer these questions in the discussion thread of this post. The URL of this discussion thread is added to the ticket's frontmatter in the <code>discussion</code> property.</p>
+<p>You will then call <code>/update-ticket US00042</code> from time to time to update your ticket until all questions are resolved. If you have a ticket system connected, the skill will also consider the comments in the ticket. Another simple way to answer these questions is to add inline comments to the ticket's Markdown. Simply add a <code>&gt; Kai: This is my thoughtful comment</code> to each question, then run <code>/update-ticket</code> to merge your answers into the correct place in the ticket.</p>
+<figure class="diagram">
+<img src="diagram-2.svg" alt="The refinement loop" aria-describedby="diagram-2-description">
+<figcaption>The refinement loop</figcaption>
+</figure>
+<details class="figure-long">
+<summary>Diagram description</summary>
+<p id="diagram-2-description">/refine starts refinement and hands over to /update-ticket. While open_questions is greater than zero, /update-ticket runs again; once it reaches zero, refinement ends.</p>
+</details>
+<h2 id="the-development-process">The Development Process<a class="zola-anchor" href="#the-development-process" aria-label="Anchor link for: the-development-process">#</a></h2>
+<p>This process is not as simple as the refinement, of course, and I consider it a starting point, not a method you have to follow thoroughly. It is aligned as closely as possible to the traditional development cycle, and at each stage it produces an artefact that you can review. You can also skip the whole process and just vibe-code the ticket, but you might miss out on some important steps that would help you in the long-term development process. These steps are: recording Architecture Decision Records (<a href="https://kaimys.github.io/obsidian-dispatch/articles/dispatch-101/#adr">ADRs</a>), an independent code review, and writing a test plan to hand over to the test team.</p>
+<figure class="diagram">
+<img src="diagram-3.svg" alt="The development process" aria-describedby="diagram-3-description">
+<figcaption>The development process</figcaption>
+</figure>
+<details class="figure-long">
+<summary>Diagram description</summary>
+<p id="diagram-3-description">/implementation-plan leads to /develop, which leads to /code-review. Open findings send the ticket back to /develop; with none, /test-plan follows. A failed manual test sends the ticket back to /develop; otherwise the process ends.</p>
+</details>
+<p>The only step which is not common in old-school programming is the <code>/implementation-plan</code>, but all the coding agents have this built in and we should do it too. This is actually the step where the developer's technical background is most needed. Once the plan is signed off, the skill extracts the durable decisions from it and records them as ADRs.</p>
+<p><code>/develop</code> implements the ticket and runs your project's checks, assuming you have set up an elaborate suite of unit, integration and end-to-end tests. A good testing suite will save you the most time in the whole process.</p>
+<p>Run <code>/code-review</code> in a fresh session, ideally with a different model. It adds all findings to the <strong>Code review</strong> section and updates the <code>open_findings</code> counter, which appears as a red badge on your ticket card. If it finds anything, you should go straight back to <code>/develop</code> to fix it. A clean review is the precondition for <code>/test-plan</code>.</p>
+<h2 id="handover-for-testing">Handover for testing<a class="zola-anchor" href="#handover-for-testing" aria-label="Anchor link for: handover-for-testing">#</a></h2>
+<p>Even if you are doing the testing yourself, the <code>/test-plan</code> skill is not optional. This is because it contains the logic for the handover from the development team to the rest of the team. These are:</p>
+<ul>
+<li>listing manual tests for the test team or stakeholders — only what automation can't cover.</li>
+<li>applying the freeze rule to tickets so they cannot be changed later in the project. I added this rule when I recognised that the LLM was updating outdated logic in the ticket, but tickets should be recognised as historical artefacts after implementation.</li>
+<li>moving the ticket to <strong>Review</strong>.</li>
+</ul>
+<p>After running <code>/test-plan</code> and adding the tests to the <strong>Test Plan</strong> section, the ticket will have an <code>open_tests</code> counter and a purple badge on the ticket card.</p>
+<h2 id="fix-bug-shortcut">Fix Bug Shortcut<a class="zola-anchor" href="#fix-bug-shortcut" aria-label="Anchor link for: fix-bug-shortcut">#</a></h2>
+<p>This rather elaborate workflow is good for larger tickets, but not for smaller bugs, which show up as a post on Slack or elsewhere. However, if you skip the entire workflow, your bug fix might not appear in the next release notes, and the LLM might overlook the fact that it has already been fixed if someone else reports the same bug.</p>
+<figure>
+<img src="fix-bug-slack.png" alt="A small bug report posted in a chat channel" width="360">
+</figure>
+<p>For this, the setup skill installs a <code>/fix-bug</code> skill. It takes a URL or other reference as a parameter, creates a bug ticket, fixes the bug, and moves the ticket to <strong>Done</strong>, all in one go. If the fix turns out to be bigger than it looked, it stops and leaves the bug ticket for the full workflow.</p>
+<h2 id="conclusion">Conclusion<a class="zola-anchor" href="#conclusion" aria-label="Anchor link for: conclusion">#</a></h2>
+<p>You can install Dispatch just by clicking on Add to Obsidian on the <a rel="external" href="https://community.obsidian.md/plugins/dispatch">Plugin Directory page</a>, but this is only half the story. You have to set up your Wiki, change the settings of the plugin and set up the <code>dispatch/</code> folder. This is quite a tedious task, but thankfully we have a plugin skill called <code>/dispatch-setup</code> for that. The skill will scan your repo and your Wiki (if you already have one) and guide you through the setup. It will also do the whole configuration of Dispatch for you.</p>
+<p>Claude Code:</p>
+<pre><code>/plugin marketplace add kaimys/obsidian-dispatch
+/plugin install dispatch-setup
+</code></pre>
+<p>Codex:</p>
+<pre><code>codex plugin marketplace add kaimys/obsidian-dispatch
+codex plugin add dispatch-setup@dispatch
+</code></pre>
+<p>If you made it this far and had some problems, or if you just have questions or feedback, I would be very happy if you share them on <a rel="external" href="https://github.com/kaimys/obsidian-dispatch/discussions">GitHub discussions</a>. I try to respond in a timely manner. Happy prompting!</p>
+<h2 id="glossary">Glossary<a class="zola-anchor" href="#glossary" aria-label="Anchor link for: glossary">#</a></h2>
+<h3 id="adr">ADR<a class="zola-anchor" href="#adr" aria-label="Anchor link for: adr">#</a></h3>
+<p>An Architecture Decision Record (ADR) is a short document that captures and explains a single decision relevant to a product or ecosystem.
+<a rel="external" href="https://martinfowler.com/bliki/ArchitectureDecisionRecord.html">martinfowler.com/bliki/ArchitectureDecisionRecord.html</a></p>
+<h3 id="frontmatter">Frontmatter<a class="zola-anchor" href="#frontmatter" aria-label="Anchor link for: frontmatter">#</a></h3>
+<p>Frontmatter is a set of metadata added to the top of a Markdown page in the YAML format, like in the example below. Obsidian makes the Wiki pages searchable by these frontmatter properties, and the Dispatch workflow relies heavily on frontmatter.</p>
+<pre><code data-lang="markdown">---
+title: Dispatch 101
+author:
+  - Kai Mysliwiec
+  - DeepL Write
+source_of_truth: true
+---
+</code></pre>
+
+  </div>
+  <footer class="article-foot">
+    <a href="https://kaimys.github.io/obsidian-dispatch/articles/">&larr; All articles</a>
+    <a href="https://github.com/kaimys/obsidian-dispatch/issues">Give feedback on GitHub</a>
+  </footer>
+</article>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

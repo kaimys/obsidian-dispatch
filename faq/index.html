@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frequently asked questions — Dispatch</title>
+<meta name="description" content="Dispatch is a board for Obsidian that gives a small agent-native team a working process.">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/faq/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/" aria-current="page">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+
+<div class="wrap">
+  <header class="page-head"><h1>Frequently asked questions</h1></header>
+  <div class="prose">
+<h2 id="what-is-dispatch">What is Dispatch?<a class="zola-anchor" href="#what-is-dispatch" aria-label="Anchor link for: what-is-dispatch">#</a></h2>
+<p>A plugin for Obsidian that turns a folder of ticket notes into a live board, and every card on it
+into a launcher for a coding agent such as Claude Code or Codex. The workflow behind each launch — refine, plan, develop, review, test, release — is a set of instruction files (skills) in your own code repository, which the agent follows and you can change.</p>
+<h2 id="who-is-it-for">Who is it for?<a class="zola-anchor" href="#who-is-it-for" aria-label="Anchor link for: who-is-it-for">#</a></h2>
+<p>Small teams and solo developers who believe in Andrej Karpathy's <a rel="external" href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f">LLM Wiki</a> approach, and who find that the agent now builds faster than they can decide what to build. Dispatch is about that human side: agreeing on a ticket, answering its open questions, reviewing and accepting the result, release planning, meetings and tasks, so that everyone knows what to do next, with the LLM helping wherever it makes sense. It works best with remote teams, because your agent can read what the team already writes down: chat threads and meeting transcripts. What it can't hear is the office grapevine.</p>
+<h2 id="does-the-llm-wiki-approach-work-at-all">Does the LLM Wiki approach work at all?<a class="zola-anchor" href="#does-the-llm-wiki-approach-work-at-all" aria-label="Anchor link for: does-the-llm-wiki-approach-work-at-all">#</a></h2>
+<p>Here are the reasons why it does:</p>
+<ol>
+<li>It's all about context. Your LLM can only do the right thing for you if it understands your context. Instead of adding the context on every prompt in every session you add it to the wiki, so that it's available in the next session too. If you do this in a team everyone benefits from that added context.</li>
+<li>LLMs are the perfect bureaucrats to maintain your wiki. You don't have to do this yourself.</li>
+<li>You can create new workflows on the fly by adding inline prompts into your wiki pages. This is helpful for updating reports and overview pages.</li>
+<li>It is fast. The LLM can get the whole context just by looking up the right wiki pages. It doesn't have to access external services over MCP or CLIs every time it needs the right context to work.</li>
+<li>Over time the wiki becomes an asset on its own. It is your knowledge base for your project.</li>
+</ol>
+<h2 id="does-it-work-on-mobile">Does it work on mobile?<a class="zola-anchor" href="#does-it-work-on-mobile" aria-label="Anchor link for: does-it-work-on-mobile">#</a></h2>
+<p>No. Chips and board automations start local programs, which Obsidian allows only on desktop. You
+need Obsidian 1.7.2 or newer on Windows, macOS or Linux. That said, there are ways to reach your LLM Wiki from your phone. You can browse your wiki with Obsidian on your phone, and if your vault syncs through Google Drive, an LLM with a Google Drive connector can read your wiki pages from your phone too.</p>
+<h2 id="what-do-i-need-besides-the-plugin">What do I need besides the plugin?<a class="zola-anchor" href="#what-do-i-need-besides-the-plugin" aria-label="Anchor link for: what-do-i-need-besides-the-plugin">#</a></h2>
+<p>A coding agent's command-line tool on your PATH, and Node.js 18 or newer for the small scripts
+that report run state and run board automations. Without an agent the boards still work; the chips
+just have nothing to launch. Your repository gets no <code>package.json</code> and no dependencies from
+Dispatch. If you work in a team, you need a service to synchronize your wiki pages, like Google Drive or Obsidian Sync.</p>
+<h2 id="can-i-use-icloud-drive">Can I use iCloud Drive?<a class="zola-anchor" href="#can-i-use-icloud-drive" aria-label="Anchor link for: can-i-use-icloud-drive">#</a></h2>
+<p>Yes, if you have a macOS-only team. On Microsoft Windows, iCloud creates duplicates of your wiki pages when you edit them with Obsidian. I haven't found a way to fix this.</p>
+<h2 id="is-there-a-server-an-account-or-telemetry">Is there a server, an account or telemetry?<a class="zola-anchor" href="#is-there-a-server-an-account-or-telemetry" aria-label="Anchor link for: is-there-a-server-an-account-or-telemetry">#</a></h2>
+<p>No. Dispatch reads and writes Markdown files in your own vault and runs programs you configured on
+your own machine. It has no server, no account and no telemetry. See the <a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a> for the
+details, including the optional Google Meet transcript import.</p>
+<h2 id="can-a-shared-note-make-my-machine-run-something">Can a shared note make my machine run something?<a class="zola-anchor" href="#can-a-shared-note-make-my-machine-run-something" aria-label="Anchor link for: can-a-shared-note-make-my-machine-run-something">#</a></h2>
+<p>No. A note can only name a tool and a repository by alias. The commands and paths behind those
+names live in a device-local file outside the vault, which vault sync never carries, and the
+prompt from a note always reaches the command as one quoted argument.</p>
+<h2 id="where-do-my-tickets-live-do-i-need-github-or-jira">Where do my tickets live? Do I need GitHub or Jira?<a class="zola-anchor" href="#where-do-my-tickets-live-do-i-need-github-or-jira" aria-label="Anchor link for: where-do-my-tickets-live-do-i-need-github-or-jira">#</a></h2>
+<p>In your vault, as ordinary notes whose frontmatter drives the board. Dragging a card writes that
+frontmatter. A tracker is optional: a board automation can mirror moves to GitHub Issues or
+another tracker, and Dispatch's own project does exactly that with a small script.</p>
+<h2 id="why-not-a-bases-view-or-the-kanban-plugin">Why not a Bases view or the Kanban plugin?<a class="zola-anchor" href="#why-not-a-bases-view-or-the-kanban-plugin" aria-label="Anchor link for: why-not-a-bases-view-or-the-kanban-plugin">#</a></h2>
+<p>Dispatch's board is a view over frontmatter too, but it adds what those do not: drag and drop that
+writes properties, a release plan with weighted progress and a velocity forecast, badges for open
+questions, tests and review findings, and chips that start an agent in the right repository with
+the ticket as context.</p>
+<h2 id="which-agents-are-supported">Which agents are supported?<a class="zola-anchor" href="#which-agents-are-supported" aria-label="Anchor link for: which-agents-are-supported">#</a></h2>
+<p>Claude Code and Codex are set up by the <code>dispatch-setup</code> skill, and any agent with a command-line
+interface can be configured as a tool. When more than one is configured, a chip asks which one to
+run and shows the exact command first.</p>
+<h2 id="how-do-i-get-started">How do I get started?<a class="zola-anchor" href="#how-do-i-get-started" aria-label="Anchor link for: how-do-i-get-started">#</a></h2>
+<p>Install Dispatch from Obsidian's community plugin directory, then press the set-up button on the
+empty board. It starts your agent with the <code>dispatch-setup</code> skill, which interviews you about your
+wiki and writes the configuration. Dispatch 101 walks through the workflow that follows.</p>
+<h2 id="how-can-i-give-feedback">How can I give feedback?<a class="zola-anchor" href="#how-can-i-give-feedback" aria-label="Anchor link for: how-can-i-give-feedback">#</a></h2>
+<p>Post in <a rel="external" href="https://github.com/kaimys/obsidian-dispatch/discussions">GitHub Discussions</a> on the project's repository. Early adopters' reports of what did and
+did not work are the most useful thing the project can receive right now.</p>
+
+  </div>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

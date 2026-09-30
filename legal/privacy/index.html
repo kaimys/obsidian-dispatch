@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Dispatch</title>
+<meta name="description" content="What data the Dispatch plugin for Obsidian touches, where it goes, and what the developer can and cannot see.">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+<div class="wrap legal">
+  <header class="page-head">
+    <h1>Privacy Policy</h1>
+    <p class="description">What data the Dispatch plugin for Obsidian touches, where it goes, and what the developer can and cannot see.</p>
+    <ul class="legal-nav" aria-label="Legal pages">
+      <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/" aria-current="page">Privacy Policy</a></li>
+      <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+      <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+    </ul>
+  </header>
+  <div class="prose">
+<p><strong>Effective 2 September 2026.</strong> Supersedes the version of 31 August 2026. What changed: Dispatch
+now finds a meeting's document through your calendar rather than by searching your Drive, so it
+asks for <strong>one</strong> permission instead of two and no longer requests any access to Google Drive
+whatsoever. This page also now describes the calendar feed, which the earlier version did not
+mention.</p>
+<p>Dispatch is an open-source plugin for <a rel="external" href="https://obsidian.md">Obsidian</a>, published under the
+MIT licence by Kai Mysliwiec. This policy explains what data Dispatch touches, where that
+data goes, and what the developer can and cannot see.</p>
+<h2 id="the-short-version">The short version<a class="zola-anchor" href="#the-short-version" aria-label="Anchor link for: the-short-version">#</a></h2>
+<p><strong>Dispatch has no server.</strong> There is no account to create, no backend to sign in to, and
+no service operated by the developer. Everything Dispatch does happens on your own
+computer, against files you already have. The developer receives no data from you of any
+kind — not your notes, not your Google data, not usage statistics, not crash reports.</p>
+<h2 id="what-dispatch-is">What Dispatch is<a class="zola-anchor" href="#what-dispatch-is" aria-label="Anchor link for: what-dispatch-is">#</a></h2>
+<p>Dispatch renders your Obsidian notes as project boards and launches command-line AI coding
+agents from them. It reads and writes the markdown files in your own vault, and it runs
+programs you have configured on your own machine. It does not transmit your notes anywhere.</p>
+<h2 id="google-account-data">Google account data<a class="zola-anchor" href="#google-account-data" aria-label="Anchor link for: google-account-data">#</a></h2>
+<p>One optional feature connects to Google. When you use Dispatch's meeting-transcript import,
+a script running on your computer asks Google for permission to read the Google Doc that Gemini
+wrote for a meeting — and nothing else.</p>
+<h3 id="what-we-request-and-why">What we request, and why<a class="zola-anchor" href="#what-we-request-and-why" aria-label="Anchor link for: what-we-request-and-why">#</a></h3>
+<table><thead><tr><th>Scope</th><th>What it grants</th><th>Why Dispatch asks</th></tr></thead><tbody>
+<tr><td><code>https://www.googleapis.com/auth/documents.readonly</code></td><td>Read-only access to your Google Docs</td><td>To read the meeting document. This is the only permission Dispatch ever asks for</td></tr>
+</tbody></table>
+<p>It is <strong>read-only</strong>, and it is the whole list. Dispatch requests no permission to modify, create
+or delete anything, and <strong>no access to your Google Drive at all</strong> — not <code>drive.readonly</code>, which
+would expose every file you own, and not the narrower Meet-files scope either. It cannot list,
+search or browse your Drive, because it never asks to.</p>
+<p><strong>Which document to fetch comes from your calendar, not from searching your Drive.</strong> If you have
+given Dispatch your calendar's secret iCal address for its Meetings view, each event in that feed
+already carries a link to its own Gemini document. So the normal path asks Google for one
+permission only — reading a document whose address it was handed.</p>
+<p>Being straightforward about what that one scope covers, because it is broader than it sounds:
+Google grants document-reading permission per application, not per file, so <code>documents.readonly</code>
+technically covers <em>all</em> of your Google Docs, not only the meeting ones. Dispatch only ever
+requests the specific document your calendar pointed at, but the permission you grant is the
+wider one, and you should know that before granting it.</p>
+<h3 id="what-the-script-does-with-it">What the script does with it<a class="zola-anchor" href="#what-the-script-does-with-it" aria-label="Anchor link for: what-the-script-does-with-it">#</a></h3>
+<ol>
+<li>Fetches your calendar feed — see below — and finds the event for the meeting you named, by date. Google attaches each meeting's Gemini document to its own calendar event, so this is what identifies the document.</li>
+<li>Asks the Google Docs API for that one document, by its id.</li>
+<li>Writes it into a folder inside your own Obsidian vault as Markdown — the Gemini summary and, when the meeting was transcribed, the transcript that Google appends to it.</li>
+</ol>
+<p>That is the entire flow. The content of your meetings is read from Google and written to
+your disk. It is not sent anywhere else, and no copy is retained outside your vault.</p>
+<h3 id="your-calendar-feed">Your calendar feed<a class="zola-anchor" href="#your-calendar-feed" aria-label="Anchor link for: your-calendar-feed">#</a></h3>
+<p>The Meetings view can show upcoming events if you give Dispatch the <strong>secret iCal address</strong> of a
+Google Calendar (<em>Settings → your calendar → Integrate calendar → Secret address in iCal
+format</em>). It is optional, and Dispatch does nothing with calendars unless you provide it.</p>
+<p>That address is itself a credential — anyone holding it can read that calendar — so it is stored
+with your other device settings, outside your vault, and never syncs. Dispatch fetches the feed
+<strong>read-only</strong>, directly from Google, and it is the transcript import's normal route to a
+document: the feed already names it, so nothing has to search your Drive. Nobody but you and
+Google sees the feed or its contents.</p>
+<h3 id="where-your-credentials-are-stored">Where your credentials are stored<a class="zola-anchor" href="#where-your-credentials-are-stored" aria-label="Anchor link for: where-your-credentials-are-stored">#</a></h3>
+<p>Your OAuth client ID, client secret and refresh token are stored with Dispatch's other per-vault
+settings, in a plain file under <code>~/.dispatch/</code> on your own computer — outside your vault, so that
+they are never picked up by Obsidian Sync, Google Drive, git, or any other sync mechanism that
+might carry your vault to another machine or another person. Your calendar's secret address lives
+in the same file.</p>
+<p>These credentials are transmitted only to Google's own endpoints, over
+HTTPS, to obtain and use an access token and to read the calendar feed. They are sent to no one
+else.</p>
+<h3 id="what-the-developer-receives">What the developer receives<a class="zola-anchor" href="#what-the-developer-receives" aria-label="Anchor link for: what-the-developer-receives">#</a></h3>
+<p>Nothing. The developer operates no server, collects no telemetry, and has no technical means
+of accessing your Google account, your Drive files, your meeting content or your vault.</p>
+<h3 id="limited-use">Limited Use<a class="zola-anchor" href="#limited-use" aria-label="Anchor link for: limited-use">#</a></h3>
+<aside class="callout callout-note">
+
+<p>Dispatch's use and transfer of information received from Google APIs to any other app will
+adhere to the <a rel="external" href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data
+Policy</a>, including the
+Limited Use requirements.</p>
+
+</aside>
+<p>Concretely, and as a restatement of what the section above already describes: data obtained
+through these scopes is used solely to provide the meeting-import feature you invoked. It is
+not transferred to anyone, not used for advertising, not used to train any model, and not
+read by any human other than you.</p>
+<h2 id="data-dispatch-does-not-collect">Data Dispatch does not collect<a class="zola-anchor" href="#data-dispatch-does-not-collect" aria-label="Anchor link for: data-dispatch-does-not-collect">#</a></h2>
+<ul>
+<li>No analytics, telemetry or usage statistics.</li>
+<li>No crash or error reporting.</li>
+<li>No advertising identifiers, cookies or tracking of any kind.</li>
+<li>No account, email address or personal profile.</li>
+<li>No network requests at all, except the Google calls described above — your calendar feed and the meeting documents — and any made by
+the agent programs you yourself configure and launch.</li>
+</ul>
+<h2 id="third-parties">Third parties<a class="zola-anchor" href="#third-parties" aria-label="Anchor link for: third-parties">#</a></h2>
+<p>Dispatch shares your data with no third party, because it sends your data to no one. The
+only external service it contacts is Google, on your instruction, using your own
+credentials.</p>
+<p>Note that Dispatch launches command-line programs you configure — for example Claude Code or
+Codex. Those programs are not part of Dispatch and are governed by their own terms and
+privacy policies. What they send, and to whom, is between you and their providers.</p>
+<h2 id="retention-and-deletion">Retention and deletion<a class="zola-anchor" href="#retention-and-deletion" aria-label="Anchor link for: retention-and-deletion">#</a></h2>
+<p>Because nothing is stored on a server, there is nothing for the developer to delete.</p>
+<ul>
+<li><strong>Downloaded meeting content</strong> stays in your vault until you delete the files.</li>
+<li><strong>Your stored credentials</strong> — the OAuth tokens and your calendar's secret address — stay in that vault's settings file under <code>~/.dispatch/</code> until you delete them. Clearing the calendar URL in Dispatch's settings removes it from the file.</li>
+<li><strong>Dispatch's access to your Google account</strong> can be revoked at any time at
+<a rel="external" href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>. Revoking
+takes effect immediately; the stored refresh token stops working, and Dispatch will report
+that re-authorisation is needed.</li>
+</ul>
+<p>Deleting the plugin removes it entirely; the credential file is separate and should be
+deleted by hand if you want it gone.</p>
+<h2 id="security">Security<a class="zola-anchor" href="#security" aria-label="Anchor link for: security">#</a></h2>
+<p>Credentials are stored unencrypted in a file in your home directory, protected by your
+operating system's own file permissions and by whatever disk encryption you have enabled.
+This is the same posture as most command-line developer tooling. Anyone with access to your
+user account on your computer can read that file, so treat it as you would an SSH key.</p>
+<h2 id="children">Children<a class="zola-anchor" href="#children" aria-label="Anchor link for: children">#</a></h2>
+<p>Dispatch is a developer tool. It is not directed at children and collects no data from
+anyone.</p>
+<h2 id="changes-to-this-policy">Changes to this policy<a class="zola-anchor" href="#changes-to-this-policy" aria-label="Anchor link for: changes-to-this-policy">#</a></h2>
+<p>Changes are published on this page with a new effective date. Because Dispatch is
+open-source, every revision is visible in the project's public history.</p>
+<h2 id="contact">Contact<a class="zola-anchor" href="#contact" aria-label="Anchor link for: contact">#</a></h2>
+<p>Kai Mysliwiec — kai@eightnine.de
+Project: <a rel="external" href="https://github.com/kaimys/obsidian-dispatch">github.com/kaimys/obsidian-dispatch</a></p>
+
+  </div>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

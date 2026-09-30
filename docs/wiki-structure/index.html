@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wiki structure — Dispatch</title>
+<meta name="description" content="Dispatch is a board over a wiki. This page describes the wiki it was built against — generalized, so you can copy it into a new project and adapt the names.">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/docs/wiki-structure/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/" aria-current="page">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+<div class="wrap docs">
+  <details class="docs-nav" open>
+    <summary>Documentation</summary>
+    <div class="inner">
+      <nav aria-label="Documentation">
+        <h2>Documentation</h2>
+        <ol>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Overview</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/">Installation &amp; configuration</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/">Page types</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/skills/">Workflow skills</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/wiki-structure/" aria-current="page">Wiki structure</a></li>
+        </ol>
+      </nav>
+      <nav class="toc-block" aria-label="On this page">
+        <h2>On this page</h2>
+        <ol class="toc">
+          <li><a href="#the-three-layers">The three layers</a></li>
+          <li><a href="#the-example-tree">The example tree</a></li>
+          <li><a href="#what-each-folder-is-for">What each folder is for</a></li>
+          <li><a href="#01sources--the-immutable-layer">01_Sources&#x2F; — the immutable layer</a></li>
+          <li><a href="#indexmd-and-logmd">index.md and log.md</a></li>
+          <li><a href="#precedence">Precedence</a></li>
+          <li><a href="#where-the-wiki-lives-relative-to-the-code">Where the wiki lives relative to the code</a></li>
+          <li class="sub"><a href="#separate-vault-symlinked-into-the-repo">Separate vault, symlinked into the repo</a></li>
+          <li class="sub"><a href="#monorepo--wiki-and-code-in-one-repository">Monorepo — wiki and code in one repository</a></li>
+          <li class="sub"><a href="#making-git-invisible-to-non-technical-people">Making git invisible to non-technical people</a></li>
+          <li><a href="#starting-small">Starting small</a></li>
+        </ol>
+      </nav>
+    </div>
+  </details>
+  <article>
+    <header class="page-head">
+      <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></p>
+      <h1>Wiki structure</h1>
+    </header>
+    <div class="prose">
+<p>Dispatch is a board over a wiki. This page describes the wiki it was built against — generalized, so you can copy it into a new project and adapt the names.</p>
+<p>It follows <a rel="external" href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f">Karpathy's LLM wiki pattern</a> with one addition: the wiki is also the ticket tracker, because that is what Dispatch turns it into.</p>
+<p>Nothing here is enforced by the plugin. Dispatch needs folder paths and property names; the structure is what makes those useful to humans and agents at the same time. Treat the tree below as a starting point for a conversation, not a standard — every project ends up with its own.</p>
+<h2 id="the-three-layers">The three layers<a class="zola-anchor" href="#the-three-layers" aria-label="Anchor link for: the-three-layers">#</a></h2>
+<table><thead><tr><th>Layer</th><th>Lives in</th><th>Written by</th><th>Rule</th></tr></thead><tbody>
+<tr><td><strong>Sources</strong></td><td><code>01_Sources/</code></td><td>humans (drop files in)</td><td><strong>Immutable.</strong> Agents read them, never modify them.</td></tr>
+<tr><td><strong>Wiki</strong></td><td>everything else</td><td>agents, reviewed by humans</td><td>Interpretations of sources plus the project's own decisions. Rewritten freely.</td></tr>
+<tr><td><strong>Schema</strong></td><td><code>dispatch/invariants.md</code> in the code repo, <code>00_Start-Here/</code></td><td>humans</td><td>How the wiki is structured, what is authoritative, which rules are inviolable.</td></tr>
+</tbody></table>
+<blockquote>
+<p>"Your curated collection of source documents. Articles, papers, images, data files. These are immutable — the LLM reads from them but never modifies them. This is your source of truth." — Karpathy</p>
+</blockquote>
+<p>The separation is what makes the wiki safe to rewrite. A wiki page is an <em>interpretation</em> — of a transcript, a bug report, a regulation — and interpretations get corrected. If the artifact behind it was edited into the page and then discarded, nobody can re-derive it. Keep the artifact.</p>
+<p>The <strong>schema layer</strong> is the part most projects forget. Conventions that every workflow must respect — what is authoritative, which sections may never be rewritten, who owns what — belong in one shared invariants file that each agent's instruction file points at (<code>dispatch/invariants.md</code>, with <code>CLAUDE.md</code> and <code>AGENTS.md</code> as pointers), not in the individual skills. A rule copied into six skills is a rule that will hold in four of them.</p>
+<h2 id="the-example-tree">The example tree<a class="zola-anchor" href="#the-example-tree" aria-label="Anchor link for: the-example-tree">#</a></h2>
+<pre><code>00_Start-Here/     index.md · log.md · Home.md · Glossary.md · Writing Standards.md
+  Templates/       one template per page type, with inline guidance
+  Team/            one page per member: contact, responsibilities, working hours
+01_Sources/        raw, immutable — see below
+  Meeting Transcripts/
+02_Product/        vision · scope definition · success metrics
+  Reports/         dated, recurring analyses (scope gaps, doc↔code drift, market news)
+    _definitions/  the rulebooks those reports are generated from
+03_Legal/          the documents that bind you and the constraints you work under
+                   (rename per project: Clinical, Safety, Regulatory, Editorial …)
+04_Discovery/      research, product ideas, evaluations, benchmarks — and anything
+                   not yet sorted
+05_Requirements/
+  Tickets/         ← one note per ticket. This is the Dispatch board.
+    images/        screenshots referenced by bug tickets
+  Non-Functional/  NFR - Privacy.md · NFR - Performance.md · NFR - Accessibility.md
+06_UX/             design guidelines, design system, screen specs
+07_Engineering/    System Context.md
+  Decisions.md     index of ADRs
+  Decisions/       ADR-0001 - &lt;decision&gt;.md …
+  Frontend/        kept in sync with the code — changes often
+  Backend/         kept in sync with the code — changes often
+08_Delivery-and-QA/
+  Releases/        Release - v1.2.0 - &lt;name&gt;.md  ← feeds the Release Plan tab
+09_Meetings/       YYYY-MM-DD - &lt;meeting&gt;.md      ← feeds the Meetings tab
+10_Archive/        retired material, kept out of the agent&#39;s way
+</code></pre>
+<p>Numbers are sort keys, not law. Rename and merge freely — but <strong>don't renumber a live vault</strong> to close a gap: links, muscle memory and half the team's bookmarks break. A hole where a folder used to be is cheaper than the churn.</p>
+<h2 id="what-each-folder-is-for">What each folder is for<a class="zola-anchor" href="#what-each-folder-is-for" aria-label="Anchor link for: what-each-folder-is-for">#</a></h2>
+<table><thead><tr><th>Folder</th><th>Holds</th><th>Who writes it</th><th>What reads it</th></tr></thead><tbody>
+<tr><td><code>00_Start-Here/</code></td><td>The entry point: <code>index.md</code>, <code>log.md</code>, glossary, conventions, the workflow doc</td><td>agent (index/log), humans (conventions)</td><td>every agent session; new team members</td></tr>
+<tr><td><code>00_Start-Here/Team/</code></td><td>One page per person — contact, responsibilities, working hours</td><td>humans</td><td>owner attribution, who to ask, when to expect an answer</td></tr>
+<tr><td><code>00_Start-Here/Templates/</code></td><td>The shape of every page type, with inline guidance on who fills which section and when</td><td>humans</td><td>the skills that create pages</td></tr>
+<tr><td><code>01_Sources/</code></td><td>Raw artifacts, unmodified</td><td>humans drop them in</td><td>the ingest step of every workflow</td></tr>
+<tr><td><code>02_Product/</code></td><td>Why the product exists, what is in scope, how success is measured</td><td>humans, agent-assisted</td><td>refinement, planning</td></tr>
+<tr><td><code>02_Product/Reports/</code></td><td>Dated snapshots: scope gaps, doc↔code inconsistencies, market news</td><td>agent (recurring jobs)</td><td>the team; the next run compares against the last</td></tr>
+<tr><td><code>02_Product/Reports/_definitions/</code></td><td>One page per recurring report: what it measures, what counts, how it ranks</td><td>humans</td><td>the maintenance skill that runs the job</td></tr>
+<tr><td><code>03_Legal/</code></td><td>Published commitments (privacy declaration, terms), the constraints you work under, generated license inventories — see <a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/#legal-and-domain-documents">page types</a></td><td>product + counsel, agent for the generated ones</td><td>every ticket that touches them</td></tr>
+<tr><td><code>04_Discovery/</code></td><td>Research and evaluation that isn't a decision yet — plus the unsorted pile</td><td>humans + agent</td><td>product planning</td></tr>
+<tr><td><code>05_Requirements/Tickets/</code></td><td><strong>The tickets.</strong> One note = one story, bug or task: full spec + frontmatter</td><td>agent (from intake) + humans</td><td><strong>the Dispatch board</strong>, every workflow skill</td></tr>
+<tr><td><code>05_Requirements/Non-Functional/</code></td><td>Cross-cutting requirements no single ticket owns</td><td>humans, agent-assisted</td><td>planning, review</td></tr>
+<tr><td><code>06_UX/</code></td><td>Design system, guidelines, screen specs</td><td>designers + agent</td><td>implementation, visual review</td></tr>
+<tr><td><code>07_Engineering/</code></td><td>How the system is actually built: context, ADRs, schema, interfaces</td><td>agent (kept in sync from code)</td><td>implementation, onboarding</td></tr>
+<tr><td><code>07_Engineering/Decisions/</code></td><td><strong>ADRs</strong> — one per durable decision, including the deliberate <em>we do not do X</em></td><td>agent (extracted from tickets), humans decide</td><td>anything designing in that area</td></tr>
+<tr><td><code>08_Delivery-and-QA/Releases/</code></td><td>One note per release: version, date, scope</td><td>agent (at release)</td><td><strong>Release Plan tab</strong></td></tr>
+<tr><td><code>09_Meetings/</code></td><td>One note per meeting: participants, decisions, action items</td><td>agent (from transcript)</td><td><strong>Meetings + Todos tabs</strong></td></tr>
+<tr><td><code>10_Archive/</code></td><td>Retired, superseded, historical</td><td>agent (on retirement)</td><td>rarely — deliberately</td></tr>
+</tbody></table>
+<h2 id="01sources--the-immutable-layer"><code>01_Sources/</code> — the immutable layer<a class="zola-anchor" href="#01sources--the-immutable-layer" aria-label="Anchor link for: 01sources--the-immutable-layer">#</a></h2>
+<p>Everything the wiki is derived from, in its original form:</p>
+<pre><code>01_Sources/
+  Meeting Transcripts/   2026-08-04 - Product Weekly - NoteTaker.md
+  Feedback/              2026-07-19 - Beta tester - chat issues.md
+  Research/              2026-06-30 - &lt;vendor&gt; pricing page.html
+  Domain/                regulations, guidelines, standards, counsel&#39;s standard
+                         drafts and signed finals (PDF is fine)
+  Exports/               analytics dumps, CSVs, tracker exports
+  Assets/                screenshots and recordings referenced by reports
+</code></pre>
+<p>The rules that make it worth having:</p>
+<ol>
+<li><strong>Never edited, never summarized in place.</strong> An agent reads a source and writes a <em>new</em> page. If the interpretation was wrong, the source is still there to redo it. This is the entire point.</li>
+<li><strong>Never deleted.</strong> Retire by moving to <code>10_Archive/</code>, not by shrinking the folder.</li>
+<li><strong>Filename is <code>YYYY-MM-DD - &lt;origin&gt; - &lt;title&gt;.&lt;ext&gt;</code>.</strong> The date is when the artifact was produced, not when you filed it — so sorting by name sorts by history.</li>
+<li><strong>Every ingest gets a <code>log.md</code> entry</strong> naming the source file <em>and</em> the pages it changed. That line is how anyone later answers "where did this claim come from?".</li>
+<li><strong>Derived pages cite their source</strong> by link. A claim with no source and no decision behind it is a claim nobody can check.</li>
+<li><strong>Binaries belong here and nowhere else.</strong> PDFs, HTML dumps, screenshots, recordings, CSVs. Keeping them out of the wiki layer is what keeps the wiki greppable and cheap for an agent to read end to end.</li>
+<li><strong>Only humans add to it.</strong> An agent writing its own output back into sources would launder its interpretation into evidence.</li>
+</ol>
+<h2 id="indexmd-and-logmd"><code>index.md</code> and <code>log.md</code><a class="zola-anchor" href="#indexmd-and-logmd" aria-label="Anchor link for: indexmd-and-logmd">#</a></h2>
+<p>Two pages in <code>00_Start-Here/</code> carry the pattern's bookkeeping. They are the reason an agent can find anything without scanning the vault.</p>
+<p><strong><code>index.md</code> — the catalog.</strong> Every page, grouped by folder, with a one-line summary and its status. Read first in any session. Updated in the same step as the page it describes, never in a separate cleanup pass — that pass never happens.</p>
+<table><thead><tr><th>Document</th><th>Status</th><th>Description</th></tr></thead><tbody>
+<tr><td>[[Product Vision]]</td><td>approved</td><td>One-line summary of what this page says</td></tr>
+</tbody></table>
+<p><strong><code>log.md</code> — the ledger.</strong> Append-only, newest first, grep-friendly headers:</p>
+<pre><code data-lang="markdown">## [YYYY-MM-DD] &lt;type&gt; | &lt;short title&gt;
+</code></pre>
+<p>Types: <code>setup</code> (structure changed) · <code>ingest</code> (a source was processed) · <code>add</code> / <code>edit</code> / <code>remove</code> (pages) · <code>lint</code> (contradictions, stale claims, dead links). A few bullets per entry: what changed, which pages, what drove it.</p>
+<p>The index answers <em>what exists</em>; the log answers <em>what happened and why</em>. Agents are good at this bookkeeping and humans are not, which is exactly why the convention can afford to be strict.</p>
+<h2 id="precedence">Precedence<a class="zola-anchor" href="#precedence" aria-label="Anchor link for: precedence">#</a></h2>
+<p>Documents will contradict each other. Write the order down once, in <code>00_Start-Here/</code>, so nobody re-litigates it per conflict. A reasonable default:</p>
+<blockquote>
+<p><strong>External constraints → published commitments → Decisions (ADRs) → Requirements → UX → Engineering → Delivery/QA.</strong>
+Meeting notes, research, inbox items and drafts are never authoritative.</p>
+</blockquote>
+<p><strong>But the order is a statement about how your team works, not a universal truth</strong>, and it is finer-grained than folder names suggest. Legal is the clearest case: a regulation is imposed on you and outranks every plan, while a privacy declaration or terms of use is <em>drafted from</em> the product — counsel supplies a standard document, you say what you actually want, counsel checks whether it's legally available. During that back-and-forth the product leads. Once the text is published and users have agreed to it, it binds the product instead, and a mismatch is the code's problem, not the document's. One folder, two precedence positions, decided by whether the thing has shipped. See <a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/#legal-and-domain-documents">legal and domain documents</a>.</p>
+<p>Decide your order deliberately, write it down, and revisit it when the team changes.</p>
+<p>ADRs sit on top for a reason: they record the decisions that were already argued, including the rejected alternatives. A change that contradicts one is a decision to reopen with the team — not a detail to work around.</p>
+<h2 id="where-the-wiki-lives-relative-to-the-code">Where the wiki lives relative to the code<a class="zola-anchor" href="#where-the-wiki-lives-relative-to-the-code" aria-label="Anchor link for: where-the-wiki-lives-relative-to-the-code">#</a></h2>
+<p>The workflow logic lives in the <strong>code repository</strong> as agent skills; the state lives in the <strong>wiki</strong>. How those two sit on disk is a real decision with three viable answers.</p>
+<h3 id="separate-vault-symlinked-into-the-repo">Separate vault, symlinked into the repo<a class="zola-anchor" href="#separate-vault-symlinked-into-the-repo" aria-label="Anchor link for: separate-vault-symlinked-into-the-repo">#</a></h3>
+<p>The wiki is its own Obsidian vault, synced by whatever your non-technical colleagues already use (Obsidian Sync, Google Drive, Dropbox), and symlinked into the code repo — a single, git-ignored, repo-relative link at <code>dispatch/wiki</code> — so agents and Dispatch see one tree. A script or workflow command that needs the vault names the <em>link</em>, never a location: <code>const VAULT_DIR = "dispatch/wiki"</code> in a repo-side script is then true by construction, and moving the wiki costs one repointed link rather than a find-and-replace across every call site. <strong>Set up before v0.3.0?</strong> Your project may still reach the vault through a root <code>wiki</code> link or an absolute path, and it keeps working after a plugin update: the plugin reads no path from your repository. Re-running the setup skill migrates it.</p>
+<ul>
+<li><strong>For</strong>: nobody outside engineering ever sees git. Unbounded binary sources cost the repo nothing.</li>
+<li><strong>Against</strong>: no history, no diffs, no review on the wiki. You cannot ask "what did this spec say when we built it?" — which is exactly the question the <a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/#the-freeze-rule">ticket freeze rule</a> exists to answer, and it answers it by convention instead of by version control.</li>
+</ul>
+<p>Two failure modes are silent, so watch for both:</p>
+<ul>
+<li><strong>Device-local config is keyed on the vault's absolute path.</strong> Moving or renaming the vault orphans it — the board renders and looks healthy, and every chip fails on click.</li>
+<li><strong>Vault-relative folder paths in the <em>shared</em> config are still folder paths.</strong> A restructure that changes them without updating the shared settings leaves the board empty rather than erroring.</li>
+</ul>
+<h3 id="monorepo--wiki-and-code-in-one-repository">Monorepo — wiki and code in one repository<a class="zola-anchor" href="#monorepo--wiki-and-code-in-one-repository" aria-label="Anchor link for: monorepo--wiki-and-code-in-one-repository">#</a></h3>
+<pre><code>repo/
+  wiki/           the vault
+  backend/
+  frontend/
+  shared/
+  .claude/        skills + scripts shared across all of it
+</code></pre>
+<p>Skills at the repo root are available anywhere you launch from it; directory-scoped ones resolve to the nearest match; nested instruction files (<code>CLAUDE.md</code>, <code>AGENTS.md</code>) layer root conventions with per-package specifics. That part works well and is the strongest argument for the layout.</p>
+<p>Two things to plan for:</p>
+<ul>
+<li><strong>Dispatch's busy-gate is per repo alias</strong>, so one monorepo means one agent at a time across backend <em>and</em> frontend. Define one alias per package (pointing at subdirectories) if you want parallel sessions, or use worktrees.</li>
+<li><strong><code>01_Sources/</code> is unbounded and mostly binary.</strong> In git that means LFS, or keeping sources out of the repo.</li>
+</ul>
+<p>And the real obstacle: the wiki is now in git, and the people who write most of it may not use git.</p>
+<h3 id="making-git-invisible-to-non-technical-people">Making git invisible to non-technical people<a class="zola-anchor" href="#making-git-invisible-to-non-technical-people" aria-label="Anchor link for: making-git-invisible-to-non-technical-people">#</a></h3>
+<p>Three options, roughly in order of how well they hold up:</p>
+<ul>
+<li><strong>The agent is the git client.</strong> Wiki sync becomes a step in the workflows that already run — pull before reading, commit and push after writing, resolve conflicts by reading both sides rather than by picking a hunk. An agent is a genuinely better merge tool than a merge tool, because it can tell which of two edits is the newer decision. Worth a dedicated skill (<code>/sync-wiki</code>) and a call at the start and end of every skill that touches the vault.</li>
+<li><strong>The Obsidian Git plugin</strong>, auto commit-and-sync on a short interval with pull on launch. Nobody sees a commit. Conflict markers inside a note are the failure mode; short intervals and one owner per page keep it rare.</li>
+<li><strong>A desktop client</strong> (GitHub Desktop). Visible, but simple — still relies on people remembering to pull.</li>
+</ul>
+<p>The first two compose: the agent handles the sessions where it does the writing, the plugin covers the hours where a human is typing in Obsidian.</p>
+<h2 id="starting-small">Starting small<a class="zola-anchor" href="#starting-small" aria-label="Anchor link for: starting-small">#</a></h2>
+<p>The full tree is what a project looks like after a year. On day one, four folders carry it:</p>
+<pre><code>00_Start-Here/           index.md · log.md · Templates/
+01_Sources/              everything raw
+05_Requirements/Tickets/ the board
+07_Engineering/Decisions/ the decisions you&#39;ll otherwise re-argue
+</code></pre>
+<p>Add a folder when a page doesn't fit anywhere — not before. An empty <code>06_UX/</code> teaches an agent nothing; fifteen real tickets teach it your entire vocabulary.</p>
+
+    </div>
+    <nav class="docs-pager" aria-label="Previous and next page">
+      <a href="https://kaimys.github.io/obsidian-dispatch/docs/skills/"><span class="dir">&larr; Previous</span>Workflow skills</a>
+      
+    </nav>
+  </article>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

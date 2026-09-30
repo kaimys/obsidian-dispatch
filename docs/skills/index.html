@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workflow skills — Dispatch</title>
+<meta name="description" content="Dispatch ships ten starter workflows through the dispatch-setup agent plugin. They are working defaults to adapt to your project. The Obsidian plugin renders…">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/docs/skills/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/" aria-current="page">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+<div class="wrap docs">
+  <details class="docs-nav" open>
+    <summary>Documentation</summary>
+    <div class="inner">
+      <nav aria-label="Documentation">
+        <h2>Documentation</h2>
+        <ol>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Overview</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/">Installation &amp; configuration</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/">Page types</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/skills/" aria-current="page">Workflow skills</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/wiki-structure/">Wiki structure</a></li>
+        </ol>
+      </nav>
+      <nav class="toc-block" aria-label="On this page">
+        <h2>On this page</h2>
+        <ol class="toc">
+          <li><a href="#install-and-adapt">Install and adapt</a></li>
+          <li><a href="#shipped-workflows">Shipped workflows</a></li>
+          <li><a href="#the-adaptation-contract">The adaptation contract</a></li>
+          <li><a href="#small-bug-shortcut">Small-bug shortcut</a></li>
+          <li><a href="#releases-and-meetings">Releases and meetings</a></li>
+          <li><a href="#optional-examples--not-shipped">Optional examples — not shipped</a></li>
+          <li><a href="#wiring-skills-to-chips">Wiring skills to chips</a></li>
+        </ol>
+      </nav>
+    </div>
+  </details>
+  <article>
+    <header class="page-head">
+      <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></p>
+      <h1>Workflow skills</h1>
+    </header>
+    <div class="prose">
+<p>Dispatch ships <strong>ten starter workflows through the <code>dispatch-setup</code> agent plugin</strong>.
+They are working defaults to adapt to your project. The Obsidian plugin renders the
+board and launches chips; it does not bundle or execute a fixed development process.</p>
+<h2 id="install-and-adapt">Install and adapt<a class="zola-anchor" href="#install-and-adapt" aria-label="Anchor link for: install-and-adapt">#</a></h2>
+<p>Install <code>dispatch-setup</code> using the <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/">setup instructions</a>, then invoke
+it in your code repository. It interviews you about the vault, lifecycle, tracker,
+chat and coding agents and scaffolds the workflows alongside your code. Existing
+projects should compare and merge updated starters into their adapted files; setup
+must not overwrite an established workflow without reviewing that change with you.</p>
+<p>Three different artifacts make this work:</p>
+<table><thead><tr><th>Artifact</th><th>Location</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>Templated starter</td><td><code>plugins/dispatch-setup/skills/dispatch-setup/assets/commands/</code></td><td>Seed shipped with setup; project values are substituted at installation</td></tr>
+<tr><td>Project's canonical workflow</td><td><code>dispatch/workflow/&lt;name&gt;.md</code></td><td>One instruction body per workflow, versioned with that project's code</td></tr>
+<tr><td>Agent invocation stub</td><td><code>.claude/commands/&lt;name&gt;.md</code> or <code>.codex/skills/&lt;name&gt;/SKILL.md</code></td><td>Agent-specific metadata and argument hand-off; points to the canonical body, carries no steps</td></tr>
+</tbody></table>
+<p>The starter and an existing project's adapted workflow need not be byte-identical.
+Claude invokes <code>/refine US00042</code>; Codex invokes <code>$refine US00042</code>. Both read the same
+canonical body with the supplied argument. Wiki = state, repo = process, chips = the
+bridge. A note names a tool and repository alias; device settings resolve commands
+and paths.</p>
+<h2 id="shipped-workflows">Shipped workflows<a class="zola-anchor" href="#shipped-workflows" aria-label="Anchor link for: shipped-workflows">#</a></h2>
+<p>Each filename below is present in the starter directory. Invoke its name without
+<code>.md</code>, using your agent's prefix. <code>meeting</code> has two modes, not two files.</p>
+<!-- shipped-workflows:start -->
+<table><thead><tr><th>File</th><th>Invocation argument</th><th>Reads</th><th>Writes / review surface</th><th>Exit and authority</th></tr></thead><tbody>
+<tr><td><code>create-ticket.md</code></td><td><code>description + source</code></td><td>source, templates, existing tickets</td><td>ticket + tracker task; index/log</td><td>Intake is ungated; starts in the new-ticket column</td></tr>
+<tr><td><code>refine.md</code></td><td><code>id</code></td><td>spec, links, code, discussion</td><td>answers and criteria in the ticket; open_questions</td><td>Human ends refinement; card stays put</td></tr>
+<tr><td><code>update-ticket.md</code></td><td><code>id</code></td><td>inline feedback, thread, tracker, code drift</td><td>updated spec and recounted counters</td><td>No status move; respects frozen contracts</td></tr>
+<tr><td><code>implementation-plan.md</code></td><td><code>id</code></td><td>refreshed spec, code, binding ADRs</td><td>plan in the ticket; ADRs after sign-off</td><td>Human signs off; card stays put</td></tr>
+<tr><td><code>develop.md</code></td><td><code>id</code></td><td>approved plan and criteria</td><td>code/tests; as-built notes; invalidated counts cleared</td><td>Explicit invocation + preconditions enter development; fresh reviewer next</td></tr>
+<tr><td><code>code-review.md</code></td><td><code>id</code></td><td>ticket, diff, current build, tests</td><td>dated findings in the ticket; open_findings</td><td>Independent session; blocking findings prevent test-plan</td></tr>
+<tr><td><code>test-plan.md</code></td><td><code>id</code></td><td>code-complete ticket, green gates, clean review</td><td>manual checks; open_tests; frozen contract</td><td>Enters review after verified preconditions; human completes remaining checks</td></tr>
+<tr><td><code>fix-bug.md</code></td><td><code>report</code></td><td>report, duplicates, affected code</td><td>bug ticket, small fix, actual verification and completion record</td><td>Explicit shortcut only; stops when full workflow or a human check is needed</td></tr>
+<tr><td><code>release.md</code></td><td><code>version</code></td><td>version scope, verified tickets, project release policy</td><td>release note, version/build; released tickets + tracker</td><td>Explicit release request and readiness gates; publishing follows project policy</td></tr>
+<tr><td><code>meeting.md</code></td><td><code>agenda or report</code></td><td>board, or transcript and discussion</td><td>meeting note; decisions folded into tickets</td><td>Agenda before; report requires transcript; no invented decisions</td></tr>
+</tbody></table>
+<!-- shipped-workflows:end -->
+<h2 id="the-adaptation-contract">The adaptation contract<a class="zola-anchor" href="#the-adaptation-contract" aria-label="Anchor link for: the-adaptation-contract">#</a></h2>
+<p>Change folder and property names, columns, IDs, tracker/chat providers, chip labels
+and local commands to match your project. Keep these parts of the method:</p>
+<ul>
+<li>A workflow produces a durable artifact in the note; that artifact is the review surface.</li>
+<li>Human decisions are not manufactured by the skill that wrote the artifact. A human
+drag or explicit next-step invocation supplies approval; mechanical gates must actually run.</li>
+<li>Counters describe the current build. Empty means uncounted; zero means counted and
+clear. Recounts replace earlier counts, and code changes invalidate review counts.</li>
+<li>The contract freezes when work leaves development. Later corrections are annotations,
+and new scope gets a linked ticket. See <a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/#the-freeze-rule">page types</a>.</li>
+<li>Every page has an accountable person. Derived pages register their maintenance.
+The project declares precedence and which system wins a wiki/tracker disagreement.</li>
+</ul>
+<p>Put these rules once in <code>dispatch/invariants.md</code>; <code>CLAUDE.md</code> and <code>AGENTS.md</code> point
+there. Ordinary development still requires independent code review before the test
+plan and freeze. A general review-toggle feature is not part of these starters.</p>
+<p>The setup README documents substitution tokens. <code>S_*</code> tokens describe statuses a
+workflow may write with the required authorization; they do not enumerate every
+column on your board. A solo board can use the same value for refinement and the
+optional ready queue. A queued-delivery board can add human/automation-only columns
+without inventing workflow tokens or granting a skill permission to advance there.</p>
+<p>Workflows reach the vault through <code>dispatch/wiki</code>, a git-ignored link from the
+repository to the vault, and never through an absolute path, which would tie every
+workflow to one machine. The same holds for notes, shared settings and chip
+repository fields, which use aliases. The device config stays in <code>~/.dispatch/</code>,
+in neither the repository nor the vault.</p>
+<p><strong>Set up before v0.3.0?</strong> Your project may still carry an absolute vault path or its scripts in <code>scripts/dispatch/</code>, and it keeps working after a plugin update: the plugin reads no path from your repository. Re-running the setup skill migrates it.</p>
+<h2 id="small-bug-shortcut">Small-bug shortcut<a class="zola-anchor" href="#small-bug-shortcut" aria-label="Anchor link for: small-bug-shortcut">#</a></h2>
+<p>Explicitly invoke <code>/fix-bug &lt;report&gt;</code> (or <code>$fix-bug &lt;report&gt;</code>) for a small bug with a
+small blast radius, such as wording or layout, usually fixed in one file. Before
+changing code it asks whether the full workflow is worthwhile. If so, it creates the
+bug record, moves it to refinement and warns you instead of starting a larger fix.</p>
+<p>For a suitable bug, it creates the ticket and tracker mirror first, fixes and verifies
+it, records the result and remaining checks, then finalizes/freezes the contract,
+stamps completion and mirrors the tracker. It can reach Done in one invocation.
+The record states that independent review was omitted; <code>open_findings</code> stays empty,
+never a fabricated zero. No unresolved question, failed gate, or outstanding manual
+check may remain. A layout fix needing your visual judgment stays open.</p>
+<p>The ticket must carry its known target version so release notes can include it. The
+shortcut does not merge, tag or publish. A tracker failure leaves a visible partial
+synchronization record; retry reconciles the existing issue rather than creating a
+duplicate. A completed ticket's original completion date survives later release runs.</p>
+<h2 id="releases-and-meetings">Releases and meetings<a class="zola-anchor" href="#releases-and-meetings" aria-label="Anchor link for: releases-and-meetings">#</a></h2>
+<p>Release takes its scope from ticket target versions, including completed shortcut
+fixes, and checks recorded verification before writing the release note. The project's
+release policy defines building/tagging/publishing; in Dispatch itself a tag builds
+a draft and a human publishes it. A workflow writing status directly also writes the
+completion date and tracker state: board drag automations do not fire for that write.</p>
+<p><code>meeting agenda</code> builds decisions to discuss from the board. <code>meeting report</code> requires
+the transcript and folds actual decisions into tickets before reporting back. Frozen
+contracts get dated record entries, not rewrites. With no tracker or chat configured,
+work stays in the wiki and questions go to the requester; an unavailable configured
+service is reported as a failure rather than silently treated as absent.</p>
+<h2 id="optional-examples--not-shipped">Optional examples — not shipped<a class="zola-anchor" href="#optional-examples--not-shipped" aria-label="Anchor link for: optional-examples--not-shipped">#</a></h2>
+<p>These examples require project-specific infrastructure and rulebooks. They are not part of the starter inventory above.</p>
+<table><thead><tr><th>Skill</th><th>Cadence</th><th>Does</th></tr></thead><tbody>
+<tr><td><code>/daily-routine</code></td><td>daily</td><td>folds new feedback into tickets in refinement, recounts open tests, reconciles wiki ↔ tracker both ways, posts one short update ranked by what blocks the next release</td></tr>
+<tr><td><code>/weekly-maintenance</code></td><td>weekly</td><td>backend/schema drift check, doc-sync jobs (schema, sitemap, API catalog…), tracker sync, the report suite, industry scan — one summary post</td></tr>
+<tr><td><code>/sync-wiki</code></td><td>on demand / around every skill</td><td>pull, commit, push the vault; resolve conflicts by reading both sides (only if the wiki is in git — see <a href="https://kaimys.github.io/obsidian-dispatch/docs/wiki-structure/#where-the-wiki-lives-relative-to-the-code">wiki-structure.md</a>)</td></tr>
+</tbody></table>
+<p>What makes recurring jobs survive contact with reality:</p>
+<ul>
+<li><strong>Sync-and-surface, never decide.</strong> A daily job may not answer an open question, may not move a ticket across a gated boundary, and stays silent when nothing changed. A job that posts every day gets muted in a week.</li>
+<li><strong>Rulebooks live in the wiki</strong> (<code>02_Product/Reports/_definitions/</code>), one page per job: what it measures, what counts, how it ranks. The skill executes; the rulebook decides. Tuning a threshold becomes a wiki edit anyone can review — not a code change.</li>
+<li><strong>A failing job is reported, never silently skipped.</strong> The one week the drift check quietly failed is the week the drift happened.</li>
+<li><strong>Derived documents register their refresh.</strong> Any job generating a page sets <code>maintained_by</code> on it; a job that no longer exists becomes a finding on the next run. This is the enforcement half of the <a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/#derived-pages">maintenance contract</a>.</li>
+</ul>
+<h2 id="wiring-skills-to-chips">Wiring skills to chips<a class="zola-anchor" href="#wiring-skills-to-chips" aria-label="Anchor link for: wiring-skills-to-chips">#</a></h2>
+<p>Define each skill once as a chip template in settings — <code>label | tool | repo | prompt</code> — and every ticket card offers it in its right-click menu:</p>
+<pre><code>Refine              | claude | my-project | /refine {{id}}
+Update ticket       | claude | my-project | /update-ticket {{id}}
+Implementation plan | claude | my-project | /implementation-plan {{id}}
+Start development   | claude | my-project | /develop {{id}}
+Code review         | claude | my-project | /code-review {{id}}
+Write test plan     | claude | my-project | /test-plan {{id}}
+</code></pre>
+<p>A label may carry the chip's <strong>intent</strong> — <code>Refine #refine</code> — which is what per-tool prompts are keyed on. It is worth setting only if you use those overrides, and it exists so that renaming the button does not silently drop them.</p>
+<p><strong>One chip per action, however many agents you run.</strong> The <code>tool</code> column is a <em>default</em>, not a constraint: with more than one agent configured, clicking a chip offers one button per agent and shows the exact command each would run. And you do not write a second prompt per agent — set the tool's invocation prefix once in the device config (<code>codex = $</code>), and a prompt that starts with <code>/</code> is rewritten for that agent. A prompt that is not a command — the batch ones below — is never touched.</p>
+<p>Column headers get batch versions (<code>{{ids}}</code>, <code>{{status}}</code>, <code>{{count}}</code>) for "update all tickets in refinement"; meeting rows and calendar events get their own sets. The mechanics — variables, tool commands, the busy-gate, run tracking — are in <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/#chips">installation.md</a>.</p>
+<p>Repositories are referenced by <strong>alias</strong>, never by path, so the same chip works on every teammate's machine.</p>
+
+    </div>
+    <nav class="docs-pager" aria-label="Previous and next page">
+      <a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/"><span class="dir">&larr; Previous</span>Page types</a>
+      <a class="next" href="https://kaimys.github.io/obsidian-dispatch/docs/wiki-structure/"><span class="dir">Next &rarr;</span>Wiki structure</a>
+    </nav>
+  </article>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

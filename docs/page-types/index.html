@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page types — Dispatch</title>
+<meta name="description" content="Every page in the wiki is a page type with a frontmatter contract. The contract is what makes a vault machine-checkable: an agent can verify that a page has…">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/" aria-current="page">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+<div class="wrap docs">
+  <details class="docs-nav" open>
+    <summary>Documentation</summary>
+    <div class="inner">
+      <nav aria-label="Documentation">
+        <h2>Documentation</h2>
+        <ol>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Overview</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/">Installation &amp; configuration</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/" aria-current="page">Page types</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/skills/">Workflow skills</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/wiki-structure/">Wiki structure</a></li>
+        </ol>
+      </nav>
+      <nav class="toc-block" aria-label="On this page">
+        <h2>On this page</h2>
+        <ol class="toc">
+          <li><a href="#every-page">Every page</a></li>
+          <li class="sub"><a href="#derived-pages">Derived pages</a></li>
+          <li><a href="#tickets">Tickets</a></li>
+          <li class="sub"><a href="#the-freeze-rule">The freeze rule</a></li>
+          <li><a href="#adrs">ADRs</a></li>
+          <li><a href="#releases">Releases</a></li>
+          <li><a href="#meetings">Meetings</a></li>
+          <li><a href="#legal-and-domain-documents">Legal and domain documents</a></li>
+          <li><a href="#reports">Reports</a></li>
+        </ol>
+      </nav>
+    </div>
+  </details>
+  <article>
+    <header class="page-head">
+      <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></p>
+      <h1>Page types</h1>
+    </header>
+    <div class="prose">
+<p>Every page in the wiki is a page type with a frontmatter contract. The contract is what makes a vault machine-checkable: an agent can verify that a page has an owner, that a derived page was refreshed after its source moved, that a ticket is complete enough to build. Without it, "the docs are current" is a feeling.</p>
+<p>Property <em>names</em> are yours — Dispatch reads whatever you configure. The names below are the ones the examples use.</p>
+<blockquote>
+<p><strong>Where these rules live:</strong> in one shared invariants file — <code>dispatch/invariants.md</code> — that each agent's instruction file (<code>CLAUDE.md</code>, <code>AGENTS.md</code>) points at, not in the individual skills. They are invariants that every workflow must respect; a rule copied into six skills is a rule that will hold in four of them, and a rule copied into two agents' instruction files will hold in one. Skills describe procedure; the invariants file describes what is never allowed to happen.</p>
+</blockquote>
+<h2 id="every-page">Every page<a class="zola-anchor" href="#every-page" aria-label="Anchor link for: every-page">#</a></h2>
+<pre><code data-lang="yaml">---
+status: approved          # approved | draft | proposed
+source_of_truth: true     # authoritative only when both are set
+updated: 2026-08-13       # last meaningful change
+owner: Morgan             # accountable human → 00_Start-Here/Team/
+---
+</code></pre>
+<ul>
+<li><strong><code>status</code> + <code>source_of_truth</code></strong> — a page is authoritative only with both. Everything else is context: useful, quotable, not binding. This is what lets you keep drafts and research in the same vault without an agent treating them as decided.</li>
+<li><strong><code>updated</code></strong> — a date an agent can compare against something else. A page that claims to describe the current system and hasn't moved in six months is a finding, not a fact.</li>
+<li><strong><code>owner</code></strong> — <strong>a person, never a team.</strong> "Everyone owns it" is how a page goes stale without anyone noticing. The owner is who gets asked when the page is wrong, and the name should resolve to a page under <code>00_Start-Here/Team/</code>.</li>
+</ul>
+<h3 id="derived-pages">Derived pages<a class="zola-anchor" href="#derived-pages" aria-label="Anchor link for: derived-pages">#</a></h3>
+<p>A page generated <em>from</em> something else — a schema doc from the live database, an API catalog from the code, a report from a rulebook — carries two more:</p>
+<pre><code data-lang="yaml">derived_from: 07_Engineering/Backend/    # source path, repo path, or URL
+maintained_by: /weekly-maintenance 1.6   # the job that regenerates it
+</code></pre>
+<p><strong>The rule that makes documentation stay current: a skill that creates a derived page must also register its refresh.</strong> If no recurring job owns it, the skill isn't allowed to create the page — because an unmaintained generated document is worse than no document. It looks authoritative and ages silently.</p>
+<p>That contract is checkable. A recurring job can flag:</p>
+<ul>
+<li>pages with no <code>owner</code></li>
+<li>derived pages whose <code>derived_from</code> changed after their <code>updated</code> date</li>
+<li>pages whose <code>maintained_by</code> job no longer exists</li>
+<li>pages marked <code>source_of_truth: true</code> that are stubs</li>
+</ul>
+<p>Which is a strictly better inconsistency report than one built on judgement calls.</p>
+<h2 id="tickets">Tickets<a class="zola-anchor" href="#tickets" aria-label="Anchor link for: tickets">#</a></h2>
+<p>The most important type — one note per story, bug or task, and the only type the Kanban board reads. Everything the board shows comes from frontmatter:</p>
+<pre><code data-lang="yaml">---
+id: US00042
+type: story                    # story | bug | security | task
+status: &quot;Development&quot;          # quote it — values contain spaces
+priority: high
+rank: 2048
+version_target: v1.4.0
+size: 3
+assignee: Alex
+open_questions: 0              # empty until someone has counted
+open_tests: 5                  # empty until the test plan is written
+open_findings:                 # empty until a review has counted
+discussion: https://…          # the thread where the team talked
+updated: 2026-08-13
+deployed: 2026-08-07           # stamped on completion
+frozen: 2026-08-05             # stamped when the spec closes (see below)
+---
+</code></pre>
+<img src="Frontmatter.png" alt="Tickets" width="33%" style="float: right; margin:10px" />
+<table><thead><tr><th>Property</th><th>Read by</th></tr></thead><tbody>
+<tr><td><code>id</code></td><td>card title prefix; the <code>{{id}}</code> chip variable — a ticket without one drops out of every batch chip</td></tr>
+<tr><td><code>type</code>, <code>priority</code></td><td>badges, slice-by</td></tr>
+<tr><td><code>status</code></td><td><strong>Kanban columns</strong> — the configured order is your pipeline</td></tr>
+<tr><td><code>rank</code></td><td>manual order within a column (priority)</td></tr>
+<tr><td><code>release_rank</code></td><td>manual build order within a Release Plan column, if the board names it as the release order property</td></tr>
+<tr><td><code>version_target</code></td><td><strong>Release Plan columns</strong>, normalized by <code>major.minor</code></td></tr>
+<tr><td><code>size</code></td><td>weighted progress and the velocity forecast</td></tr>
+<tr><td><code>assignee</code></td><td>owner badge, slice-by, Todos fallback owner</td></tr>
+<tr><td><code>open_questions</code></td><td>the <code>? N</code> badge — 0 is the gate out of refinement; empty means nobody has counted, which is not the same as 0</td></tr>
+<tr><td><code>open_tests</code></td><td>the <code>✓ N</code> badge — 0 means manual review is complete; empty means no test plan has been written, which is not the same as 0</td></tr>
+<tr><td><code>open_findings</code></td><td>the <code>⚠ N</code> badge — blocking findings from the <em>latest</em> code review; empty means no review describes this build, which is not the same as 0</td></tr>
+<tr><td><code>discussion</code></td><td>chat icon linking to the thread</td></tr>
+<tr><td><code>deployed</code></td><td>drives the velocity forecast (completed weight per day)</td></tr>
+</tbody></table>
+<p>The <a href="https://kaimys.github.io/obsidian-dispatch/docs/skills/#small-bug-shortcut">explicit small-bug shortcut</a> may complete without
+an independent review: its record says review was omitted and <code>open_findings</code> stays
+empty. It still assesses coverage, records actual verification and requires no
+outstanding manual checks before <code>open_tests: 0</code> and completion. It finalizes and
+freezes the contract before completing, and writes the configured completion date
+and tracker state itself. This does not relax the ordinary <code>/test-plan</code> review gate.</p>
+<p>Two conventions worth adopting: <strong>quote status values</strong>, since they contain spaces, and <strong>make <code>id</code> mandatory</strong> via the required-properties setting, so the problems panel catches a missing one immediately.</p>
+<h3 id="the-freeze-rule">The freeze rule<a class="zola-anchor" href="#the-freeze-rule" aria-label="Anchor link for: the-freeze-rule">#</a></h3>
+<p>A ticket has two zones, and they behave differently once code exists.</p>
+<p><strong>Contract zone</strong> — Goal / Symptom, Acceptance criteria, Open questions and their answers, Scope, Implementation plan. This is what the implementation was built against.</p>
+<p><strong>Record zone</strong> — As-built notes, Test plan and results, Follow-ups, dated comments. This is what actually happened.</p>
+<p><strong>The contract zone freezes when the ticket leaves development</strong> — at the status where code exists that depends on it (<em>Ready for Build</em> in the example pipeline). Stamp <code>frozen:</code> with the date, so the boundary survives a card being dragged backwards later.</p>
+<p>After the freeze:</p>
+<ol>
+<li><strong>Contract sections are read-only.</strong> New information becomes a dated entry in the record zone.</li>
+<li><strong>A wrong frozen statement gets an annotation, never a rewrite:</strong> <code>&gt; ⚠️ Correction 2026-08-12: …</code> directly beneath it. The wrong sentence stays visible, because that is what the code was built on.</li>
+<li><strong>New scope is a new ticket</strong>, linked both ways. A finished ticket is not superseded — it is finished, and the new work is a different piece of work.</li>
+<li><strong>Every skill that writes to tickets checks the freeze first.</strong> On a frozen ticket it appends to the record zone or opens a follow-up, and says which it did.</li>
+</ol>
+<p>The reason is auditability, not ceremony. If a spec can be edited after the code was written against it, then a later mismatch between spec and code has two explanations — the code is wrong, or the spec drifted — and no way to tell them apart. Rewriting an answered open question is the sharpest case: it erases what was actually decided at build time, which is often the only record of <em>why</em>.</p>
+<p>Mark the zones in the ticket template so the boundary is visible while writing, not just documented somewhere.</p>
+<h2 id="adrs">ADRs<a class="zola-anchor" href="#adrs" aria-label="Anchor link for: adrs">#</a></h2>
+<p>One file per durable decision, in <code>07_Engineering/Decisions/</code>, indexed by <code>Decisions.md</code>.</p>
+<pre><code data-lang="yaml">---
+id: ADR-0012
+status: accepted            # proposed | accepted | superseded
+date: 2026-05-14
+superseded_by: ADR-0031     # only when status: superseded
+owner: Alex
+---
+</code></pre>
+<ul>
+<li><strong>Record the rejected alternatives</strong>, not just the decision. Half an ADR's value is the deliberate <em>we do not do X</em> — those are the ones re-proposed every few months by someone who wasn't there.</li>
+<li><strong>Never delete one.</strong> Supersede it: mark <code>superseded</code>, link forward with <code>superseded_by</code>, and leave the original in place. The link is what makes it useful — a reader lands on the old decision and is pointed to the current one, instead of merely warned off.</li>
+<li><strong>A change that contradicts an accepted ADR is a decision to reopen</strong>, not a detail to work around.</li>
+<li>ADRs are written <em>from</em> tickets — the implementation-plan step is a natural extraction point, since that is where durable decisions get made and would otherwise be buried in a spec nobody reads again.</li>
+</ul>
+<h2 id="releases">Releases<a class="zola-anchor" href="#releases" aria-label="Anchor link for: releases">#</a></h2>
+<p>One note per release, in <code>08_Delivery-and-QA/Releases/</code>. The Release Plan tab reads them: a note for <code>x.y.0</code> links from the version line, and each <code>x.y.z</code> links from its patch column when the line is expanded.</p>
+<pre><code data-lang="yaml">---
+version: v1.4.0
+date: 2026-08-07
+status: released            # planned | released
+owner: Alex
+---
+</code></pre>
+<p>Contents worth keeping: what shipped (as links to the tickets, which carry the detail), what the build metadata was, and what deliberately did not make it. Release notes are <strong>events</strong> — they were true on their date and never become untrue, so they need no currency marker. They are, however, the fastest way to answer "when did this behaviour change?", which makes the ticket links the important part.</p>
+<h2 id="meetings">Meetings<a class="zola-anchor" href="#meetings" aria-label="Anchor link for: meetings">#</a></h2>
+<p>One note per meeting, in <code>09_Meetings/</code>, named <code>YYYY-MM-DD - &lt;meeting&gt;.md</code>. Feeds both the Meetings tab and the Todos tab.</p>
+<pre><code data-lang="yaml">---
+meeting_date: 2026-08-04
+participants: [Alex, Robin, Morgan]
+discussion: https://…        # the thread where the agenda was announced
+decisions_folded: 2026-08-05 # when decisions were written into the tickets
+open_actions: 3
+---
+</code></pre>
+<ul>
+<li><strong>The agenda is written before</strong>, from the board — open refinement questions, tests waiting for sign-off, what blocks the next release. Announce it in the thread named by <code>discussion:</code> so the team can add to it.</li>
+<li><strong>The report is written after</strong>, from the transcript in <code>01_Sources/</code> <em>together with</em> that thread — the thread usually carries the context the transcript lacks.</li>
+<li><strong><code>decisions_folded:</code></strong> is the property that matters. A meeting note's decisions are worthless until they reach the tickets they affect, and that is a real, changing, checkable state — unlike "historical", which every meeting note eventually becomes and which therefore carries no information.</li>
+<li><strong>Action items go in an allowlisted section</strong> (default "Action items"), with an owner as a bold line or an inline <code>**Name:**</code> prefix. That is what the Todos tab collects.</li>
+</ul>
+<p>Meeting notes are never authoritative. Durable outcomes get promoted — into tickets, or into an ADR — and the note stays as the record of when it was said.</p>
+<h2 id="legal-and-domain-documents">Legal and domain documents<a class="zola-anchor" href="#legal-and-domain-documents" aria-label="Anchor link for: legal-and-domain-documents">#</a></h2>
+<p>One folder, three kinds of document that behave nothing like each other. Getting them confused is why "legal outranks product" feels wrong to anyone who has actually shipped a privacy declaration.</p>
+<table><thead><tr><th>Kind</th><th>Example</th><th>Where it comes from</th><th>Precedence</th></tr></thead><tbody>
+<tr><td><strong>External constraints</strong></td><td>GDPR, AI Act, medical-device rules, app-store policy</td><td>imposed on you; the text lives in <code>01_Sources/Domain/</code></td><td>above everything — no decision of yours changes it</td></tr>
+<tr><td><strong>Negotiated commitments</strong></td><td>privacy declaration, terms of use, data-processing agreement</td><td><em>derived from</em> your product: counsel supplies a standard document, you state the deltas you need, counsel checks what is legally available</td><td>product leads while drafting; <strong>binds the product once published</strong></td></tr>
+<tr><td><strong>Generated inventories</strong></td><td>open-source licenses and attributions</td><td>derived mechanically from the dependency tree</td><td>a <a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/#derived-pages">derived page</a> — regenerate, never hand-edit</td></tr>
+</tbody></table>
+<p>The middle row is the one that needs a contract, because it changes direction the moment it ships:</p>
+<pre><code data-lang="yaml">---
+status: approved
+source_of_truth: true
+owner: Morgan              # the accountable person on your side, not the lawyer
+counsel: &lt;firm or person&gt;  # who reviewed it
+published: 2026-08-07      # the date this text went live
+binds: v1.4.5              # the release whose users agreed to this text
+supersedes: [[Privacy Declaration v1.3]]
+---
+</code></pre>
+<ul>
+<li><strong>A published legal text is never edited in place.</strong> Publish a new version and keep the previous one verbatim — "what did this user agree to in March?" is a question you must be able to answer per release, and consent records point at a version. Same shape as the <a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/#the-freeze-rule">ticket freeze</a>: a document is freely editable until something depends on it, then changes become a deliberate, versioned act.</li>
+<li><strong>The drift check runs backwards.</strong> For most engineering docs you ask "does the doc still match the code". For a published commitment you ask "<strong>does the code still match what we promised</strong>" — and when it doesn't, the code is the defect. Give that check a recurring job, because it is the one place where a documentation gap is a liability rather than an inconvenience.</li>
+<li><strong>Owner is internal.</strong> The lawyer authored the text; they are not the person who notices that a shipped feature contradicts it. That is someone on your team, and their name goes in <code>owner:</code>.</li>
+<li><strong>The source artifacts belong in <code>01_Sources/</code></strong> — counsel's standard draft, the signed final, the regulation itself. The wiki page is your working version; the artifact is what you were actually given.</li>
+</ul>
+<h2 id="reports">Reports<a class="zola-anchor" href="#reports" aria-label="Anchor link for: reports">#</a></h2>
+<p>Dated, recurring analyses in <code>02_Product/Reports/</code> — scope gaps, doc↔code drift, market scans. Derived pages, so they carry <code>derived_from</code> and <code>maintained_by</code>.</p>
+<p>The part worth stealing: <strong>the rulebook lives next to the reports, not in the skill.</strong> One page per report in <code>_definitions/</code> describing what it measures, what counts as a finding, how findings are ranked, and what goes in the summary. The skill executes; the rulebook decides. That way tuning a report — raising a threshold, excluding a category, changing the KPI — is a wiki edit a non-developer can make and review, instead of a code change.</p>
+
+    </div>
+    <nav class="docs-pager" aria-label="Previous and next page">
+      <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/"><span class="dir">&larr; Previous</span>Installation &amp; configuration</a>
+      <a class="next" href="https://kaimys.github.io/obsidian-dispatch/docs/skills/"><span class="dir">Next &rarr;</span>Workflow skills</a>
+    </nav>
+  </article>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

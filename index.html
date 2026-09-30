@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dispatch — a working process for agent-native teams</title>
+<meta name="description" content="Dispatch is a board for Obsidian that gives a small agent-native team a working process.">
+<meta name="color-scheme" content="light dark">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/" aria-current="page"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+<section class="hero" aria-labelledby="pitch">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Obsidian plugin</p>
+      <h1 id="pitch">A working process for agent-native teams <span class="tri" aria-hidden="true">&#9655;</span></h1>
+      <p class="lede">Dispatch is a board for Obsidian that gives a small agent-native team a working process: skills that run through the wiki and the team chat, and a chip on every card that sends an agent at the work.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="https://community.obsidian.md/plugins/dispatch">Install from the plugin directory</a>
+        <a class="btn btn-secondary" href="https://kaimys.github.io/obsidian-dispatch/articles/dispatch-101"><span class="tri" aria-hidden="true">&#9655;</span> Read Dispatch 101</a>
+      </div>
+      <p class="requirements">Free and open source. Desktop only, Obsidian 1.7.2 or newer.</p>
+    </div>
+    <div class="board" role="img" aria-label="A Dispatch board with Refinement, In progress and Review columns. Each card shows its ticket ID, badges for open questions and tests, and a chip that launches a coding agent on it.">
+      <div class="col">
+        <div class="col-head"><span>Refinement</span><span>2</span></div>
+        <div class="card"><div class="id">US00042</div><div class="t">Let users export a report</div><div class="foot"><span class="badge badge-amber">? 2</span><span class="pill">story</span><span class="launch">&#9655; refine</span></div></div>
+        <div class="card"><div class="id">BUG00001</div><div class="t">Bold owner context survives a blank line</div><div class="foot"><span class="badge badge-green">? 0</span><span class="pill">bug</span><span class="launch">&#9655; fix-bug</span></div></div>
+      </div>
+      <div class="col">
+        <div class="col-head"><span>In progress</span><span>1</span></div>
+        <div class="card running"><div class="id">US00053</div><div class="t">Retarget a whole release from its header</div><div class="foot"><span class="pill">v0.3.0</span><span class="launch">&#9654; develop</span></div></div>
+      </div>
+      <div class="col">
+        <div class="col-head"><span>Review</span><span>1</span></div>
+        <div class="card"><div class="id">US00043</div><div class="t">Finished is not shipped</div><div class="foot"><span class="badge badge-violet">&#10003; 5</span><span class="pill">v0.3.0</span><span class="launch">&#9655; test-plan</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+<div class="wrap home-grid">
+  <section class="home-section" aria-labelledby="updates">
+    <h2 class="section-title" id="updates">Updates</h2>
+    <ul class="updates">
+      <li><a class="entry" href="https://kaimys.github.io/obsidian-dispatch/articles/elternkraft">
+        <span class="kind"><span class="chip">Article</span><span class="meta"><time datetime="2026-09-30">2026-09-30</time></span></span>
+        <span class="title">Elternkraft: the origins of Dispatch</span>
+        <p class="summary">A team of three took a parenting app from its first commit to the App Store and Google Play in 130 days, with an LLM Wiki as the backbone. Dispatch grew out of that project.</p>
+      </a></li>
+      <li><a class="entry" href="https://kaimys.github.io/obsidian-dispatch/releases/0-3-1">
+        <span class="kind"><span class="chip chip-release">Release</span><span class="meta"><time datetime="2026-09-28">2026-09-28</time></span></span>
+        <span class="title">v0.3.1</span>
+        <p class="summary">Dispatch 0.3.1 fixes the 0.3.0 release, which shipped with the wrong manifest.json and was broken. The plugin&#x27;s code, styles and minAppVersion are the same as…</p>
+      </a></li>
+      <li><a class="entry" href="https://kaimys.github.io/obsidian-dispatch/releases/0-3-0">
+        <span class="kind"><span class="chip chip-release">Release</span><span class="meta"><time datetime="2026-09-28">2026-09-28</time></span></span>
+        <span class="title">v0.3.0</span>
+        <p class="summary">Version 0.3.0 substantially improved release planning. The develop branch is now the standard, and the &#x2F;release skill merges it back to the main branch. It…</p>
+      </a></li>
+      <li><a class="entry" href="https://kaimys.github.io/obsidian-dispatch/articles/dispatch-101">
+        <span class="kind"><span class="chip">Article</span><span class="meta"><time datetime="2026-09-24">2026-09-24</time></span></span>
+        <span class="title">Dispatch 101</span>
+        <p class="summary">How Dispatch connects your Obsidian wiki, your repository and your coding agent — the setup, the ticket workflow and the skills that carry a ticket from refinement to release.</p>
+      </a></li>
+      <li><a class="entry" href="https://kaimys.github.io/obsidian-dispatch/releases/0-2-5">
+        <span class="kind"><span class="chip chip-release">Release</span><span class="meta"><time datetime="2026-09-18">2026-09-18</time></span></span>
+        <span class="title">v0.2.5</span>
+        <p class="summary">Chips can now dispatch Codex as well as Claude Code, through every install route — the Claude plugin marketplace, the Codex marketplace, and the Codex skill…</p>
+      </a></li>
+      <li><a class="entry" href="https://kaimys.github.io/obsidian-dispatch/releases/0-2-4">
+        <span class="kind"><span class="chip chip-release">Release</span><span class="meta"><time datetime="2026-08-24">2026-08-24</time></span></span>
+        <span class="title">v0.2.4</span>
+        <p class="summary">Fixes github.com&#x2F;kaimys&#x2F;obsidian-dispatch&#x2F;issues&#x2F;5</p>
+      </a></li>
+    </ul>
+    <p class="more"><a href="https://kaimys.github.io/obsidian-dispatch/articles/">All articles</a> · <a href="https://kaimys.github.io/obsidian-dispatch/releases/">All releases</a></p>
+  </section>
+  <aside class="home-section home-aside" aria-labelledby="follow">
+    <h2 class="section-title" id="follow">Follow and give feedback</h2>
+    <ul class="social">
+      <li><a href="https://github.com/kaimys/obsidian-dispatch"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg><span>GitHub</span><span class="handle">kaimys&#x2F;obsidian-dispatch</span></a></li>
+      <li><a href="https://community.obsidian.md/plugins/dispatch"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg><span>Obsidian</span><span class="handle">dispatch</span></a></li>
+      <li><a href="https://www.linkedin.com/in/kaimysliwiec/"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg><span>LinkedIn</span><span class="handle">kaimysliwiec</span></a></li>
+      <li><a href="https://bsky.app/profile/kaimys.bsky.social"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg><span>Bluesky</span><span class="handle">@kaimys.bsky.social</span></a></li>
+      <li><a href="https://x.com/kaimys"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg><span>X</span><span class="handle">@kaimys</span></a></li>
+      <li><a href="https://eightnine.de/"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg><span>Kai&#x27;s homepage</span><span class="handle">eightnine.de</span></a></li>
+    </ul>
+  </aside>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

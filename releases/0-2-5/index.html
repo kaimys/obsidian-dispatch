@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v0.2.5 — Dispatch releases</title>
+<meta name="description" content="Chips can now dispatch Codex as well as Claude Code, through every install route — the Claude plugin marketplace, the Codex marketplace, and the Codex skill…">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/releases/0-2-5/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/" aria-current="page">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+
+<article class="wrap">
+  <header class="page-head">
+    <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></p>
+    <h1>v0.2.5</h1>
+    <p class="meta"><time datetime="2026-09-18">2026-09-18</time> · <a href="https://github.com/kaimys/obsidian-dispatch/releases/tag/0.2.5">GitHub release</a></p>
+  </header>
+  <div class="prose">
+<h2 id="the-agent-release">The agent release<a class="zola-anchor" href="#the-agent-release" aria-label="Anchor link for: the-agent-release">#</a></h2>
+<p>0.2.4 was a single fix. This one is eleven tickets, and most of them are about
+what happens after you click a chip.</p>
+<h3 id="codex-is-a-first-class-chip-tool">Codex is a first-class chip tool<a class="zola-anchor" href="#codex-is-a-first-class-chip-tool" aria-label="Anchor link for: codex-is-a-first-class-chip-tool">#</a></h3>
+<p>Chips can now dispatch <strong>Codex</strong> as well as Claude Code, through every install
+route — the Claude plugin marketplace, the Codex marketplace, and the Codex
+skill installer. In a multi-agent setup the board offers one neutral chip per
+workflow intent and keeps the agent-specific <code>/</code> or <code>$</code> prefix in device-local
+configuration, so the same menu entry launches either agent.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/4">github.com/kaimys/obsidian-dispatch/issues/4</a></p>
+<h3 id="a-code-review-chip-on-the-card">A code-review chip on the card<a class="zola-anchor" href="#a-code-review-chip-on-the-card" aria-label="Anchor link for: a-code-review-chip-on-the-card">#</a></h3>
+<p><code>/code-review &lt;id&gt;</code> launches from the ticket card. The point is not
+convenience: a chip launch is a fresh session by construction, and "the
+reviewer is not the author" is the one precondition a review cannot fake. Cards
+also gained a blocking-findings counter beside the existing questions and tests
+badges.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/33">github.com/kaimys/obsidian-dispatch/issues/33</a></p>
+<h3 id="the-skills-catalog-describes-what-you-actually-get">The skills catalog describes what you actually get<a class="zola-anchor" href="#the-skills-catalog-describes-what-you-actually-get" aria-label="Anchor link for: the-skills-catalog-describes-what-you-actually-get">#</a></h3>
+<p>The setup skill scaffolds nine workflow commands; the documentation still
+claimed Dispatch shipped none, and mixed those defaults with examples that were
+never shipped.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/10">github.com/kaimys/obsidian-dispatch/issues/10</a></p>
+<h3 id="install-and-setup">Install and setup<a class="zola-anchor" href="#install-and-setup" aria-label="Anchor link for: install-and-setup">#</a></h3>
+<p>Every install document now says what is true — Dispatch is in the Obsidian
+community plugin directory, and the quick start no longer routes people through
+a manual file copy.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/7">github.com/kaimys/obsidian-dispatch/issues/7</a></p>
+<p>A wiki and its code repository are now paired by configuration rather than by
+folder nesting and symlinks, so the two no longer have to live inside one
+another on disk.</p>
+<h3 id="google-meet-transcripts-import-themselves">Google Meet transcripts import themselves<a class="zola-anchor" href="#google-meet-transcripts-import-themselves" aria-label="Anchor link for: google-meet-transcripts-import-themselves">#</a></h3>
+<p>Meeting summaries and transcripts no longer have to be downloaded by hand and
+dropped into a sources folder before a meeting report can run.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/3">github.com/kaimys/obsidian-dispatch/issues/3</a></p>
+<h3 id="fixes">Fixes<a class="zola-anchor" href="#fixes" aria-label="Anchor link for: fixes">#</a></h3>
+<p><strong>The milestone forecast was pessimistic on young boards.</strong> Velocity was
+divided by the full look-back window even when the board had only been
+collecting completions for a fraction of it, so a new board reported a fraction
+of its real throughput and every version forecast inherited the error.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/42">github.com/kaimys/obsidian-dispatch/issues/42</a></p>
+<p><strong>New tickets no longer claim a refinement nobody did.</strong> The starter ticket
+templates seeded <code>open_questions: 0</code>, so every ticket created from one rendered
+a green counter badge and met the development gate before anyone had refined
+it. All three gated counters now ship empty, and a counter reads <code>0</code> only where
+the section it counts records that the count was taken. This changes what a new
+ticket looks like — nothing rewrites tickets that already exist.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/60">github.com/kaimys/obsidian-dispatch/issues/60</a></p>
+<h3 id="security">Security<a class="zola-anchor" href="#security" aria-label="Anchor link for: security">#</a></h3>
+<p>The community directory's security review is answered, and the open advisories
+are cleared.</p>
+<ul>
+<li><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/17">github.com/kaimys/obsidian-dispatch/issues/17</a></li>
+<li><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/15">github.com/kaimys/obsidian-dispatch/issues/15</a></li>
+<li><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/34">github.com/kaimys/obsidian-dispatch/issues/34</a></li>
+</ul>
+<p>One recommendation was deliberately <strong>not</strong> taken: removing the plugin's
+clipboard write. It backs one convenience button, the reach it costs is a
+single documented call, and the review's concern is answered directly instead.</p>
+<p><a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/18">github.com/kaimys/obsidian-dispatch/issues/18</a></p>
+<h3 id="upgrading">Upgrading<a class="zola-anchor" href="#upgrading" aria-label="Anchor link for: upgrading">#</a></h3>
+<p>No migration and no configuration change. <code>minAppVersion</code> stays at <strong>1.7.2</strong>.</p>
+<p>Download <code>main.js</code>, <code>manifest.json</code> and <code>styles.css</code> below into
+<code>&lt;vault&gt;/.obsidian/plugins/dispatch/</code>, or install <strong>Dispatch</strong> from Obsidian's
+community plugin directory. Desktop only.</p>
+<p><strong>Full changelog:</strong> <a rel="external" href="https://github.com/kaimys/obsidian-dispatch/compare/0.2.4...0.2.5">github.com/kaimys/obsidian-dispatch/compare/0.2.4...0.2.5</a></p>
+
+  </div>
+  <footer class="article-foot">
+    <a href="https://kaimys.github.io/obsidian-dispatch/releases/0-2-4/">&larr; v0.2.4</a>
+    <a href="https://kaimys.github.io/obsidian-dispatch/releases/0-3-0/">v0.3.0 &rarr;</a>
+  </footer>
+</article>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

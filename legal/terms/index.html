@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms of Service — Dispatch</title>
+<meta name="description" content="Terms of service for Dispatch, the open-source agentic ticket board plugin for Obsidian.">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+<div class="wrap legal">
+  <header class="page-head">
+    <h1>Terms of Service</h1>
+    <p class="description">Terms of service for Dispatch, the open-source agentic ticket board plugin for Obsidian.</p>
+    <ul class="legal-nav" aria-label="Legal pages">
+      <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+      <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/" aria-current="page">Terms of Service</a></li>
+      <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+    </ul>
+  </header>
+  <div class="prose">
+<p><strong>Effective 31 August 2026.</strong></p>
+<p>These terms cover Dispatch, an open-source plugin for <a rel="external" href="https://obsidian.md">Obsidian</a> and
+its accompanying scripts, published by Kai Mysliwiec at
+<a rel="external" href="https://github.com/kaimys/obsidian-dispatch">github.com/kaimys/obsidian-dispatch</a>.</p>
+<p>By installing or using Dispatch, you agree to these terms. If you do not agree, do not
+install it.</p>
+<h2 id="1-what-dispatch-is-and-what-it-is-not">1. What Dispatch is, and what it is not<a class="zola-anchor" href="#1-what-dispatch-is-and-what-it-is-not" aria-label="Anchor link for: 1-what-dispatch-is-and-what-it-is-not">#</a></h2>
+<p>Dispatch is <strong>software you run on your own computer</strong>. It is not a hosted service. There is
+no account, no subscription, no server operated by the developer, and no data of yours held
+anywhere by the developer.</p>
+<p>Dispatch is provided free of charge under the <a rel="external" href="https://github.com/kaimys/obsidian-dispatch/blob/main/LICENSE">MIT
+licence</a>. Those licence terms
+govern your rights to use, copy, modify and redistribute the software; these terms cover
+your use of it.</p>
+<h2 id="2-your-responsibilities">2. Your responsibilities<a class="zola-anchor" href="#2-your-responsibilities" aria-label="Anchor link for: 2-your-responsibilities">#</a></h2>
+<ul>
+<li><strong>Your Google account.</strong> If you enable the meeting-import feature, you authorise Dispatch
+to read meeting artifacts from your own Google Drive using your own credentials. You are
+responsible for keeping those credentials secure, for having the right to access the
+content you import, and for complying with <a rel="external" href="https://policies.google.com/terms">Google's Terms of
+Service</a>.</li>
+<li><strong>Your recordings.</strong> Recording and transcribing meetings is regulated in many
+jurisdictions and often requires the consent of the participants. Dispatch imports
+transcripts that Google Meet has already produced; obtaining consent to produce them is
+yours to handle, not Dispatch's.</li>
+<li><strong>Your data.</strong> Dispatch writes to the markdown files in your vault, including moving
+cards, rewriting frontmatter and adding downloaded content. Keep backups. Use version
+control. The developer cannot recover anything for you.</li>
+<li><strong>Your commands.</strong> See section 3.</li>
+</ul>
+<h2 id="3-dispatch-launches-programs-you-configure">3. Dispatch launches programs you configure<a class="zola-anchor" href="#3-dispatch-launches-programs-you-configure" aria-label="Anchor link for: 3-dispatch-launches-programs-you-configure">#</a></h2>
+<p>This is the central thing to understand before using Dispatch.</p>
+<p>Dispatch's "chips" and board automations <strong>execute command-line programs on your computer</strong>
+using command templates that you supply in your own device-local configuration. Dispatch
+does not ship, endorse or vet those programs; it starts them, passes them the arguments you
+configured, and observes that they ran.</p>
+<p>You are solely responsible for what you configure Dispatch to run and for everything those
+programs do — including any file they change, any command they execute, any cost they incur
+and any data they transmit. AI coding agents in particular act with your permissions and can
+modify or delete your files.</p>
+<aside class="callout callout-note">
+
+<p>Dispatch is designed so that commands and filesystem paths live only in device-local
+configuration and never in synced notes, precisely so that a shared note cannot cause someone
+else's machine to run something. Do not defeat that boundary.</p>
+
+</aside>
+<h2 id="4-third-party-services">4. Third-party services<a class="zola-anchor" href="#4-third-party-services" aria-label="Anchor link for: 4-third-party-services">#</a></h2>
+<p>Dispatch interoperates with services operated by others — Google, GitHub, Anthropic, OpenAI
+and whatever else you point it at. Those services are governed by their own terms and
+policies. The developer is not a party to your relationship with them, is not responsible
+for their availability, and cannot help you with their accounts.</p>
+<h2 id="5-no-warranty">5. No warranty<a class="zola-anchor" href="#5-no-warranty" aria-label="Anchor link for: 5-no-warranty">#</a></h2>
+<p>Dispatch is provided <strong>"as is", without warranty of any kind</strong>, express or implied,
+including but not limited to the warranties of merchantability, fitness for a particular
+purpose and non-infringement.</p>
+<p>The developer does not warrant that Dispatch will be uninterrupted, error-free, compatible
+with any particular version of Obsidian or of any third-party service, or that it will
+preserve your data. It is a hobby project maintained at the developer's discretion.</p>
+<h2 id="6-limitation-of-liability">6. Limitation of liability<a class="zola-anchor" href="#6-limitation-of-liability" aria-label="Anchor link for: 6-limitation-of-liability">#</a></h2>
+<p>To the fullest extent permitted by applicable law, the developer shall not be liable for any
+claim, damages or other liability — whether in contract, tort or otherwise — arising from or
+in connection with Dispatch or its use, including any loss of data, loss of work, corruption
+of files, or costs incurred by programs Dispatch launched.</p>
+<p>Nothing in these terms excludes or limits liability for intent or gross negligence, for
+injury to life, body or health, or any other liability that cannot be excluded under
+mandatory applicable law.</p>
+<h2 id="7-availability-and-changes-to-the-software">7. Availability and changes to the software<a class="zola-anchor" href="#7-availability-and-changes-to-the-software" aria-label="Anchor link for: 7-availability-and-changes-to-the-software">#</a></h2>
+<p>The developer may change, break, or stop developing Dispatch at any time, without notice and
+without obligation. Because it is open-source and MIT-licensed, you may always continue to
+use, fork and maintain the version you have.</p>
+<h2 id="8-changes-to-these-terms">8. Changes to these terms<a class="zola-anchor" href="#8-changes-to-these-terms" aria-label="Anchor link for: 8-changes-to-these-terms">#</a></h2>
+<p>These terms may be revised. Revisions are published on this page with a new effective
+date, and every revision is visible in the project's public history. Continued use after a
+change constitutes acceptance of it.</p>
+<h2 id="9-governing-law">9. Governing law<a class="zola-anchor" href="#9-governing-law" aria-label="Anchor link for: 9-governing-law">#</a></h2>
+<p>These terms are governed by the law of the Federal Republic of Germany, excluding its
+conflict-of-law rules and excluding the UN Convention on Contracts for the International Sale
+of Goods. Where you are a consumer, this choice of law does not deprive you of the protection
+of mandatory provisions of the law of your country of habitual residence.</p>
+<h2 id="10-severability">10. Severability<a class="zola-anchor" href="#10-severability" aria-label="Anchor link for: 10-severability">#</a></h2>
+<p>If any provision of these terms is found unenforceable, the remaining provisions stay in
+full effect.</p>
+<h2 id="contact">Contact<a class="zola-anchor" href="#contact" aria-label="Anchor link for: contact">#</a></h2>
+<p>Kai Mysliwiec — kai@eightnine.de
+Project: <a rel="external" href="https://github.com/kaimys/obsidian-dispatch">github.com/kaimys/obsidian-dispatch</a></p>
+
+  </div>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

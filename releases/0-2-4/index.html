@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v0.2.4 — Dispatch releases</title>
+<meta name="description" content="Fixes github.com&#x2F;kaimys&#x2F;obsidian-dispatch&#x2F;issues&#x2F;5">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/releases/0-2-4/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/" aria-current="page">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+
+<article class="wrap">
+  <header class="page-head">
+    <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></p>
+    <h1>v0.2.4</h1>
+    <p class="meta"><time datetime="2026-08-24">2026-08-24</time> · <a href="https://github.com/kaimys/obsidian-dispatch/releases/tag/0.2.4">GitHub release</a></p>
+  </header>
+  <div class="prose">
+<h2 id="the-settings-tab-has-its-input-fields-back">The settings tab has its input fields back<a class="zola-anchor" href="#the-settings-tab-has-its-input-fields-back" aria-label="Anchor link for: the-settings-tab-has-its-input-fields-back">#</a></h2>
+<p>0.2.3 shipped a settings tab that rendered <strong>no input controls</strong> on Obsidian
+1.13 or later: every setting appeared as a name and a description with nothing
+to type into. Legible, and completely inert. If you are on 1.13+, upgrade —
+there is no workaround short of editing <code>data.json</code> by hand.</p>
+<p>Fixes <a rel="external" href="https://github.com/kaimys/obsidian-dispatch/issues/5">github.com/kaimys/obsidian-dispatch/issues/5</a></p>
+<h3 id="what-happened">What happened<a class="zola-anchor" href="#what-happened" aria-label="Anchor link for: what-happened">#</a></h3>
+<p>Obsidian 1.13 renders a settings tab from <code>getSettingDefinitions()</code> and <strong>stops
+calling <code>display()</code></strong> as soon as that array comes back non-empty. 0.2.3 added
+<code>getSettingDefinitions()</code> to feed the new settings search with names and
+descriptions only, on the assumption that <code>display()</code> would carry on rendering
+— so all 37 rows arrived without their controls. Below 1.13 the API does not
+exist, <code>display()</code> still ran, and the tab worked, which is why it passed
+testing against <code>minAppVersion</code> 1.7.2 and shipped broken to everyone above it.</p>
+<p>Introduced in <a rel="external" href="https://github.com/kaimys/obsidian-dispatch/releases/tag/0.2.3">github.com/kaimys/obsidian-dispatch/releases/tag/0.2.3</a> —
+that release note claimed rendering was unchanged on 1.13+. It was not, and
+this is the correction.</p>
+<p><strong>No settings were lost.</strong> <code>data.json</code> and the device-local config kept their
+values and the board kept reading them throughout; only editing from the UI was
+affected.</p>
+<h3 id="the-trade-off">The trade-off<a class="zola-anchor" href="#the-trade-off" aria-label="Anchor link for: the-trade-off">#</a></h3>
+<p>Dispatch is invisible to Obsidian's 1.13+ settings search again, which is the
+feature 0.2.3 was reaching for. Keeping it would mean porting all 37 settings
+to declarative <code>control</code>/<code>render</code> definitions <strong>and</strong> raising <code>minAppVersion</code>
+to 1.13, dropping every user below it. That is a deliberate decision rather
+than a lint fix, and it is not scheduled.</p>
+<p><code>minAppVersion</code> stays at <strong>1.7.2</strong>. Nothing else changes: no migration, no
+configuration change, no behaviour change outside the settings tab.</p>
+<h3 id="install">Install<a class="zola-anchor" href="#install" aria-label="Anchor link for: install">#</a></h3>
+<p>Download <code>main.js</code>, <code>manifest.json</code> and <code>styles.css</code> below into
+<code>&lt;vault&gt;/.obsidian/plugins/dispatch/</code>, or install <strong>Dispatch</strong> from Obsidian's
+community plugin directory. Requires Obsidian 1.7.2+. Desktop only.</p>
+<p><strong>Full changelog:</strong> <a rel="external" href="https://github.com/kaimys/obsidian-dispatch/compare/0.2.3...0.2.4">github.com/kaimys/obsidian-dispatch/compare/0.2.3...0.2.4</a></p>
+
+  </div>
+  <footer class="article-foot">
+    <span></span>
+    <a href="https://kaimys.github.io/obsidian-dispatch/releases/0-2-5/">v0.2.5 &rarr;</a>
+  </footer>
+</article>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

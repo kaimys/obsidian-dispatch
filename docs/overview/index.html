@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview — Dispatch</title>
+<meta name="description" content="Dispatch turns a folder of markdown notes into a live project board — and every card on it into a launcher for a coding agent.">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/" aria-current="page">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+<div class="wrap docs">
+  <details class="docs-nav" open>
+    <summary>Documentation</summary>
+    <div class="inner">
+      <nav aria-label="Documentation">
+        <h2>Documentation</h2>
+        <ol>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/" aria-current="page">Overview</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/">Installation &amp; configuration</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/">Page types</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/skills/">Workflow skills</a></li>
+          <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/wiki-structure/">Wiki structure</a></li>
+        </ol>
+      </nav>
+      <nav class="toc-block" aria-label="On this page">
+        <h2>On this page</h2>
+        <ol class="toc">
+          <li><a href="#kanban-board">Kanban board</a></li>
+          <li><a href="#release-plan">Release Plan</a></li>
+          <li><a href="#meetings-board">Meetings board</a></li>
+          <li><a href="#todos-board">Todos board</a></li>
+          <li><a href="#what-the-board-doesnt-do">What the board doesn&#x27;t do</a></li>
+        </ol>
+      </nav>
+    </div>
+  </details>
+  <article>
+    <header class="page-head">
+      <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></p>
+      <h1>Overview</h1>
+    </header>
+    <div class="prose">
+<p>Dispatch turns a folder of markdown notes into a live project board — and every card on it into a launcher for a coding agent.</p>
+<p>Two primitives carry the whole plugin:</p>
+<ul>
+<li><strong>Boards</strong> — views over note frontmatter. Drag a card, and the frontmatter is written immediately. There is no separate database; the notes <em>are</em> the board, so everything a board shows is greppable, diffable and syncable.</li>
+<li><strong>Chips</strong> — buttons that launch an agent (Claude Code, Codex, any CLI) in the right repository, with the ticket as context. The board knows what the agent is doing; the note keeps what it did.</li>
+</ul>
+<p>Four tabs sit above the board. <strong>Kanban</strong> and <strong>Release Plan</strong> are always there; <strong>Meetings</strong> and <strong>Todos</strong> appear once you point at their folders. A ⟳ button re-reads settings and rescans the vault — use it after a git pull or an agent run rather than restarting Obsidian.</p>
+<p>Which frontmatter properties drive all this is up to you; see <a href="https://kaimys.github.io/obsidian-dispatch/docs/page-types/">page-types.md</a> for the contract, and <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/">installation.md</a> for where each setting lives.</p>
+<h2 id="kanban-board">Kanban board<a class="zola-anchor" href="#kanban-board" aria-label="Anchor link for: kanban-board">#</a></h2>
+<p>Columns are the values of your <strong>status</strong> property, in the order you configure — which means the column order <em>is</em> your pipeline, and Dispatch never invents one for you. A status found in a note but not configured shows up as an extra column at the end, so nothing silently disappears.</p>
+<figure>
+<img src="Kanban-Teaser.png" alt="Kanban Board">
+</figure>
+<ul>
+<li><strong>Drag between columns</strong> to change status; <strong>drag within a column</strong> to change priority. Order is data: it's written back into a <code>rank</code> property with gaps of 1024 and midpoint inserts, so a reorder normally rewrites only the moved note.</li>
+<li><strong>Cards show what you configure</strong>: a title (optionally prefixed by the ticket <code>id</code>), badges for any property (type, priority, size), an accent-outlined <code>@Name</code> for the assignee, and a chat icon linking to the discussion thread.</li>
+<li><strong>Three counters get their own badges</strong> because they gate the workflow rather than describe it: <code>? N</code> for open refinement questions (amber → green at 0), <code>⚠ N</code> for blocking findings from the last code review (red → green at 0) and <code>✓ N</code> for open manual test items (purple → green at 0). Green means build-ready, review-ready and sign-off-ready respectively. An <em>empty</em> counter is not a green one — an empty <code>⚠</code> means no review has run, an empty <code>✓</code> means no test plan has been written — so the badge is absent rather than reassuring.</li>
+<li><strong>A ⚠ problems panel</strong> lists cards missing required properties, carrying unrendered template stubs, or using a status that isn't a column — malformed tickets surface the moment they appear.</li>
+<li><strong>Right-click a card</strong> for its chips, or to edit size and badge properties inline.</li>
+<li><strong>Click a column header</strong> for batch chips: one agent session working through every ticket in that column in sequence.</li>
+<li><strong>WIP limits</strong> per column: the header shows <code>count/limit</code>, and the column outlines amber at the limit, red above it.</li>
+<li><strong>Keyboard</strong>: click a card to focus it and open its note; back on the board, arrows move focus, <code>Enter</code>/<code>o</code> opens the note, <code>[</code> / <code>]</code> move the focused card one column left or right — they do nothing when no card shows the focus outline.</li>
+</ul>
+<h2 id="release-plan">Release Plan<a class="zola-anchor" href="#release-plan" aria-label="Anchor link for: release-plan">#</a></h2>
+<p>The same cards, grouped by <strong>target version</strong> instead of status. Dragging a card between columns changes only the version — never its status or its Kanban rank. With a release order property configured, it also sets the card's place in the column (see below).</p>
+<figure>
+<img src="Release-Teaser.png" alt="Release Board">
+</figure>
+<ul>
+<li><strong>Version columns are keyed by <code>major.minor</code></strong>, so <code>v1.2.0</code>, <code>1.2.0</code> and <code>1.2.1</code> all land in the same <code>1.2</code> column. Inconsistent formatting in your notes doesn't split a milestone.</li>
+<li><strong>Planned versions are always shown</strong>, even when empty — that's how you plan a release before any ticket is assigned to it. Non-version planned values ("Icebox") become special columns on the left.</li>
+<li><strong>A drop writes one convention.</strong> Dropping a card on a version line writes that line's highest known patch as <code>vMAJOR.MINOR.PATCH</code> — <code>v1.2.3</code> if any card or planned entry already targets it, <code>v1.2.0</code> if none names a patch — whether the column was planned or appeared from the cards. A card dropped back on its own line keeps whatever it had.</li>
+<li><strong>An (archive) column</strong> on the far left collects cards excluded from progress (Rejected) and completed work with no version, keeping <em>(no version)</em> a clean pool of unscheduled open work.</li>
+<li><strong>Each version carries a progress bar</strong>: <code>Σ(size × status progress) / Σ(size)</code>. Status progress is a number you assign per column (e.g. Development = 55, Done = 100, Rejected = excluded); size is a numeric property, defaulting to 1 when missing.</li>
+<li><strong>Each version can carry a tag</strong> — "MVP", "Closed Beta" — edited by clicking the chip in the header.</li>
+<li><strong>Shipped versions link their release note</strong> and show the release date instead of an estimate. Unreleased ones show a <strong>velocity-based forecast</strong> that accumulates along the pipeline: a version's ETA covers the remaining weight of every earlier version plus its own, so a later release can never be forecast before an earlier one. The rate is measured from the completions in the look-back window: the earliest is a baseline, and the work finished after it is divided by the days from that date to the last completion. Fewer completions than the configured minimum (default four), or more than one on the earliest date, means no forecast — it never guesses.</li>
+<li><strong>Retarget a whole release from its header.</strong> Right-click a version line (<code>0.4</code>, not a patch column, <em>(no version)</em> or a label) and choose <em>Retarget release…</em> to move every card it shows to another line, whatever slice is active. Pick an existing line to merge into it — the cards get that line's highest known patch, and its own cards and tag stay as they are — or type a new version such as <code>v0.6.0</code>. The emptied line disappears: its planned entry is removed, or renumbered when the target is new, and its tag follows it to a new line or is dropped on a merge. A tag the target line already has always wins. A line holding any finished card (a status at 100 % progress, such as Done or Released) cannot be retargeted at all — nothing is written, and the notice names the cards. A target on the same line (<code>0.4.0</code> → <code>0.4.1</code>) is refused; drag single cards to change a patch. A confirmation says how many tickets move and what happens to the column before anything is written, and board automations do not run for it.</li>
+<li><strong>Patch releases expand on demand</strong>: a <code>+</code> on a version line splits <code>1.4</code> into <code>1.4.0</code>, <code>1.4.1</code>, <code>1.4.2</code> …, each with its own progress, drop target and release note; <code>−</code> collapses it again. The expansion is view-local, so opening a line never changes anyone else's board.</li>
+</ul>
+<p><strong>Order inside a column.</strong> By default, cards inside a version column follow the configured status-column order — with Backlog → Refinement → In progress → Review → Done, Backlog comes first — then Kanban rank, then title.</p>
+<p>Set <strong>Release order property</strong> (e.g. <code>release_rank</code>) to <strong>drag cards into the order you intend to build them</strong>. The order is data, written into that property the same gap-based way as the Kanban <code>rank</code>, and kept separate from it, so the two tabs never reorder each other.</p>
+<ul>
+<li><strong>Your order wins.</strong> A card with a release position sorts above one without, whatever their status — a <code>Backlog</code> card can sit above a <code>Done</code> one. Cards without a position follow in the default order, so the board looks exactly as before until someone drags. The first drop in a column numbers the whole column as it was shown.</li>
+<li><strong>A drop lands where you drop it</strong>, next to the visible card it was dropped on, even while a slice hides some of the column. Dropping a card back on its own spot writes nothing, and reordering never touches the version, however it is spelled.</li>
+<li><strong>A position belongs to its line.</strong> Expanding a line shows each patch column's cards in the line's one order. A card that changes column without a chosen spot — the <code>[</code> / <code>]</code> keys, or a <em>Retarget release…</em> that merges into an existing line — joins the end of the target, and a merged line keeps its own order after the target's cards.</li>
+<li><strong>(no version) and label columns are ordered too</strong>; the (archive) keeps the default sort.</li>
+<li><strong>Copy release order to Kanban.</strong> Right-click a version line and choose it to start building that release: on the Kanban tab, the line's cards move to the top of each status column in release order, and every other card keeps its order below them. It writes <code>rank</code> only, once — a later release reorder does not copy again, and running it again right away writes nothing.</li>
+<li>A reorder is silent and runs no board automation.</li>
+</ul>
+<h2 id="meetings-board">Meetings board<a class="zola-anchor" href="#meetings-board" aria-label="Anchor link for: meetings-board">#</a></h2>
+<p>One row per meeting, newest first, upcoming ones marked with a dashed border. Each row shows the date, the participants, and <strong>that meeting's open action items broken down per person</strong> — not a total, because "7 open" tells you nothing about whether it's your problem. A green check marks a meeting with nothing outstanding.</p>
+<figure>
+<img src="Meeting-Teaser.png" alt="Meeting Board">
+</figure>
+<p>Meeting rows get their own chips (e.g. "Write the report from the transcript"), and calendar events get <strong>event chips</strong> with <code>{{date}}</code>/<code>{{title}}</code> variables (e.g. "Prepare agenda") — both as right-click menus, so a chip never has to be pasted into a note.</p>
+<p>With a <strong>calendar ICS URL</strong> configured (device-local — a Google Calendar secret address works), an upcoming strip sits on top: recurring events expanded, filtered by title if you want. An event whose date already has a meeting note links to it (<em>agenda ✓</em>); the rest say <em>no agenda yet</em>, which is the entire status report you need before a week starts.</p>
+<h2 id="todos-board">Todos board<a class="zola-anchor" href="#todos-board" aria-label="Anchor link for: todos-board">#</a></h2>
+<p>Every open action item across your configured folders, in <strong>two columns</strong>: <strong>Assigned</strong> (items with a named owner) and a fallback column — <em>Team</em> by default — for shared items nobody owns yet. A slice bar filters the assigned column to one person; the Team column always stays visible, because shared work is everyone's.</p>
+<figure>
+<img src="Todos-Teaser.png" alt="Open Task Board">
+</figure>
+<ul>
+<li><strong>Items are unchecked <code>- [ ]</code> lines inside allowlisted sections</strong> (default: "Action items", "Open action items"), so acceptance criteria and test plans don't flood the board.</li>
+<li><strong>Owner attribution</strong> follows the convention meeting notes already use — a bold owner line (<code>**Alex**</code>) or an inline <code>- [ ] **Alex:** …</code> prefix — with a ticket's assignee as fallback. Configure the list of real names, and a bold prefix that isn't one (<code>**US00055:**</code>, <code>**Friday:**</code>) stays item text instead of inventing a person.</li>
+<li><strong>Clicking an item deep-links into the note at that line.</strong> Ticking happens in the document, where the context and evidence live; the board follows within a second. There is deliberately no write path from the board into your notes here.</li>
+</ul>
+<p>Collection is cache-layered — a metadata pre-filter, then content reads only for files that changed, memoized by mtime — so the tab stays cheap in a large vault.</p>
+<h2 id="what-the-board-doesnt-do">What the board doesn't do<a class="zola-anchor" href="#what-the-board-doesnt-do" aria-label="Anchor link for: what-the-board-doesnt-do">#</a></h2>
+<p>Dispatch reads and writes frontmatter, and launches processes you configured. It does not track state of its own: no hidden database, no sync service, no server. Live agent state lives on the machine running the agent; everything durable lives in the notes and travels with your vault.</p>
+<p>That boundary is deliberate — see <a href="https://kaimys.github.io/obsidian-dispatch/docs/installation/#security-model">installation.md</a> for what a note can and cannot cause to happen.</p>
+
+    </div>
+    <nav class="docs-pager" aria-label="Previous and next page">
+      
+      <a class="next" href="https://kaimys.github.io/obsidian-dispatch/docs/installation/"><span class="dir">Next &rarr;</span>Installation &amp; configuration</a>
+    </nav>
+  </article>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,16 @@
+DispatchOCR
+
+Derived from OCR A by Matthew Skala (2011-12, 2021), based on code by
+Richard B. Wales (1988-89) and Tor Lillqvist.
+Upstream: https://tsukurimashou.org/ocr.php.en
+
+Matthew Skala places his work in the public domain. The Richard B. Wales
+notice it derives from asks that the credit stay intact and that the font
+not be sold. The attribution also lives in the font's own name table and in
+the comment above the @font-face rule in style.css — keep them together.
+
+Changes in the Dispatch build: added U+00E4 U+00F6 U+00FC (derived from the
+capitals), U+00DF and U+00A7 (drawn with the source's own pen, grid and
+joins), U+25B6 and U+25B7 (Lucide's play icon, ISC, at cap height); family
+renamed to DispatchOCR.
+Build script: build-font.py (see 06_UX/Dispatch-UX.md).
