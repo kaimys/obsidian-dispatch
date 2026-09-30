@@ -15,6 +15,8 @@ A first paragraph that becomes the summary. See [[Second article]] and [[Second 
 
 A <img src='../assets/pic.png' alt='Single-quoted picture'> in a sentence.
 
+A <img alt="Before > After" src="../assets/pic.png"> comparison, its alt text holding a bracket.
+
 > [!tip] Remember
 > Keep the **vault** private.
 

@@ -21,6 +21,7 @@ import {
 	publishedTags,
 	readSiteSettings,
 	resourceAttributes,
+	scanTags,
 	repositoryOf,
 	routeCollisions,
 	scanPaths,
@@ -317,6 +318,10 @@ describe("the clean fixture vault", () => {
 		expect(content("articles/getting-started/index.md")).toContain("A <img src='pic.png' alt='Single-quoted picture'> in a sentence.");
 	});
 
+	it("reads a tag to its unquoted end: a > inside an alt text neither cuts the tag nor hides the image", () => {
+		expect(content("articles/getting-started/index.md")).toContain('A <img alt="Before > After" src="pic.png"> comparison');
+	});
+
 	it("takes Home's pitch from the Home note, and its button only while the article is published", () => {
 		expect(JSON.parse(read(join(staged.root, "home.json")))).toEqual({
 			eyebrow: "Obsidian plugin",
@@ -401,6 +406,9 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		"10_Website/Articles/Single-quoted private link.md:7: link ../../02_Private/Private-note.md points outside the published set",
 		// A copied SVG may not depend on a local file it cannot bring along.
 		"10_Website/assets/refs.svg:2: references ../../02_Private/secret.png, a local file an asset cannot bring along; embed it instead",
+		// A quoted < or > inside another attribute neither ends the tag nor hides the URL after it.
+		"10_Website/Articles/Quoted angle brackets.md:7: link ../../02_Private/Private-note.md points outside the published set",
+		"10_Website/Articles/Quoted angle brackets.md:9: link ../../02_Private/Other.md points outside the published set",
 	];
 	for (const finding of expected) it(finding.replace(/:\d+: .*/, "") + " — " + finding.split(/:\d+: /)[1], () => expect(errors).toContain(finding));
 	it("reports nothing else", () => expect([...errors].sort()).toEqual([...expected].sort()));
@@ -433,6 +441,17 @@ describe("the output guard", () => {
 		expect(guard('<a href="file:&#x2F;&#x2F;&#x2F;home&#x2F;kai&#x2F;x">a</a>')).toEqual(["articles/a/index.html:1: a file:// URL: file:///home/kai/x"]);
 		expect(guard("<p>see file:&#x2F;&#x2F;&#x2F;C:&#x2F;x</p>")).toEqual(["articles/a/index.html:1: a file:// URL: file:///C:/x"]);
 		expect(decodeEntities("a&#x2F;b&#47;c&amp;d")).toBe("a/b/c&d");
+	});
+
+	it("tokenizes tags as a browser does: quoted < and > are values, attribute-looking text inside a value is not an attribute", () => {
+		const html = `<a title="A > B" href="x">t</a> <img alt='1 < 2 src="fake"' src=y data-z="3 > 2"> <!-- <a href="hidden"> --> <p>href="text"</p> <b broken="unclosed>`;
+		expect(scanTags(html).map((t: { name: string }) => t.name)).toEqual(["a", "img", "p"]);
+		expect(resourceAttributes(html).map((a: { name: string; raw: string }) => `${a.name}=${a.raw}`)).toEqual(["href=x", "src=y"]);
+		const img = scanTags(html)[1];
+		expect(img.attrs.find((a: { name: string }) => a.name === "alt").raw).toBe('1 < 2 src="fake"');
+		expect(html.slice(img.start, img.end)).toBe(`<img alt='1 < 2 src="fake"' src=y data-z="3 > 2">`);
+		expect(guard(`<a title="A > B" href="../../02_Private/p.md">x</a>`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/p.md"]);
+		expect(guard(`<p title="C:\\Users\\kai > x">in text</p>`)).toEqual([]);
 	});
 
 	it("reads URL attributes in every quoting, in pages and in SVG files", () => {
@@ -552,6 +571,8 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 			}
 		}
 		expect(home).toContain("Public article");
+		expect(article).toContain('<img alt="Before > After" src="pic.png">');
+		expect(existsSync(join(result.output, "articles", "getting-started", "pic.png"))).toBe(true);
 		expect(home).toContain("The public introduction. It says what the article is about.");
 		expect(html("legal/impressum/index.html")).toContain('<html lang="de">');
 		expect(html("legal/impressum/index.html")).toContain('hreflang="en">Privacy Policy</a>');

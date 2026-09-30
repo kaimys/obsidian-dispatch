@@ -224,22 +224,84 @@ export function blankComments(body) {
 const lineOf = (text, index) => text.slice(0, index).split("\n").length;
 
 /**
+ * The start tags of HTML or SVG markup, read the way a browser tokenizes them: a quoted attribute
+ * value may contain `<`, `>` and attribute-looking text, and only an unquoted `>` ends the tag.
+ * Comments are skipped. Returns `{ start, end, name, attrs }`; each attribute is
+ * `{ name, start, end, raw, quote }` with offsets into `markup`, so findings keep source lines.
+ * The one tokenizer behind every URL and alt-text check — no quote-blind regex decides a boundary.
+ */
+export function scanTags(markup) {
+	const text = String(markup);
+	const tags = [];
+	const space = /\s/;
+	let i = 0;
+	while ((i = text.indexOf("<", i)) >= 0) {
+		if (text.startsWith("<!--", i)) {
+			const close = text.indexOf("-->", i + 4);
+			i = close < 0 ? text.length : close + 3;
+			continue;
+		}
+		const name = /^<([a-zA-Z][\w:-]*)/.exec(text.slice(i, i + 100));
+		if (!name) {
+			i++;
+			continue;
+		}
+		const tag = { start: i, end: -1, name: name[1].toLowerCase(), attrs: [] };
+		let j = i + name[0].length;
+		while (j < text.length) {
+			while (j < text.length && space.test(text[j])) j++;
+			if (text[j] === ">") {
+				tag.end = j + 1;
+				break;
+			}
+			if (text[j] === "/") {
+				j++;
+				continue;
+			}
+			const attrStart = j;
+			while (j < text.length && !space.test(text[j]) && !"=>/".includes(text[j])) j++;
+			const attrName = text.slice(attrStart, j);
+			let k = j;
+			while (k < text.length && space.test(text[k])) k++;
+			let raw = "";
+			let quote = "";
+			if (text[k] === "=") {
+				k++;
+				while (k < text.length && space.test(text[k])) k++;
+				if (text[k] === '"' || text[k] === "'") {
+					quote = text[k];
+					const close = text.indexOf(quote, k + 1);
+					if (close < 0) break; // an unclosed quote: not a tag a browser would finish either
+					raw = text.slice(k + 1, close);
+					k = close + 1;
+				} else {
+					const from = k;
+					while (k < text.length && !space.test(text[k]) && text[k] !== ">") k++;
+					raw = text.slice(from, k);
+				}
+				j = k;
+			}
+			if (attrName) tag.attrs.push({ name: attrName.toLowerCase(), start: attrStart, end: j, raw, quote });
+			else j++;
+		}
+		if (tag.end < 0) {
+			i++;
+			continue;
+		}
+		tags.push(tag);
+		i = tag.end;
+	}
+	return tags;
+}
+
+/**
  * Every URL-carrying attribute (`href`, `src`, `xlink:href`) inside a tag of HTML or SVG markup,
  * quoted with `"`, `'` or not at all — all three are valid, so all three must be checked. One
  * reader for the source, the built pages and SVG files, so no quoting style slips past one of them.
  * Returns `{ start, end, name, raw, quote }`, with `start`/`end` the attribute's offsets in `markup`.
  */
 export function resourceAttributes(markup) {
-	const found = [];
-	const text = String(markup);
-	for (const tag of text.matchAll(/<[a-zA-Z][\w:-]*(?:\s[^<>]*)?>/g)) {
-		for (const a of tag[0].matchAll(/(?<=\s)((?:xlink:)?href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi)) {
-			const quote = a[2] !== undefined ? '"' : a[3] !== undefined ? "'" : "";
-			const start = tag.index + a.index;
-			found.push({ start, end: start + a[0].length, name: a[1], raw: a[2] ?? a[3] ?? a[4], quote });
-		}
-	}
-	return found;
+	return scanTags(markup).flatMap((tag) => tag.attrs.filter((a) => /^((xlink:)?href|src)$/.test(a.name)));
 }
 
 /** A reference that stays on the web or inside the file itself: never a local dependency. */
@@ -690,15 +752,16 @@ export function convertMarkdown(source, ctx) {
 		}
 		// Raw HTML in a note: every URL attribute of every tag, in any quoting, goes through the same
 		// resolution as a Markdown link, and keeps its own quote style when rewritten.
-		for (const tag of line.matchAll(/<img\b[^<>]*>/gi)) {
-			if (masked.slice(tag.index, tag.index + tag[0].length).trim() === "") continue; // inside inline code
-			if (!/\salt\s*=\s*("[^"]+"|'[^']+'|[^\s"'=<>`]+)/i.test(tag[0])) {
-				const src = resourceAttributes(tag[0])[0];
-				fail(at(tag.index), `image ${src ? src.raw : "(no src)"} has no alt text`);
+		for (const tag of scanTags(line).filter((t) => t.name === "img")) {
+			if (masked.slice(tag.start, tag.end).trim() === "") continue; // inside inline code
+			if (!tag.attrs.some((a) => a.name === "alt" && a.raw.trim())) {
+				const src = tag.attrs.find((a) => a.name === "src");
+				fail(at(tag.start), `image ${src ? src.raw : "(no src)"} has no alt text`);
 			}
 		}
 		for (const a of resourceAttributes(line)) {
 			if (masked.slice(a.start, a.end).trim() === "") continue; // inside inline code
+			if (!a.raw) continue; // a bare `href` names nothing
 			const found = target(a.raw, a.start);
 			if (!found.keep) edits.push({ start: a.start, end: a.end, value: `${a.name}=${a.quote}${found.url}${a.quote}` });
 		}
@@ -859,7 +922,11 @@ export function guardOutput(pages, baseUrl, exists) {
 			checkUrls(page, page.text);
 			continue;
 		}
-		const prose = decodeEntities(withoutCode(page.html).replace(/<[^>]+>/g, (m) => m.replace(/[^\n]/g, " ")));
+		// Tags blanked by the same tokenizer, so a quoted `>` does not leave half a tag as "text".
+		let stripped = withoutCode(page.html);
+		for (const tag of scanTags(stripped)) stripped = stripped.slice(0, tag.start) + stripped.slice(tag.start, tag.end).replace(/[^\n]/g, " ") + stripped.slice(tag.end);
+		stripped = stripped.replace(/<\/[a-zA-Z][^>]*>|<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, " "));
+		const prose = decodeEntities(stripped);
 		for (const { line, message } of scanPaths(prose)) errors.push(`${page.path}:${line}: ${message}`);
 		if (page.fromVault) {
 			for (const m of prose.matchAll(/!?\[\[[^\]]*\]\]/g)) errors.push(`${page.path}:${lineOf(prose, m.index)}: unconverted wikilink ${m[0]}`);
