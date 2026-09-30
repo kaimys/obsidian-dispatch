@@ -10,8 +10,10 @@ so Documentation and Releases follow the new tag. The pipeline is Dispatch-scope
 `dispatch/scripts/website.mjs`; the site's configuration and design live in `dispatch/website/`.
 
 **What gets published is decided by the vault, never by this workflow** (ADR-0039, ADR-0040): only
-notes in the website folder with `status: ready`, the Home page and every legal note, each released
-version's `## GitHub release body`, and `docs/` at the newest release tag. Never mark a note ready,
+notes in the website folder with `status: ready`, the Home page and every legal note, the
+`## GitHub release body` of each version GitHub shows as published, and `docs/` at the newest such
+release — never a bare tag or draft. The build asks GitHub for that list, so `gh` must be signed
+in; if it cannot, it stops rather than guess. Never mark a note ready,
 edit an article, or mark a testimonial ready to make a build pass — those are the editor's decisions.
 
 ## Check
@@ -44,10 +46,8 @@ With `--check`, stop here.
    confirm they answer with the new content. If Pages is not enabled on the repository, say so; the
    one-time enabling is a human's decision.
 
-## After a legal change
+## Project steps
 
-8. When a note in the website folder's `Legal/` changed, the eightnine.de copies need regenerating
-   too, because Google's OAuth consent screen points there. Run `node
-   dispatch/scripts/eightnine-legal.mjs`, show the user the word diff it prints, and only on their
-   go-ahead run it with `--write` and commit `docs/privacy.html`, `terms.html` and `impressum.html`.
-   Uploading them to eightnine.de stays manual.
+8. **If `dispatch/website/project-steps.md` exists, read it and follow its steps now.** It holds
+   what only this project needs around a publish; this workflow is the Dispatch-standard part and
+   names no project's own artifacts. A project without the file has nothing to do here.
