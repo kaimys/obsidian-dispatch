@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -10,6 +10,7 @@ import {
 	buildUpdates,
 	compareVersions,
 	convertMarkdown,
+	decodeEntities,
 	extractReleaseBody,
 	frontMatter,
 	guardOutput,
@@ -17,16 +18,22 @@ import {
 	isReady,
 	newestReleaseTag,
 	parseNote,
+	publishedTags,
 	readSiteSettings,
+	repositoryOf,
+	routeCollisions,
 	scanPaths,
 	segments,
 	stage,
 	summaryOf,
 	teraString,
 	titleAndBody,
+	withoutComments,
 } from "../dispatch/scripts/website.mjs";
 
 const FIXTURES = "test/fixtures/website";
+const listOutput = (dir: string, prefix = ""): string[] =>
+	readdirSync(join(dir, prefix), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? listOutput(dir, join(prefix, e.name)) : [join(prefix, e.name)]));
 const read = (path: string) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 const fakeDiagram = () => Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
 const docs = {
@@ -53,9 +60,15 @@ function fixtureSite({ design = false } = {}) {
 	return { site, buildDir: join(dir, ".build") };
 }
 
+/** What GitHub shows as published, per fixture vault. The clean vault's 1.2.0 note says
+ * `released` but is not in this list — the candidate that must stay off the site. */
+const published = ["1.0.0", "1.0.1"];
+const brokenPublished = ["1.0.1", "2.0.0"];
+
 const stageFixture = (vault: "clean" | "broken") => {
 	const { site, buildDir } = fixtureSite();
-	return stage({ wikiRoot: join(FIXTURES, vault), siteDir: site, buildDir, docs, renderDiagram: fakeDiagram });
+	const broken = vault === "broken";
+	return stage({ wikiRoot: join(FIXTURES, vault), siteDir: site, buildDir, docs: broken ? { ...docs, tag: "2.0.0" } : docs, published: broken ? brokenPublished : published, renderDiagram: fakeDiagram });
 };
 
 describe("reading notes and settings", () => {
@@ -97,7 +110,33 @@ describe("release notes", () => {
 		const note = "# v1\n\nInternal.\n\n## GitHub release body\n\n````markdown\n## Title\n\n```js\ncode\n```\n````\n\n## After\n";
 		expect(extractReleaseBody(note)).toBe("## Title\n\n```js\ncode\n```\n");
 		expect(extractReleaseBody("# v1\n\n## Build\n")).toBeNull();
-		expect(extractReleaseBody("## GitHub release body\n\n## Next\n\n```\nnot the body\n```\n")).toBeNull();
+	});
+
+	it("refuses a public section it cannot delimit, rather than publishing the rest of the note", () => {
+		const unclosed = "# v1\n\n## GitHub release body\n\n````markdown\nPublic.\n\n## Internal follow-up\n\nINTERNAL-REVIEW-MARKER\n";
+		const tooShort = "## GitHub release body\n\n````markdown\nPublic.\n```\n\nINTERNAL\n";
+		const noFence = "## GitHub release body\n\n## Next\n\n```\nnot the body\n```\n";
+		expect(() => extractReleaseBody(unclosed)).toThrow("opens a ```` fence that is never closed");
+		expect(() => extractReleaseBody(tooShort)).toThrow("never closed");
+		expect(() => extractReleaseBody(noFence)).toThrow("has no fenced block under it");
+		try {
+			extractReleaseBody(unclosed);
+		} catch (error) {
+			expect((error as { line: number }).line).toBe(3);
+		}
+	});
+
+	it("counts only releases GitHub shows as published — never a draft, pre-release or bare tag", () => {
+		const releases = [
+			{ tag_name: "1.1.0", draft: true, prerelease: false },
+			{ tag_name: "1.0.1", draft: false, prerelease: false },
+			{ tag_name: "1.1.0-rc.1", draft: false, prerelease: true },
+			{ tag_name: "1.0.0", draft: false, prerelease: false },
+		];
+		expect(publishedTags(releases)).toEqual(["1.0.1", "1.0.0"]);
+		expect(newestReleaseTag(publishedTags(releases))).toBe("1.0.1");
+		expect(repositoryOf('[extra]\nrepository = "https://github.com/kaimys/obsidian-dispatch"\n')).toBe("kaimys/obsidian-dispatch");
+		expect(repositoryOf('repository = "https://gitlab.com/x/y"')).toBeNull();
 	});
 
 	it("finds the newest release tag and orders versions numerically", () => {
@@ -201,7 +240,7 @@ describe("the clean fixture vault", () => {
 	it("stages with no finding", () => expect(staged.errors).toEqual([]));
 
 	it("publishes the ready articles only, and says what it skipped and why", () => {
-		expect(staged.set.articles.map((a: { slug: string }) => a.slug)).toEqual(["getting-started", "second-article"]);
+		expect(staged.set.articles.map((a: { slug: string }) => a.slug)).toEqual(["commented", "getting-started", "second-article"]);
 		expect(staged.set.skipped).toEqual([
 			"10_Website/Articles/Capital ready.md (status: Ready)",
 			"10_Website/Articles/Draft.md (status: draft)",
@@ -210,6 +249,7 @@ describe("the clean fixture vault", () => {
 			"10_Website/Links/Unready.md (status: unset)",
 			"10_Website/Testimonials/Waiting for approval.md (status: draft)",
 			"08_Releases/Release 0.9.0.md (no GitHub release body)",
+			"08_Releases/Release 1.2.0.md (v1.2.0 is not a published release on GitHub)",
 		]);
 		expect(existsSync(join(staged.root, "content", "articles", "draft"))).toBe(false);
 		expect(existsSync(join(staged.root, "content", "faq"))).toBe(false);
@@ -230,8 +270,11 @@ describe("the clean fixture vault", () => {
 		expect(existsSync(join(staged.root, "content", "articles", "second-article", "secret.png"))).toBe(false);
 	});
 
-	it("publishes a released note's GitHub body only, and skips planned notes and notes without one", () => {
+	it("publishes a released note's GitHub body only, and skips planned notes, notes without one, and versions GitHub has not published", () => {
 		expect(staged.set.releases.map((r: { version: string }) => r.version)).toEqual(["1.0.1", "1.0.0"]);
+		expect(staged.set.skipped).toContain("08_Releases/Release 1.2.0.md (v1.2.0 is not a published release on GitHub)");
+		expect(existsSync(join(staged.root, "content", "releases", "1-2-0"))).toBe(false);
+		expect(read(join(staged.root, "updates.json"))).not.toContain("CANDIDATE-RELEASE-MARKER");
 		const page = content("releases/1-0-0/index.md");
 		expect(page).toContain("The first release.");
 		expect(page).not.toContain("Internal notes");
@@ -240,9 +283,19 @@ describe("the clean fixture vault", () => {
 
 	it("lists updates newest first, the newer release first on a shared date, links included", () => {
 		const updates = JSON.parse(read(join(staged.root, "updates.json")));
-		expect(updates.map((u: { title: string }) => u.title)).toEqual(["Second article", "A podcast about Dispatch", "Getting started", "v1.0.1", "v1.0.0"]);
+		expect(updates.map((u: { title: string }) => u.title)).toEqual(["Second article", "A podcast about Dispatch", "Getting started", "Commented", "v1.0.1", "v1.0.0"]);
 		expect(updates[1]).toEqual({ kind: "link", title: "A podcast about Dispatch", url: "https://example.com/podcast", date: "2026-09-21", summary: "" });
 		expect(updates[0]).toMatchObject({ kind: "article", url: "articles/second-article/", summary: "The second one." });
+	});
+
+	it("never lets an Obsidian comment reach a summary, a description or a page — code keeps its own", () => {
+		const updates = JSON.parse(read(join(staged.root, "updates.json")));
+		expect(updates.find((u: { title: string }) => u.title === "Commented").summary).toBe("The public introduction. It says what the article is about.");
+		const page = content("articles/commented/index.md");
+		expect(page).not.toContain("INTERNAL-COMMENT-MARKER");
+		expect(page).not.toContain("inline-secret-marker");
+		expect(page).toContain("%% a comment shown as an example stays in code %%");
+		expect(withoutComments("a %%x%% b\n```\n%%y%%\n```")).toBe("a  b\n```\n%%y%%\n```");
 	});
 
 	it("takes Home's pitch from the Home note, and its button only while the article is published", () => {
@@ -304,11 +357,26 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		"10_Website/Articles/Bad date.md:1: date must be YYYY-MM-DD, not \"29.09.2026\"",
 		"10_Website/Testimonials/Missing consent.md:1: missing consent",
 		"10_Website/Links/No date.md:1: missing date",
-		"10_Website/Links/Relative url.md:1: url must be an absolute http(s) URL",
+		"10_Website/Links/Relative url.md:3: url must be an absolute http(s) URL",
 		"08_Releases/Release 2.0.0.md:17: [[Release 1.9.0]] links to a page that is not published",
 		"08_Releases/Release 2.0.0.md:17: a path into the vault (dispatch/wiki/…): dispatch/wiki/08_Releases/x.md.",
 		"08_Releases/Release 2.1.0.md:1: a released note needs version: vX.Y.Z and date: YYYY-MM-DD",
 		"10_Website/Articles/Missing teaser.md:1: teaser nowhere.png is not a file in the published set",
+		// A public section the build cannot delimit fails; the rest of the note is never published.
+		"08_Releases/Release 2.2.0.md:8: ## GitHub release body opens a ```` fence that is never closed",
+		// Frontmatter and heading-derived titles get the same guard as body text.
+		"10_Website/Home page.md:6: title contains [[Private note]], and a wikilink cannot be published from a title",
+		"10_Website/Links/Wikilink title.md:2: title contains [[Private note]], and a wikilink cannot be published from frontmatter",
+		"10_Website/Testimonials/Path in quote.md:2: quote contains a local filesystem path: C:\\Users\\kai\\vault",
+		// An entity-encoded file: link is decoded before any scheme is allowed.
+		"10_Website/Articles/Encoded file link.md:7: a file:// URL: file:///C:/Users/kai/secret.md",
+		// A published text asset is scanned as it is copied.
+		"10_Website/assets/leaky.svg:2: a local filesystem path: C:\\Users\\kai\\Documents\\private.drawio",
+		"10_Website/assets/leaky.svg:3: contains [[Private note]], which cannot be published",
+		// One address, one page: explicit and normalized collisions, and a name with no Latin letter.
+		"10_Website/Articles/Same one.md:1: articles/same/ is also the address of 10_Website/Articles/Same two.md; give one of them its own slug:",
+		"10_Website/Articles/A B.md:1: articles/a-b/ is also the address of 10_Website/Articles/A-B.md; give one of them its own slug:",
+		"10_Website/Articles/日本.md:1: its name gives an empty page address; set slug: to a Latin name",
 	];
 	for (const finding of expected) it(finding.replace(/:\d+: .*/, "") + " — " + finding.split(/:\d+: /)[1], () => expect(errors).toContain(finding));
 	it("reports nothing else", () => expect([...errors].sort()).toEqual([...expected].sort()));
@@ -336,6 +404,21 @@ describe("the output guard", () => {
 		]);
 	});
 
+	it("fails a file: URL and a local path in an attribute, however they are encoded", () => {
+		expect(guard('<a href="file:///C:/Users/kai/x.md">a</a>')).toEqual(["articles/a/index.html:1: a file:// URL: file:///C:/Users/kai/x.md"]);
+		expect(guard('<a href="file:&#x2F;&#x2F;&#x2F;home&#x2F;kai&#x2F;x">a</a>')).toEqual(["articles/a/index.html:1: a file:// URL: file:///home/kai/x"]);
+		expect(guard("<p>see file:&#x2F;&#x2F;&#x2F;C:&#x2F;x</p>")).toEqual(["articles/a/index.html:1: a file:// URL: file:///C:/x"]);
+		expect(decodeEntities("a&#x2F;b&#47;c&amp;d")).toBe("a/b/c&d");
+	});
+
+	it("checks emitted text assets such as SVG, not only pages", () => {
+		const svg = { path: "articles/a/d.svg", text: "<svg>\n<!-- C:\\Users\\kai\\x -->\n<text>[[Secret]]</text></svg>", fromVault: true };
+		expect(guardOutput([svg], base, () => true)).toEqual([
+			"articles/a/d.svg:2: a local filesystem path: C:\\Users\\kai\\x",
+			"articles/a/d.svg:3: unconverted wikilink [[Secret]]",
+		]);
+	});
+
 	it("fails an unconverted wikilink on a vault page, but not on a docs page, and never inside code", () => {
 		expect(guard("<p>see [[Secret]]</p>")).toEqual(["articles/a/index.html:1: unconverted wikilink [[Secret]]"]);
 		expect(guard("<p>see [[Product Vision]]</p>", false)).toEqual([]);
@@ -360,6 +443,23 @@ describe("the placeholder is never published, and nothing built is committed", (
 		expect(() => assertDesign(site)).not.toThrow();
 	});
 
+	it("keeps the standard website workflow free of this project's own artifacts (US00069 lifts it unchanged)", () => {
+		const workflow = read("dispatch/workflow/website.md");
+		for (const projectOnly of ["eightnine", "docs/privacy.html", "impressum", "US00068", "kaimys"]) expect(workflow.toLowerCase()).not.toContain(projectOnly.toLowerCase());
+		expect(workflow).toContain("dispatch/website/project-steps.md");
+		const steps = read("dispatch/website/project-steps.md");
+		expect(steps).toContain("node dispatch/scripts/eightnine-legal.mjs");
+		expect(existsSync("dispatch/scripts/eightnine-legal.mjs")).toBe(true);
+	});
+
+	it("gives every page its own non-empty address", () => {
+		expect(routeCollisions([{ route: "a/x", slug: "x", rel: "one.md" }, { route: "a/y", slug: "y", rel: "two.md" }])).toEqual([]);
+		expect(routeCollisions([{ route: "a/x", slug: "x", rel: "one.md" }, { route: "a/x", slug: "x", rel: "two.md" }, { route: "a/", slug: "", rel: "three.md" }])).toEqual([
+			"three.md:1: its name gives an empty page address; set slug: to a Latin name",
+			"one.md:1: a/x/ is also the address of two.md; give one of them its own slug:",
+		]);
+	});
+
 	it("git-ignores the staging folder", () => {
 		expect(read(".gitignore").split("\n")).toContain("/dispatch/website/.build/");
 		expect(spawnSync("git", ["check-ignore", "-q", "dispatch/website/.build/site/content/x.md"]).status).toBe(0);
@@ -376,7 +476,7 @@ const zola = spawnSync("zola", ["--version"]).status === 0;
 describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without zola on PATH, as in CI)", () => {
 	it("builds, and the output guard passes over every page", () => {
 		const { site, buildDir } = fixtureSite();
-		const result = build({ wikiRoot: join(FIXTURES, "clean"), siteDir: site, buildDir, docs, renderDiagram: fakeDiagram });
+		const result = build({ wikiRoot: join(FIXTURES, "clean"), siteDir: site, buildDir, docs, published, renderDiagram: fakeDiagram });
 		const html = (path: string) => read(join(result.output, path));
 		expect(result.pages).toBeGreaterThan(10);
 		expect(html("index.html")).toContain("A podcast about Dispatch");
@@ -388,7 +488,7 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 
 	it("builds with the project's design, and the output guard passes over every page", () => {
 		const { site, buildDir } = fixtureSite({ design: true });
-		const result = build({ wikiRoot: join(FIXTURES, "clean"), siteDir: site, buildDir, docs, renderDiagram: fakeDiagram });
+		const result = build({ wikiRoot: join(FIXTURES, "clean"), siteDir: site, buildDir, docs, published, renderDiagram: fakeDiagram });
 		const html = (path: string) => read(join(result.output, path));
 		const home = html("index.html");
 		expect(home).toContain('<h1 id="pitch">A pitch in one line');
@@ -407,6 +507,12 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		const newer = html("releases/1-0-0/index.html");
 		expect(newer).toMatch(/<a href="[^"]*\/releases\/1-0-1\/">v1.0.1 &rarr;<\/a>/);
 		expect(html("docs/overview/index.html")).toMatch(/class="next" href="[^"]*\/docs\/installation\/"/);
+		// No comment and no unpublished release reaches any emitted file: pages, feeds, metadata.
+		for (const file of listOutput(result.output)) {
+			const text = readFileSync(join(result.output, file)).toString("utf8");
+			for (const marker of ["INTERNAL-COMMENT-MARKER", "inline-secret-marker", "CANDIDATE-RELEASE-MARKER"]) expect(text, `${marker} in ${file}`).not.toContain(marker);
+		}
+		expect(home).toContain("The public introduction. It says what the article is about.");
 		expect(html("legal/impressum/index.html")).toContain('<html lang="de">');
 		expect(html("legal/impressum/index.html")).toContain('hreflang="en">Privacy Policy</a>');
 	});

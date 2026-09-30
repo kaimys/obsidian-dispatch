@@ -14,9 +14,10 @@
  * What it publishes (ADR-0039, ADR-0040):
  *   - from `<source>/` in the vault: Articles/, FAQ.md, Links/ and Testimonials/ with
  *     `status: ready` (a testimonial needs all four fields), Home page.md and every Legal/ note;
- *   - from the release notes: only the fenced `## GitHub release body` of a released version;
- *   - from the repository: `docs/*.md` and `docs/assets/` at the newest release tag, never the
- *     working tree.
+ *   - from the release notes: only the fenced `## GitHub release body` of a version marked
+ *     released and published on GitHub; a public section it cannot delimit is a finding;
+ *   - from the repository: `docs/*.md` and `docs/assets/` at the newest release GitHub shows as
+ *     published (never a draft, pre-release or bare tag), never the working tree.
  * A note that is not published is never written into the staging root. The leak guard runs on the
  * source and on the built HTML, and any finding fails the build with file and line.
  */
@@ -80,18 +81,21 @@ function unquote(value) {
 export function parseNote(text) {
 	const source = String(text || "").replace(/\r\n/g, "\n");
 	const match = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(source);
-	if (!match) return { data: {}, body: source, bodyLine: 1 };
+	if (!match) return { data: {}, body: source, bodyLine: 1, lines: {} };
 	const data = {};
+	// The file line each key sits on, so a finding in a frontmatter value can name it.
+	const lines = {};
 	let listKey = null;
-	for (const line of match[1].split("\n")) {
+	match[1].split("\n").forEach((line, i) => {
 		const item = /^\s+-\s*(.*)$/.exec(line);
 		if (item && listKey) {
 			data[listKey].push(unquote(item[1]));
-			continue;
+			return;
 		}
 		const pair = /^([^\s:#][^:]*):(?:\s+(.*))?$/.exec(line);
-		if (!pair) continue;
+		if (!pair) return;
 		const key = pair[1].trim();
+		lines[key] = i + 2;
 		const value = (pair[2] ?? "").trim();
 		if (value === "") {
 			data[key] = [];
@@ -100,9 +104,9 @@ export function parseNote(text) {
 			data[key] = unquote(value);
 			listKey = null;
 		}
-	}
+	});
 	for (const [key, value] of Object.entries(data)) if (Array.isArray(value) && value.length === 0) data[key] = "";
-	return { data, body: source.slice(match[0].length), bodyLine: match[0].split("\n").length };
+	return { data, body: source.slice(match[0].length), bodyLine: match[0].split("\n").length, lines };
 }
 
 export const isReady = (data) => data.status === "ready";
@@ -184,7 +188,9 @@ export function scanPaths(body, firstLine = 1) {
 	const findings = [];
 	for (const part of segments(body)) {
 		if (part.code) continue;
-		const prose = blankInlineCode(part.text);
+		// Decoded as a browser would, so `file:&#x2F;&#x2F;…` is caught in the source, not only in
+		// the output. References never contain a line break, so lines still match.
+		const prose = decodeEntities(blankInlineCode(part.text));
 		const taken = [];
 		for (const { re, message } of PATH_RULES) {
 			for (const m of prose.matchAll(re)) {
@@ -201,19 +207,25 @@ export function scanPaths(body, firstLine = 1) {
 
 // ─── Release notes ──────────────────────────────────────────────────────────
 
-/** The fenced block under `## GitHub release body`, or null when the note has none. */
+/**
+ * The fenced block under `## GitHub release body`. A note without the heading has no public
+ * section and returns null (Q15: skipped). A heading whose fence is missing, or never closed by a
+ * fence at least as long, is malformed and throws, with `line` set to the heading's line within
+ * `body`. The rest of an internal note must never be taken for the public section.
+ */
 export function extractReleaseBody(body) {
 	const text = String(body).replace(/\r\n/g, "\n");
 	const heading = /^## GitHub release body[ \t]*$/m.exec(text);
 	if (!heading) return null;
+	const malformed = (reason) => Object.assign(new Error(`## GitHub release body ${reason}`), { line: lineOf(text, heading.index) });
 	const rest = text.slice(heading.index + heading[0].length);
 	const open = /^(`{3,}|~{3,})[^\n]*\n/m.exec(rest);
-	if (!open) return null;
 	const nextHeading = /^## /m.exec(rest);
-	if (nextHeading && nextHeading.index < open.index) return null;
+	if (!open || (nextHeading && nextHeading.index < open.index)) throw malformed("has no fenced block under it");
 	const after = rest.slice(open.index + open[0].length);
 	const close = new RegExp(`^${open[1][0] === "`" ? "`" : "~"}{${open[1].length},}\\s*$`, "m").exec(after);
-	return (close ? after.slice(0, close.index) : after).replace(/\s+$/, "") + "\n";
+	if (!close) throw malformed(`opens a ${open[1]} fence that is never closed`);
+	return after.slice(0, close.index).replace(/\s+$/, "") + "\n";
 }
 
 /** Orders `0.3.10` after `0.3.9`; a leading `v` is ignored. */
@@ -257,9 +269,19 @@ export function titleAndBody(data, body) {
 	return { title: heading ? heading[1].trim() : "", body: stripped };
 }
 
-/** First prose paragraph as plain text, for summaries. */
+/**
+ * The body with Obsidian `%%comments%%` removed from prose — code blocks keep theirs, as in the
+ * body converter. Everything derived from a note's text (summaries, descriptions) goes through it.
+ */
+export function withoutComments(body) {
+	return segments(body)
+		.map((part) => (part.code ? part.text : part.text.replace(/%%[\s\S]*?%%/g, "")))
+		.join("\n");
+}
+
+/** First prose paragraph as plain text, for summaries. Comments never reach it. */
 export function summaryOf(body, limit = 160) {
-	for (const part of segments(body)) {
+	for (const part of segments(withoutComments(body))) {
 		if (part.code) continue;
 		for (const para of part.text.split(/\n\s*\n/)) {
 			const text = para.trim();
@@ -299,11 +321,27 @@ export function collectVault(wikiRoot, settings) {
 		}
 		return missing.length === 0;
 	};
+	// Frontmatter values reach pages verbatim (titles, descriptions, quotes), so they get the
+	// body's leak guard: no wikilink and no local or vault path. A title taken from the `# `
+	// heading is checked on the heading's line.
+	const guard = (note, fields) => {
+		for (const field of fields) {
+			const title = field === "title" && !note.data.title;
+			const values = title ? [note.title] : [].concat(note.data[field] ?? []);
+			const line = title ? note.bodyLine + lineOf(note.body, Math.max(0, note.body.indexOf(`# ${note.title}`))) - 1 : (note.lines?.[field] ?? 1);
+			for (const value of values.map(String).filter(Boolean)) {
+				for (const m of value.matchAll(/!?\[\[[^\]]*\]\]/g)) set.errors.push(`${note.rel}:${line}: ${field} contains ${m[0]}, and a wikilink cannot be published from ${title ? "a title" : "frontmatter"}`);
+				for (const f of scanPaths(value)) set.errors.push(`${note.rel}:${line}: ${field} contains ${f.message}`);
+			}
+		}
+	};
 
 	// Home's pitch is editorial too, so it lives in the vault; it is published by existing.
 	if (existsSync(join(root, "Home page.md"))) {
 		const note = read("Home page.md");
 		const { title } = titleAndBody(note.data, note.body);
+		note.title = title;
+		guard(note, ["title", "eyebrow", "description", "requirements"]);
 		set.home = { eyebrow: note.data.eyebrow || "", title, lede: note.data.description || "", requirements: note.data.requirements || "", readMore: note.data.read_more || "" };
 		if (!title) set.errors.push(`${note.rel}:1: missing title (no title: and no # heading)`);
 	}
@@ -318,6 +356,7 @@ export function collectVault(wikiRoot, settings) {
 		note.title = title;
 		note.content = body;
 		if (!title) set.errors.push(`${note.rel}:1: missing title (no title: and no # heading)`);
+		guard(note, ["title", "description", "author"]);
 		need(note, ["date"]);
 		note.slug = slugOf(note, name);
 		note.dir = "Articles";
@@ -336,6 +375,7 @@ export function collectVault(wikiRoot, settings) {
 		if (isReady(note.data)) {
 			const { title, body } = titleAndBody(note.data, note.body);
 			Object.assign(note, { title: title || "FAQ", content: body, slug: "faq", dir: "" });
+			guard(note, ["title", "description"]);
 			set.faq = note;
 		} else set.skipped.push(`${note.rel} (status: ${note.data.status || "unset"})`);
 	}
@@ -346,8 +386,9 @@ export function collectVault(wikiRoot, settings) {
 			continue;
 		}
 		if (need(note, ["title", "url", "date"]) && !/^https?:\/\//.test(note.data.url)) {
-			set.errors.push(`${note.rel}:1: url must be an absolute http(s) URL`);
+			set.errors.push(`${note.rel}:${note.lines.url ?? 1}: url must be an absolute http(s) URL`);
 		}
+		guard(note, ["title"]);
 		set.links.push(note);
 	}
 	// A testimonial publishes like an article: only with `status: ready`, so a quote can wait in
@@ -359,12 +400,14 @@ export function collectVault(wikiRoot, settings) {
 			continue;
 		}
 		need(note, ["quote", "name", "role", "consent"]);
+		guard(note, ["quote", "name", "role"]);
 		set.testimonials.push(note);
 	}
 	for (const name of markdownFiles(join(root, "Legal"))) {
 		const note = read(`Legal/${name}`);
 		const { title, body } = titleAndBody(note.data, note.body);
 		Object.assign(note, { title: title || name.replace(/\.md$/, ""), content: body, slug: slugOf(note, name), dir: "Legal" });
+		guard(note, ["title", "description"]);
 		set.legal.push(note);
 	}
 	// An optional `weight:` orders the legal pages; unweighted ones follow, by file name.
@@ -376,7 +419,13 @@ export function collectVault(wikiRoot, settings) {
 		const rel = `${settings.releases}/${name}`;
 		const note = { rel, ...parseNote(readFileSync(join(releaseDir, name), "utf8")) };
 		if (note.data.status !== "released") continue;
-		const content = extractReleaseBody(note.body);
+		let content;
+		try {
+			content = extractReleaseBody(note.body);
+		} catch (error) {
+			set.errors.push(`${rel}:${note.bodyLine + error.line - 1}: ${error.message}`);
+			continue;
+		}
 		if (content === null) {
 			set.skipped.push(`${rel} (no GitHub release body)`);
 			continue;
@@ -392,7 +441,30 @@ export function collectVault(wikiRoot, settings) {
 	}
 	set.releases.sort((a, b) => compareVersions(b.version, a.version));
 	set.assets = listFiles(root).filter((path) => !path.endsWith(".md"));
+	set.errors.push(...routeCollisions([
+		...set.articles.map((n) => ({ route: `articles/${n.slug}`, slug: n.slug, rel: n.rel })),
+		...set.legal.map((n) => ({ route: `legal/${n.slug}`, slug: n.slug, rel: n.rel })),
+		...set.releases.map((n) => ({ route: `releases/${n.slug}`, slug: n.slug, rel: n.rel })),
+	]));
 	return set;
+}
+
+/**
+ * Every page needs an address of its own. An empty slug (a name of only non-Latin characters)
+ * or two notes on one address (`slug: same`, or `A B.md` beside `A-B.md`) would make one page
+ * silently replace the other, so both are findings, naming every note involved.
+ */
+export function routeCollisions(pages) {
+	const errors = [];
+	const byRoute = new Map();
+	for (const page of pages) {
+		if (!page.slug) errors.push(`${page.rel}:1: its name gives an empty page address; set slug: to a Latin name`);
+		else byRoute.set(page.route, [...(byRoute.get(page.route) ?? []), page.rel]);
+	}
+	for (const [route, rels] of byRoute) {
+		if (rels.length > 1) errors.push(`${rels[0]}:1: ${route}/ is also the address of ${rels.slice(1).join(", ")}; give one of them its own slug:`);
+	}
+	return errors;
 }
 
 // ─── Converting Obsidian Markdown ───────────────────────────────────────────
@@ -513,7 +585,13 @@ export function convertMarkdown(body, ctx) {
 		}
 		// A relative link becomes a Zola `@/` link (a published note) or a file copied next to the
 		// page (a published asset); anything else points outside the published set.
-		const target = (url, index) => {
+		const target = (raw, index) => {
+			// An attribute may be entity-encoded; a browser decodes it before choosing a scheme.
+			const url = decodeEntities(raw);
+			if (/^file:/i.test(url)) {
+				fail(at(index), `a file:// URL: ${url}`);
+				return { keep: true };
+			}
 			if (/^([a-z][a-z0-9+.-]*:|#|@\/)/i.test(url)) return { keep: true };
 			const [path, hash] = decodeURI(url).split("#");
 			const resolved = posix.normalize(posix.join(ctx.dir || ".", path)).toLowerCase();
@@ -644,27 +722,55 @@ function withoutCode(html) {
 }
 
 /**
- * The output half of the leak guard. `pages` are `{ path, html, fromVault }` with `path` relative
- * to the output root; `exists(path)` answers for any output file. Checks: no filesystem or vault
- * path outside code, no `[[` on a page built from a vault note, and every internal `href`/`src`
- * resolves to a file in the output — which is also what proves the subpath works.
+ * HTML character references decoded as a browser would. None of them contains a line break, so
+ * a decoded line is still the same line.
+ */
+export function decodeEntities(text) {
+	const named = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+	return String(text)
+		.replace(/&#x([0-9a-f]+);/gi, (e, hex) => String.fromCodePoint(parseInt(hex, 16)))
+		.replace(/&#(\d+);/g, (e, dec) => String.fromCodePoint(Number(dec)))
+		.replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (e, name) => named[name]);
+}
+
+/**
+ * The output half of the leak guard. Every emitted text file is checked, not just the pages:
+ * `pages` are `{ path, html, fromVault }` for HTML and `{ path, text, fromVault }` for other text
+ * (SVG, CSS, XML), with `path` relative to the output root; `exists(path)` answers for any output
+ * file. Checks, after decoding character references: no filesystem or vault path outside code, no
+ * `[[` in anything built from the vault, and every `href`/`src` either external over http(s) or
+ * resolving to a file in the output — which is also what proves the subpath works.
  */
 export function guardOutput(pages, baseUrl, exists) {
 	const errors = [];
 	const base = baseUrl.replace(/\/+$/, "");
 	for (const page of pages) {
-		const prose = withoutCode(page.html);
-		for (const { line, message } of scanPaths(prose.replace(/<[^>]+>/g, (m) => m.replace(/[^\n]/g, " ")))) errors.push(`${page.path}:${line}: ${message}`);
+		if (page.text !== undefined) {
+			const text = decodeEntities(page.text);
+			for (const { line, message } of scanPaths(text)) errors.push(`${page.path}:${line}: ${message}`);
+			if (page.fromVault) for (const m of text.matchAll(/!?\[\[[^\]]*\]\]/g)) errors.push(`${page.path}:${lineOf(text, m.index)}: unconverted wikilink ${m[0]}`);
+			continue;
+		}
+		const prose = decodeEntities(withoutCode(page.html).replace(/<[^>]+>/g, (m) => m.replace(/[^\n]/g, " ")));
+		for (const { line, message } of scanPaths(prose)) errors.push(`${page.path}:${line}: ${message}`);
 		if (page.fromVault) {
 			for (const m of prose.matchAll(/!?\[\[[^\]]*\]\]/g)) errors.push(`${page.path}:${lineOf(prose, m.index)}: unconverted wikilink ${m[0]}`);
 		}
 		const dir = posix.dirname(`/${page.path}`);
 		for (const m of page.html.matchAll(/\s(?:href|src)="([^"]*)"/g)) {
-			// Tera escapes data-driven URLs (`https:&#x2F;&#x2F;…`); browsers decode them, so do we.
-			const url = m[1]
-				.replace(/&#x([0-9a-f]+);/gi, (e, hex) => String.fromCodePoint(parseInt(hex, 16)))
-				.replace(/&#(\d+);/g, (e, dec) => String.fromCodePoint(Number(dec)))
-				.replace(/&amp;/g, "&");
+			// Tera escapes data-driven URLs (`https:&#x2F;&#x2F;…`); browsers decode them, so do we,
+			// before any scheme is allowed — an encoded `file:` URL is still a local path.
+			const url = decodeEntities(m[1]);
+			const at = lineOf(page.html, m.index);
+			const leaks = scanPaths(url);
+			if (leaks.length) {
+				errors.push(...leaks.map((f) => `${page.path}:${at}: ${f.message}`));
+				continue;
+			}
+			if (/^file:/i.test(url)) {
+				errors.push(`${page.path}:${at}: a file:// URL: ${url}`);
+				continue;
+			}
 			if (!url || /^(#|mailto:|data:|tel:)/i.test(url)) continue;
 			let path;
 			if (url.startsWith(`${base}/`) || url === base) path = url.slice(base.length) || "/";
@@ -675,7 +781,7 @@ export function guardOutput(pages, baseUrl, exists) {
 			} else path = posix.normalize(posix.join(dir, url));
 			path = decodeURIComponent(path.split(/[?#]/)[0]);
 			const candidates = path.endsWith("/") ? [`${path}index.html`] : [path, `${path}/index.html`];
-			if (!candidates.some((c) => exists(c.replace(/^\/+/, "")))) errors.push(`${page.path}:${lineOf(page.html, m.index)}: broken link ${m[1]}`);
+			if (!candidates.some((c) => exists(c.replace(/^\/+/, "")))) errors.push(`${page.path}:${at}: broken link ${m[1]}`);
 		}
 	}
 	return errors;
@@ -709,10 +815,40 @@ function git(args, options = {}) {
 	return execFileSync("git", args, { cwd: REPO_ROOT, ...options });
 }
 
-/** `docs/*.md` and `docs/assets/*` at the newest release tag, as `{ tag, files: Map<path, Buffer> }`. */
-export function readDocsAtTag(docsDir) {
-	const tag = newestReleaseTag(git(["tag", "--list"], { encoding: "utf8" }).split("\n"));
-	if (!tag) throw new Error("no release tag found; Documentation is published from the newest release tag");
+/** `owner/repo` from the site's `[extra] repository` GitHub URL, or null. */
+export function repositoryOf(configText) {
+	return /^repository\s*=\s*"https:\/\/github\.com\/([^/"]+\/[^/"]+?)\/?"/m.exec(String(configText))?.[1] ?? null;
+}
+
+/**
+ * The tags of releases GitHub shows as published: not drafts, not pre-releases. A tag alone
+ * proves nothing — `/release` pushes its tag and the CI draft before a person publishes it, so a
+ * build between the two must still show the previous release's docs.
+ */
+export function publishedTags(releases) {
+	return releases.filter((r) => !r.draft && !r.prerelease && /^v?\d+\.\d+\.\d+$/.test(r.tag_name)).map((r) => r.tag_name);
+}
+
+function publishedReleasesOn(repository) {
+	if (!repository) throw new Error("config.toml has no [extra] repository = \"https://github.com/owner/repo\"; the published release cannot be verified");
+	const result = spawnSync("gh", ["api", "--paginate", `repos/${repository}/releases?per_page=100`], { encoding: "utf8" });
+	if (result.error || result.status !== 0) {
+		throw new Error(`cannot list the published releases of ${repository} (gh api: ${(result.stderr || result.error?.message || "").trim()}); the docs and release notes are only built from a release GitHub shows as published`);
+	}
+	return JSON.parse(`[${result.stdout.trim().replace(/\]\s*\[/g, ",").replace(/^\[|\]$/g, "")}]`);
+}
+
+/**
+ * `docs/*.md` and `docs/assets/*` at a verified published tag, as `{ tag, files: Map<path, Buffer> }`.
+ * The tag is fetched when this checkout lacks it, and a local tag that differs from the remote one
+ * is refused rather than trusted.
+ */
+export function readDocsAtTag(docsDir, tag) {
+	const local = spawnSync("git", ["rev-parse", "-q", "--verify", `refs/tags/${tag}`], { cwd: REPO_ROOT, encoding: "utf8" }).stdout.trim();
+	const remote = git(["ls-remote", "--tags", "origin", `refs/tags/${tag}`], { encoding: "utf8" }).split(/\s/)[0];
+	if (!remote) throw new Error(`the published release ${tag} has no tag on origin`);
+	if (!local) git(["fetch", "--no-tags", "origin", `refs/tags/${tag}:refs/tags/${tag}`]);
+	else if (local !== remote) throw new Error(`the local tag ${tag} (${local.slice(0, 7)}) differs from origin's (${remote.slice(0, 7)}); fix the local tag before building`);
 	const paths = git(["ls-tree", "-r", "--name-only", tag, "--", `${docsDir}/`], { encoding: "utf8" })
 		.split("\n")
 		.filter((p) => new RegExp(`^${docsDir}/([^/]+\\.md|assets/.+)$`).test(p));
@@ -744,12 +880,24 @@ function writePage(contentDir, dir, fields, markdown) {
  * Converts the vault and the docs into a staged Zola root. Returns the stage path, the report,
  * and every finding; the caller decides whether findings stop the build (they always do).
  */
-export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR), siteDir = join(repoRoot, SITE_DIR), buildDir = join(repoRoot, BUILD_DIR), docs, renderDiagram = renderMermaid } = {}) {
+export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR), siteDir = join(repoRoot, SITE_DIR), buildDir = join(repoRoot, BUILD_DIR), docs, published, renderDiagram = renderMermaid } = {}) {
 	const configText = readFileSync(join(siteDir, "config.toml"), "utf8");
 	const settings = readSiteSettings(configText);
 	if (!existsSync(wikiRoot)) throw new Error(`vault link ${relative(repoRoot, wikiRoot)} not found — create it (see dispatch/invariants.md)`);
 	const set = collectVault(wikiRoot, settings);
 	const errors = [...set.errors];
+
+	// Only what GitHub shows as published counts as released: the docs come from the newest such
+	// tag, and a release note appears only for a published version, so the two move together.
+	const tags = published ?? publishedTags(publishedReleasesOn(repositoryOf(configText)));
+	const docsTag = newestReleaseTag(tags);
+	if (!docsTag) throw new Error("no published release found; Documentation is built from the newest published release");
+	const versions = new Set(tags.map((t) => t.replace(/^v/, "")));
+	set.releases = set.releases.filter((r) => {
+		if (versions.has(r.version)) return true;
+		set.skipped.push(`${r.rel} (v${r.version} is not a published release on GitHub)`);
+		return false;
+	});
 	const root = join(buildDir, "site");
 	rmSync(root, { recursive: true, force: true });
 	mkdirSync(root, { recursive: true });
@@ -763,12 +911,26 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 	const sourceRoot = join(wikiRoot, settings.source);
 	const vaultPages = [];
 
+	// A text asset (an SVG, say) is published as it is, so it gets the leak guard as it is copied,
+	// with findings naming the vault file; the output guard checks it again after Zola.
+	const copied = new Set();
+	const copyAsset = (asset, dir) => {
+		mkdirSync(dir, { recursive: true });
+		cpSync(join(sourceRoot, asset), join(dir, basename(asset)));
+		if (copied.has(asset) || !TEXT_OUTPUT.test(asset)) return;
+		copied.add(asset);
+		const text = decodeEntities(readFileSync(join(sourceRoot, asset), "utf8"));
+		const rel = `${settings.source}/${asset}`;
+		errors.push(...scanPaths(text).map((f) => `${rel}:${f.line}: ${f.message}`));
+		for (const m of text.matchAll(/!?\[\[[^\]]*\]\]/g)) errors.push(`${rel}:${lineOf(text, m.index)}: contains ${m[0]}, which cannot be published`);
+	};
+
 	const convertNote = (note, outDir) => {
 		errors.push(...scanPaths(note.content, note.bodyLine).map((f) => `${note.rel}:${f.line}: ${f.message}`));
 		const result = convertMarkdown(note.content, { notes, assets, dir: note.dir, file: note.rel, line: note.bodyLine });
 		errors.push(...result.errors);
 		mkdirSync(join(content, outDir), { recursive: true });
-		for (const asset of result.assets) cpSync(join(sourceRoot, asset), join(content, outDir, basename(asset)));
+		for (const asset of result.assets) copyAsset(asset, join(content, outDir));
 		for (const diagram of result.diagrams) writeFileSync(join(content, outDir, diagram.file), renderDiagram(diagram, join(buildDir, "cache", "mermaid")));
 		vaultPages.push(outDir.replace(/\\/g, "/"));
 		return result.markdown;
@@ -791,7 +953,7 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 			const asset = assets.get(basename(String(a.data.teaser)).toLowerCase());
 			if (asset) {
 				teaser = basename(asset);
-				cpSync(join(sourceRoot, asset), join(content, "articles", a.slug, teaser));
+				copyAsset(asset, join(content, "articles", a.slug));
 			} else errors.push(`${a.rel}:1: teaser ${a.data.teaser} is not a file in the published set`);
 		}
 		// `lead` marks a written description; a generated one serves lists and the meta tag, but
@@ -819,10 +981,12 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 		vaultPages.push(`releases/${r.slug}`);
 	});
 
-	const docsSource = docs ?? readDocsAtTag(settings.docs);
+	const docsSource = docs ?? readDocsAtTag(settings.docs, docsTag);
+	if (docsSource.tag !== docsTag) errors.push(`docs were read at ${docsSource.tag}, but the newest published release is ${docsTag}`);
 	section("docs", { title: "Documentation", sort_by: "weight", page_template: "docs-page.html", extra: { release: docsSource.tag } });
 	const docPages = [...docsSource.files.keys()].filter((p) => p.endsWith(".md")).map((p) => p.replace(/\.md$/, ""));
 	const order = [...settings.docs_order.filter((n) => docPages.includes(n)), ...docPages.filter((n) => !settings.docs_order.includes(n)).sort()];
+	errors.push(...routeCollisions(order.map((n) => ({ route: `docs/${slugify(n)}`, slug: slugify(n), rel: `${settings.docs}/${n}.md@${docsSource.tag}` }))));
 	const docNotes = new Map(order.map((n) => [`path:${n.toLowerCase()}.md`, `@/docs/${slugify(n)}/index.md`]));
 	const docAssets = assetIndex([...docsSource.files.keys()].filter((p) => !p.endsWith(".md")));
 	order.forEach((name, i) => {
@@ -844,26 +1008,29 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 
 	const baseUrl = /^base_url\s*=\s*"([^"]+)"/m.exec(configText)?.[1];
 	if (!baseUrl) throw new Error("config.toml has no base_url");
-	return { root, set, errors, vaultPages, baseUrl, docsTag: docsSource.tag };
+	// Two checks can name one place (an encoded file: link is both a path and a link); report once.
+	return { root, set, errors: [...new Set(errors)], vaultPages, baseUrl, docsTag: docsSource.tag };
 }
 
-function htmlFiles(dir) {
-	return listFiles(dir).filter((p) => p.endsWith(".html"));
-}
+const TEXT_OUTPUT = /\.(svg|css|xml|txt|json)$/i;
 
-/** Stage, run Zola, run the output guard. Throws with every finding, or returns the output path. */
+/**
+ * Stage, run Zola, run the output guard over every emitted text file. Throws with every finding,
+ * or returns the output path. Everything but the documentation pages carries vault-derived text —
+ * Home and every listing repeat titles and summaries — so only a docs page (public in git already,
+ * and free to show Obsidian syntax) is exempt from the `[[` check.
+ */
 export function build(options = {}) {
 	const staged = stage(options);
 	if (staged.errors.length) throw new BuildError(staged.errors);
 	const output = join(staged.root, "..", "public");
 	rmSync(output, { recursive: true, force: true });
 	run("zola", ["--root", staged.root, "build", "--output-dir", output, "--force"]);
-	const pages = htmlFiles(output).map((path) => ({
-		path,
-		html: readFileSync(join(output, path), "utf8"),
-		fromVault: staged.vaultPages.some((dir) => path.startsWith(`${dir}/`)),
-	}));
-	const errors = guardOutput(pages, staged.baseUrl, (path) => existsSync(join(output, path)) && statSync(join(output, path)).isFile());
+	const fromVault = (path) => !(path.startsWith("docs/") && path !== "docs/index.html");
+	const files = listFiles(output);
+	const pages = files.filter((p) => p.endsWith(".html")).map((path) => ({ path, html: readFileSync(join(output, path), "utf8"), fromVault: fromVault(path) }));
+	const texts = files.filter((p) => TEXT_OUTPUT.test(p)).map((path) => ({ path, text: readFileSync(join(output, path), "utf8"), fromVault: fromVault(path) }));
+	const errors = guardOutput([...pages, ...texts], staged.baseUrl, (path) => existsSync(join(output, path)) && statSync(join(output, path)).isFile());
 	if (errors.length) throw new BuildError(errors);
 	return { ...staged, output, pages: pages.length };
 }
@@ -877,18 +1044,22 @@ export class BuildError extends Error {
 
 // ─── Publishing ─────────────────────────────────────────────────────────────
 
-/** Replaces the gh-pages tree with the built output, in a temporary worktree, and pushes it. */
+/**
+ * Replaces the gh-pages tree with the built output, in a temporary detached worktree, and pushes
+ * it as `HEAD:gh-pages`. No local gh-pages branch is created, so a dry run leaves nothing behind.
+ */
 export function publish(result, { dryRun = false } = {}) {
 	const worktree = mkdtempSync(join(tmpdir(), "dispatch-gh-pages-"));
 	rmSync(worktree, { recursive: true, force: true });
 	const hasRemote = git(["ls-remote", "--heads", "origin", "gh-pages"], { encoding: "utf8" }).trim() !== "";
+	const orphan = "dispatch-gh-pages-first-publish";
 	try {
 		if (hasRemote) {
 			git(["fetch", "origin", "gh-pages"]);
-			git(["worktree", "add", "-B", "gh-pages", worktree, "origin/gh-pages"]);
+			git(["worktree", "add", "--detach", worktree, "FETCH_HEAD"]);
 		} else {
 			git(["worktree", "add", "--detach", worktree]);
-			execFileSync("git", ["checkout", "--orphan", "gh-pages"], { cwd: worktree });
+			execFileSync("git", ["checkout", "--orphan", orphan], { cwd: worktree });
 		}
 		for (const entry of readdirSync(worktree)) if (entry !== ".git") rmSync(join(worktree, entry), { recursive: true, force: true });
 		cpSync(result.output, worktree, { recursive: true });
@@ -899,11 +1070,11 @@ export function publish(result, { dryRun = false } = {}) {
 		if (!changed) return { pushed: false, message: "gh-pages already holds this build" };
 		execFileSync("git", ["commit", "--quiet", "-m", `site: ${source} (docs ${result.docsTag})`], { cwd: worktree });
 		if (dryRun) return { pushed: false, message: "dry run: committed in a temporary worktree, not pushed" };
-		execFileSync("git", ["push", "origin", "gh-pages"], { cwd: worktree, stdio: "inherit" });
+		execFileSync("git", ["push", "origin", "HEAD:refs/heads/gh-pages"], { cwd: worktree, stdio: "inherit" });
 		return { pushed: true, message: `pushed gh-pages: site ${source}, docs ${result.docsTag}` };
 	} finally {
 		spawnSync("git", ["worktree", "remove", "--force", worktree], { cwd: REPO_ROOT });
-		if (!hasRemote) spawnSync("git", ["branch", "-D", "gh-pages"], { cwd: REPO_ROOT });
+		if (!hasRemote) spawnSync("git", ["branch", "-D", orphan], { cwd: REPO_ROOT });
 	}
 }
 
