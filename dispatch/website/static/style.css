@@ -447,3 +447,7 @@ a:hover { text-decoration-thickness: 2px; }
 /* An SVG in an <img> follows the page's colour scheme, and draw.io exports carry a dark variant:
  * on the white plate that turns them black with dark labels. Pin the plated images to light. */
 .prose figure img, .teaser img { color-scheme: light; }
+/* The GitHub mark in the header, after FAQ (Kai, 2026-10-01). Same hit area and hover as the
+ * text links; the mark takes the link colour, so it follows the scheme and the current state. */
+.site-nav a.nav-github { display: flex; align-items: center; padding-left: .55rem; padding-right: .55rem; }
+.site-nav a.nav-github svg { width: 1.25rem; height: 1.25rem; }

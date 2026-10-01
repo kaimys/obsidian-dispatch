@@ -571,6 +571,13 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 			}
 		}
 		expect(home).toContain("Public article");
+		// The GitHub mark sits last in the header navigation — after FAQ when the FAQ is published,
+		// after Releases while it is a draft, as in this fixture — named for screen readers.
+		const nav = home.slice(home.indexOf('<nav class="site-nav"'), home.indexOf("</nav>"));
+		const items = nav.split("<li>").slice(1);
+		expect(items.at(-1)).toMatch(/^<a class="nav-github" href="https:\/\/github.com\/kaimys\/obsidian-dispatch" aria-label="Dispatch on GitHub"/);
+		expect(items.at(-2)).toContain(">Releases</a>");
+		expect(items.at(-1)).toMatch(/<svg[^>]*aria-hidden="true"/);
 		expect(article).toContain('<img alt="Before > After" src="pic.png">');
 		expect(existsSync(join(result.output, "articles", "getting-started", "pic.png"))).toBe(true);
 		expect(home).toContain("The public introduction. It says what the article is about.");
