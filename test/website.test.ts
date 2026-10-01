@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { deflateSync } from "node:zlib";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -20,7 +21,9 @@ import {
 	parseNote,
 	publishedTags,
 	readSiteSettings,
+	parseSrcset,
 	resourceAttributes,
+	serializeSrcset,
 	scanTags,
 	repositoryOf,
 	routeCollisions,
@@ -34,6 +37,45 @@ import {
 } from "../dispatch/scripts/website.mjs";
 
 const FIXTURES = "test/fixtures/website";
+
+/** A real RGB PNG of any size, so resize tests need no committed image per case. */
+function png(width: number, height: number): Buffer {
+	const table = Array.from({ length: 256 }, (_, n) => {
+		let c = n;
+		for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+		return c >>> 0;
+	});
+	const crc = (data: Buffer) => {
+		let c = 0xffffffff;
+		for (const byte of data) c = table[(c ^ byte) & 255] ^ (c >>> 8);
+		return (c ^ 0xffffffff) >>> 0;
+	};
+	const chunk = (type: string, data: Buffer) => {
+		const body = Buffer.concat([Buffer.from(type), data]);
+		const length = Buffer.alloc(4);
+		length.writeUInt32BE(data.length);
+		const sum = Buffer.alloc(4);
+		sum.writeUInt32BE(crc(body));
+		return Buffer.concat([length, body, sum]);
+	};
+	const header = Buffer.alloc(13);
+	header.writeUInt32BE(width, 0);
+	header.writeUInt32BE(height, 4);
+	header[8] = 8; // bit depth
+	header[9] = 2; // RGB
+	const rows = Buffer.alloc((width * 3 + 1) * height, 200);
+	for (let y = 0; y < height; y++) rows[y * (width * 3 + 1)] = 0;
+	return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", header), chunk("IDAT", deflateSync(rows)), chunk("IEND", Buffer.alloc(0))]);
+}
+
+/** A WebP file's pixel width, read from its VP8, VP8L or VP8X header. */
+function webpWidth(file: Buffer): number {
+	const kind = file.toString("ascii", 12, 16);
+	if (kind === "VP8 ") return file.readUInt16LE(26) & 0x3fff;
+	if (kind === "VP8L") return 1 + (file[21] | ((file[22] & 0x3f) << 8));
+	if (kind === "VP8X") return 1 + file.readUIntLE(24, 3);
+	throw new Error(`not a WebP file (${kind})`);
+}
 const listOutput = (dir: string, prefix = ""): string[] =>
 	readdirSync(join(dir, prefix), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? listOutput(dir, join(prefix, e.name)) : [join(prefix, e.name)]));
 const read = (path: string) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
@@ -206,6 +248,25 @@ describe("Markdown conversion", () => {
 	it("links a bare URL, shown without its scheme, and leaves every other URL alone", () => {
 		expect(convert("See https://github.com/x/y/issues/5.").markdown).toBe("See [github.com/x/y/issues/5](https://github.com/x/y/issues/5).");
 		for (const kept of ["[t](https://a.b/c)", "<https://a.b/c>", '<a href="https://a.b/c">t</a>', "`https://a.b/c`", '<a title="see https://a.b/c" href="https://a.b/d">t</a>']) expect(convert(kept).markdown).toBe(kept);
+	});
+
+	it("parses srcset as the HTML standard does: commas inside a URL stay, trailing commas separate", () => {
+		expect(parseSrcset("a.png 1x, b.png 2x")).toEqual([{ url: "a.png", descriptor: "1x" }, { url: "b.png", descriptor: "2x" }]);
+		expect(parseSrcset("https://img.example/resize,w_448/p.png 2x")).toEqual([{ url: "https://img.example/resize,w_448/p.png", descriptor: "2x" }]);
+		expect(parseSrcset("data:image/png;base64,iVBORw0KGgo= 1x,b.png 2x")).toEqual([{ url: "data:image/png;base64,iVBORw0KGgo=", descriptor: "1x" }, { url: "b.png", descriptor: "2x" }]);
+		expect(parseSrcset("https://img.example/a.png, ../../02_Private/s.png 2x")).toEqual([{ url: "https://img.example/a.png", descriptor: "" }, { url: "../../02_Private/s.png", descriptor: "2x" }]);
+		expect(parseSrcset(" ,, a.png 100w (x, y), b.png")).toEqual([{ url: "a.png", descriptor: "100w (x, y)" }, { url: "b.png", descriptor: "" }]);
+		expect(serializeSrcset([{ url: "a&b.png", descriptor: "2x" }, { url: "c.png", descriptor: "" }])).toBe("a&amp;b.png 2x, c.png");
+		// The reader decodes before parsing, so an encoded separator cannot hide a candidate.
+		expect(resourceAttributes(`<img srcset="https://x.y/a.png&#44; ../../02_Private/s.png 2x">`).map((a: { url: string }) => a.url)).toEqual(["https://x.y/a.png", "../../02_Private/s.png"]);
+	});
+
+	it("keeps comma-containing external and data: candidates, and rewrites only the local one", () => {
+		const external = `<img src="https://img.example/f.png" srcset="https://img.example/resize,w_448/p.png 2x, data:image/png;base64,iVBORw0KGgo= 1x" alt="E">`;
+		expect(convert(external)).toMatchObject({ markdown: external, errors: [] });
+		expect(convert(`<img src="../assets/pic.png" srcset='../assets/pic.png 1x, https://img.example/resize,w_2/p.png 2x' alt="P">`).markdown).toBe(
+			`<img src="pic.png" srcset='pic.png 1x, https://img.example/resize,w_2/p.png 2x' alt="P">`,
+		);
 	});
 
 	it("resolves each srcset entry, keeping descriptors and quotes, and fails a private one", () => {
@@ -422,6 +483,8 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		"10_Website/Articles/Quoted angle brackets.md:7: link ../../02_Private/Private-note.md points outside the published set",
 		"10_Website/Articles/Quoted angle brackets.md:9: link ../../02_Private/Other.md points outside the published set",
 		// A testimonial's photo must be a published image.
+		// srcset is parsed as the browser parses it, after decoding: &#44; separates candidates.
+		"10_Website/Articles/Encoded srcset separator.md:7: link ../../02_Private/secret.png points outside the published set",
 		"10_Website/Testimonials/Missing photo.md:6: photo nowhere.png is not a file in the published set",
 		"10_Website/Testimonials/Photo not an image.md:6: photo notes.txt is not a PNG, JPEG, WebP or GIF image, which the build can resize",
 	];
@@ -469,8 +532,13 @@ describe("the output guard", () => {
 		expect(guard(`<p title="C:\\Users\\kai > x">in text</p>`)).toEqual([]);
 	});
 
+	it("sees the candidate behind an encoded srcset separator, and accepts commas inside external URLs", () => {
+		expect(guard(`<img src="pic.png" srcset="https://img.example/a.png&#44; ../../02_Private/s.png 2x" alt="x">`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/s.png"]);
+		expect(guard(`<img src="pic.png" srcset="https://img.example/resize,w_448/p.png 2x, data:image/png;base64,iVBORw0KGgo= 1x" alt="x">`)).toEqual([]);
+	});
+
 	it("reads every URL of a srcset, checks each, and rewrites only the entries that change", () => {
-		expect(resourceAttributes(`<img src="a.webp" srcset="a.webp 1x, b.webp 2x" alt="x">`).map((a: { raw: string }) => a.raw)).toEqual(["a.webp", "a.webp", "b.webp"]);
+		expect(resourceAttributes(`<img src="a.webp" srcset="a.webp 1x, b.webp 2x" alt="x">`).map((a: { url: string }) => a.url)).toEqual(["a.webp", "a.webp", "b.webp"]);
 		expect(guard(`<img src="pic.png" srcset="pic.png 1x, gone.webp 2x" alt="x">`)).toEqual(["articles/a/index.html:1: broken link gone.webp"]);
 		expect(guard(`<img src="pic.png" srcset="pic.png 1x, file:///C:/x.png 2x" alt="x">`)).toEqual(["articles/a/index.html:1: a file:// URL: file:///C:/x.png"]);
 	});
@@ -580,13 +648,14 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		expect(article).not.toContain('<p class="description">');
 		expect(article).toContain('<base href="https://kaimys.github.io/obsidian-dispatch/articles/getting-started/">');
 		expect(html("articles/second-article/index.html")).toContain('<p class="description">The second one.</p>');
-		// A raster teaser is resized to the widths its 480 px source can fill (never upscaled):
-		// 224 and 448 in the list, 336 on the article page (as wide as the text column); the original is not published.
+		// A raster teaser is resized to the widths its 480 px source can fill, plus its own width
+		// (never upscaled): 224, 448 and 480 in the list, 336 and 480 on the article page (as wide
+		// as the text column); the original is not published.
 		const processed = "https://kaimys\\.github\\.io/obsidian-dispatch/processed_images/teaser\\.[0-9a-f]+\\.webp";
 		const list = html("articles/index.html");
-		expect(list).toMatch(new RegExp(`<span class="teaser teaser-cover"><img src="${processed}" srcset="${processed} 224w, ${processed} 448w" sizes="\\(max-width: 36rem\\) calc\\(100vw - 2rem\\), 14rem" alt="" width="480" height="270" loading="lazy"></span>`));
+		expect(list).toMatch(new RegExp(`<span class="teaser teaser-cover"><img src="${processed}" srcset="${processed} 224w, ${processed} 448w, ${processed} 480w" sizes="\\(max-width: 36rem\\) calc\\(100vw - 2rem\\), 14rem" alt="" width="480" height="270" loading="lazy"></span>`));
 		const second = html("articles/second-article/index.html");
-		expect(second).toMatch(new RegExp(`<figure class="teaser article-teaser teaser-cover"><img src="${processed}" srcset="${processed} 336w" sizes="[^"]+" alt="" width="480" height="270"></figure>`));
+		expect(second).toMatch(new RegExp(`<figure class="teaser article-teaser teaser-cover"><img src="${processed}" srcset="${processed} 336w, ${processed} 480w" sizes="[^"]+" alt="" width="480" height="270"></figure>`));
 		expect(listOutput(result.output).filter((f) => /teaser\.png$/.test(f))).toEqual([]);
 		for (const m of (list + second).matchAll(/processed_images\/(teaser\.[0-9a-f]+\.webp)/g)) expect(existsSync(join(result.output, "processed_images", m[1]))).toBe(true);
 		// An SVG teaser scales by itself and is used as it is.
@@ -643,5 +712,38 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 			{ quote: "It works for us.", name: "With Photo", role: "Tester", photo: "photos/portrait.png" },
 			{ quote: "It works for us.", name: "Without Photo", role: "Tester" },
 		]);
+	});
+
+	it("resizes a teaser to every width its source can fill, plus its own width — never upscaled, never losing resolution", () => {
+		const vault = join(mkdtempSync(join(tmpdir(), "dispatch-website-vault-")), "wiki");
+		cpSync(join(FIXTURES, "clean"), vault, { recursive: true });
+		// Sources below, between, exactly at and above the requested widths.
+		const sources = { below: [200, 113], between: [1177, 662], exact: [672, 378], above: [1400, 788] } as const;
+		for (const [name, [w, h]] of Object.entries(sources)) {
+			writeFileSync(join(vault, "10_Website", "assets", `${name}.png`), png(w, h));
+			writeFileSync(join(vault, "10_Website", "Articles", `Size ${name}.md`), `---\ndate: 2026-09-01\nstatus: ready\nteaser: ${name}.png\n---\n# Size ${name}\n\nText.\n`);
+		}
+		const { site, buildDir } = fixtureSite({ design: true });
+		const result = build({ wikiRoot: vault, siteDir: site, buildDir, docs, published, renderDiagram: fakeDiagram });
+		const read$ = (path: string) => read(join(result.output, path));
+		const offered = (html: string, name: string) => {
+			const tag = new RegExp(`<img src="[^"]*processed_images/${name}\\.[0-9a-f]+\\.webp" srcset="([^"]+)"`).exec(html);
+			expect(tag, name).not.toBeNull();
+			return parseSrcset(tag![1]).map((c: { url: string; descriptor: string }) => {
+				const file = readFileSync(join(result.output, c.url.replace(/^.*\/obsidian-dispatch\//, "")));
+				expect(webpWidth(file), `${c.url} is really ${c.descriptor}`).toBe(Number(c.descriptor.replace("w", "")));
+				return Number(c.descriptor.replace("w", ""));
+			});
+		};
+		const list = read$("articles/index.html");
+		expect(offered(list, "below")).toEqual([200]);
+		expect(offered(list, "between")).toEqual([224, 448, 896]);
+		expect(offered(list, "exact")).toEqual([224, 448, 672]);
+		expect(offered(list, "above")).toEqual([224, 448, 896]);
+		expect(offered(read$("articles/size-below/index.html"), "below")).toEqual([200]);
+		expect(offered(read$("articles/size-between/index.html"), "between")).toEqual([336, 672, 1177]);
+		expect(offered(read$("articles/size-exact/index.html"), "exact")).toEqual([336, 672]);
+		expect(offered(read$("articles/size-above/index.html"), "above")).toEqual([336, 672, 1344]);
+		expect(listOutput(result.output).filter((f) => /(below|between|exact|above)\.png$/.test(f))).toEqual([]);
 	});
 });

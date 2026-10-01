@@ -303,14 +303,58 @@ export function scanTags(markup) {
 export function resourceAttributes(markup) {
 	return scanTags(markup).flatMap((tag) =>
 		tag.attrs.flatMap((a) => {
-			if (/^((xlink:)?href|src)$/.test(a.name)) return [a];
-			// `srcset` lists several URLs ("a.webp 1x, b.webp 2x"): one entry per URL, each with
-			// `set` (the whole attribute) and its `part` index, so a rewrite can rebuild the list.
+			// `url` is what the browser fetches: the attribute value with character references
+			// decoded. Every consumer reads `url`; none decodes or splits on its own.
+			if (/^((xlink:)?href|src)$/.test(a.name)) return [{ ...a, url: decodeEntities(a.raw).trim() }];
+			// `srcset` lists several candidates ("a.webp 1x, b.webp 2x"): one entry per candidate,
+			// parsed as the browser parses it, each with `set` (the attribute and all its
+			// candidates) and its `part` index, so a rewrite can rebuild the list.
 			if (a.name !== "srcset") return [];
-			const parts = a.raw.split(",").map((p) => p.trim()).filter(Boolean);
-			return parts.map((p, part) => ({ ...a, raw: p.split(/\s+/)[0], set: { attr: a, parts }, part }));
+			const candidates = parseSrcset(decodeEntities(a.raw));
+			return candidates.map((c, part) => ({ ...a, url: c.url, set: { attr: a, candidates }, part }));
 		}),
 	);
+}
+
+/**
+ * A `srcset` value split into `{ url, descriptor }` candidates by the HTML standard's algorithm,
+ * on the already-decoded value: a URL is a run of non-whitespace, so a comma *inside* it (a
+ * `resize,w_448` path, a `data:` URL) stays part of it, while trailing commas end the candidate;
+ * a descriptor runs to the next comma outside parentheses.
+ */
+export function parseSrcset(value) {
+	const text = String(value);
+	const space = /[\t\n\f\r ]/;
+	const candidates = [];
+	let i = 0;
+	while (i < text.length) {
+		while (i < text.length && (space.test(text[i]) || text[i] === ",")) i++;
+		if (i >= text.length) break;
+		const start = i;
+		while (i < text.length && !space.test(text[i])) i++;
+		let url = text.slice(start, i);
+		let descriptor = "";
+		if (/,$/.test(url)) url = url.replace(/,+$/, "");
+		else {
+			let depth = 0;
+			while (i < text.length) {
+				const c = text[i++];
+				if (c === "(") depth++;
+				else if (c === ")") depth = Math.max(0, depth - 1);
+				else if (c === "," && depth === 0) break;
+				descriptor += c;
+			}
+			descriptor = descriptor.trim();
+		}
+		if (url) candidates.push({ url, descriptor });
+	}
+	return candidates;
+}
+
+/** A srcset value from candidates, escaped for an attribute quoted with `quote`. */
+export function serializeSrcset(candidates, quote = '"') {
+	const value = candidates.map((c) => (c.descriptor ? `${c.url} ${c.descriptor}` : c.url)).join(", ");
+	return value.replace(/&/g, "&amp;").replace(quote === "'" ? /'/g : /"/g, quote === "'" ? "&#39;" : "&quot;");
 }
 
 /** A reference that stays on the web or inside the file itself: never a local dependency. */
@@ -727,9 +771,10 @@ export function convertMarkdown(source, ctx) {
 		}
 		// A relative link becomes a Zola `@/` link (a published note) or a file copied next to the
 		// page (a published asset); anything else points outside the published set.
-		const target = (raw, index) => {
+		const target = (raw, index, decoded = false) => {
 			// An attribute may be entity-encoded; a browser decodes it before choosing a scheme.
-			const url = decodeEntities(raw);
+			// `resourceAttributes` hands over URLs already decoded, so they are not decoded twice.
+			const url = decoded ? raw : decodeEntities(raw);
 			if (/^file:/i.test(url)) {
 				fail(at(index), `a file:// URL: ${url}`);
 				return { keep: true };
@@ -771,21 +816,22 @@ export function convertMarkdown(source, ctx) {
 		const srcsets = new Map();
 		for (const a of resourceAttributes(line)) {
 			if (masked.slice(a.start, a.end).trim() === "") continue; // inside inline code
-			if (!a.raw) continue; // a bare `href` names nothing
-			const found = target(a.raw, a.start);
+			if (!a.url) continue; // a bare `href` names nothing
+			const found = target(a.url, a.start, true);
 			if (a.set) {
-				// Collect a srcset's entries; the attribute is rebuilt once, below.
-				const parts = srcsets.get(a.set.attr) ?? [...a.set.parts];
-				if (!found.keep) parts[a.part] = parts[a.part].replace(a.raw, found.url);
-				srcsets.set(a.set.attr, parts);
+				// Collect a srcset's candidates; the attribute is rebuilt once, below.
+				const entry = srcsets.get(a.set.attr) ?? { candidates: a.set.candidates.map((c) => ({ ...c })), changed: false };
+				if (!found.keep) {
+					entry.candidates[a.part].url = found.url;
+					entry.changed = true;
+				}
+				srcsets.set(a.set.attr, entry);
 			} else if (!found.keep) edits.push({ start: a.start, end: a.end, value: `${a.name}=${a.quote}${found.url}${a.quote}` });
 		}
-		for (const [attr, parts] of srcsets) {
-			const original = attr.raw.split(",").map((p) => p.trim()).filter(Boolean);
-			if (parts.some((p, i) => p !== original[i])) {
-				const quote = attr.quote || '"';
-				edits.push({ start: attr.start, end: attr.end, value: `${attr.name}=${quote}${parts.join(", ")}${quote}` });
-			}
+		for (const [attr, entry] of srcsets) {
+			if (!entry.changed) continue;
+			const quote = attr.quote || '"';
+			edits.push({ start: attr.start, end: attr.end, value: `${attr.name}=${quote}${serializeSrcset(entry.candidates, quote)}${quote}` });
 		}
 		// A bare URL is a link on GitHub and in Obsidian, but plain text to Zola. It shows without
 		// its scheme; trailing sentence punctuation stays outside the link. A URL inside a tag (an
@@ -915,7 +961,7 @@ export function guardOutput(pages, baseUrl, exists) {
 	const checkUrls = (page, markup) => {
 		const dir = posix.dirname(`/${page.path}`);
 		for (const a of resourceAttributes(markup)) {
-			const url = decodeEntities(a.raw).trim();
+			const url = a.url;
 			const at = lineOf(markup, a.start);
 			const leaks = scanPaths(url);
 			if (leaks.length) {
@@ -936,7 +982,7 @@ export function guardOutput(pages, baseUrl, exists) {
 			} else path = posix.normalize(posix.join(dir, url));
 			path = decodeURIComponent(path.split(/[?#]/)[0]);
 			const candidates = path.endsWith("/") ? [`${path}index.html`] : [path, `${path}/index.html`];
-			if (!candidates.some((c) => exists(c.replace(/^\/+/, "")))) errors.push(`${page.path}:${at}: broken link ${a.raw}`);
+			if (!candidates.some((c) => exists(c.replace(/^\/+/, "")))) errors.push(`${page.path}:${at}: broken link ${a.url}`);
 		}
 	};
 	for (const page of pages) {
@@ -1101,7 +1147,7 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 		// would be missing on the site, or reach outside the published set. Embed it instead.
 		const raw = readFileSync(join(sourceRoot, asset), "utf8");
 		for (const a of resourceAttributes(raw)) {
-			const url = decodeEntities(a.raw).trim();
+			const url = a.url;
 			if (url && !isExternal(url) && !/^file:/i.test(url)) errors.push(`${rel}:${lineOf(raw, a.start)}: references ${url}, a local file an asset cannot bring along; embed it instead`);
 		}
 	};
