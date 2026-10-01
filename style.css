@@ -376,7 +376,7 @@ a:hover { text-decoration-thickness: 2px; }
 }
 .teaser img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 6%; border-radius: 0; }
 .teaser-cover img { object-fit: cover; object-position: top left; padding: 0; }
-.article-teaser { max-width: 56rem; margin: 0 0 2.75rem; }
+.article-teaser { max-width: var(--prose); margin: 0 0 2.75rem; } /* the text column, 672 px (Kai, 2026-10-01; the design had 56rem) */
 
 /* ---------- Article page ---------- */
 .article-foot { max-width: var(--prose); margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; font-size: .95rem; }
