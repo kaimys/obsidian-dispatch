@@ -485,6 +485,9 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		// A testimonial's photo must be a published image.
 		// srcset is parsed as the browser parses it, after decoding: &#44; separates candidates.
 		"10_Website/Articles/Encoded srcset separator.md:7: link ../../02_Private/secret.png points outside the published set",
+		// A named reference, and a numeric one without its semicolon, separate candidates too.
+		"10_Website/Articles/Named srcset separator.md:7: link ../../02_Private/secret.png points outside the published set",
+		"10_Website/Articles/Named srcset separator.md:9: link ../../02_Private/other.png points outside the published set",
 		"10_Website/Testimonials/Missing photo.md:6: photo nowhere.png is not a file in the published set",
 		"10_Website/Testimonials/Photo not an image.md:6: photo notes.txt is not a PNG, JPEG, WebP or GIF image, which the build can resize",
 	];
@@ -532,8 +535,30 @@ describe("the output guard", () => {
 		expect(guard(`<p title="C:\\Users\\kai > x">in text</p>`)).toEqual([]);
 	});
 
-	it("sees the candidate behind an encoded srcset separator, and accepts commas inside external URLs", () => {
+	it("decodes character references by the HTML standard's rules, once", () => {
+		const attr = (s: string) => decodeEntities(s, { attribute: true });
+		// Numeric, decimal and hex, with and without the semicolon.
+		expect(["&#44;", "&#44", "&#x2c;", "&#X2C", "&#0044;"].map(attr)).toEqual([",", ",", ",", ",", ","]);
+		// Named, from the standard's full table; the longest name wins.
+		expect(attr("&comma;&period;&period;&sol;")).toBe(",../");
+		expect(attr("&notin; &not;")).toBe("∉ ¬");
+		// Legacy names without ";": decoded in text, but kept before "=" or an alphanumeric in an attribute.
+		expect(decodeEntities("&copy 2026 &notit;")).toBe("© 2026 ¬it;");
+		expect(attr("?a=1&copy=2&notit;&copy 2026")).toBe("?a=1&copy=2&notit;© 2026");
+		// One pass: an escaped ampersand stays an ampersand, never a second reference.
+		expect(attr("&amp;#44; &amp;comma;")).toBe("&#44; &comma;");
+		// Out-of-range and C1 values as the standard maps them; unknown names stay literal.
+		expect(attr("&#0;&#x110000;&#xD800;&#128;&#x9F;")).toBe("���€Ÿ");
+		expect(attr("&unknown; & &#; &#x;")).toBe("&unknown; & &#; &#x;");
+		// A decoded line break is a space, so findings keep their line numbers.
+		expect(attr("a&NewLine;b&#10;c")).toBe("a b c");
+	});
+
+	it("sees the candidate behind any encoded srcset separator, and accepts commas inside external URLs", () => {
 		expect(guard(`<img src="pic.png" srcset="https://img.example/a.png&#44; ../../02_Private/s.png 2x" alt="x">`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/s.png"]);
+		expect(guard(`<img src="pic.png" srcset="https://img.example/a.png&comma; ../../02_Private/s.png 2x" alt="x">`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/s.png"]);
+		expect(guard(`<img src="pic.png" srcset="https://img.example/a.png&#44 ../../02_Private/s.png 2x" alt="x">`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/s.png"]);
+		expect(guard(`<a href="&period;&period;&sol;&period;&period;&sol;02_Private/p.md">x</a>`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/p.md"]);
 		expect(guard(`<img src="pic.png" srcset="https://img.example/resize,w_448/p.png 2x, data:image/png;base64,iVBORw0KGgo= 1x" alt="x">`)).toEqual([]);
 	});
 

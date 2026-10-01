@@ -27,6 +27,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join, posix, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+// The HTML standard's named character references, as data beside this file; lifted with it.
+import NAMED_REFERENCES from "./html-entities.mjs";
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const SITE_DIR = join("dispatch", "website");
@@ -305,12 +307,12 @@ export function resourceAttributes(markup) {
 		tag.attrs.flatMap((a) => {
 			// `url` is what the browser fetches: the attribute value with character references
 			// decoded. Every consumer reads `url`; none decodes or splits on its own.
-			if (/^((xlink:)?href|src)$/.test(a.name)) return [{ ...a, url: decodeEntities(a.raw).trim() }];
+			if (/^((xlink:)?href|src)$/.test(a.name)) return [{ ...a, url: decodeEntities(a.raw, { attribute: true }).trim() }];
 			// `srcset` lists several candidates ("a.webp 1x, b.webp 2x"): one entry per candidate,
 			// parsed as the browser parses it, each with `set` (the attribute and all its
 			// candidates) and its `part` index, so a rewrite can rebuild the list.
 			if (a.name !== "srcset") return [];
-			const candidates = parseSrcset(decodeEntities(a.raw));
+			const candidates = parseSrcset(decodeEntities(a.raw, { attribute: true }));
 			return candidates.map((c, part) => ({ ...a, url: c.url, set: { attr: a, candidates }, part }));
 		}),
 	);
@@ -774,7 +776,7 @@ export function convertMarkdown(source, ctx) {
 		const target = (raw, index, decoded = false) => {
 			// An attribute may be entity-encoded; a browser decodes it before choosing a scheme.
 			// `resourceAttributes` hands over URLs already decoded, so they are not decoded twice.
-			const url = decoded ? raw : decodeEntities(raw);
+			const url = decoded ? raw : decodeEntities(raw, { attribute: true });
 			if (/^file:/i.test(url)) {
 				fail(at(index), `a file:// URL: ${url}`);
 				return { keep: true };
@@ -932,16 +934,66 @@ function withoutCode(html) {
 	return html.replace(/<(pre|code)\b[\s\S]*?<\/\1>/gi, (m) => m.replace(/[^\n]/g, " "));
 }
 
+/** Numeric references 0x80–0x9F are read as Windows-1252, as the HTML standard maps them. */
+const WINDOWS_1252 = {
+	0x80: 0x20ac, 0x82: 0x201a, 0x83: 0x0192, 0x84: 0x201e, 0x85: 0x2026, 0x86: 0x2020, 0x87: 0x2021, 0x88: 0x02c6,
+	0x89: 0x2030, 0x8a: 0x0160, 0x8b: 0x2039, 0x8c: 0x0152, 0x8e: 0x017d, 0x91: 0x2018, 0x92: 0x2019, 0x93: 0x201c,
+	0x94: 0x201d, 0x95: 0x2022, 0x96: 0x2013, 0x97: 0x2014, 0x98: 0x02dc, 0x99: 0x2122, 0x9a: 0x0161, 0x9b: 0x203a,
+	0x9c: 0x0153, 0x9e: 0x017e, 0x9f: 0x0178,
+};
+const LONGEST_NAME = Math.max(...Object.keys(NAMED_REFERENCES).map((name) => name.length));
+
 /**
- * HTML character references decoded as a browser would. None of them contains a line break, so
- * a decoded line is still the same line.
+ * HTML character references decoded as a browser decodes them, by the HTML standard's rules, in
+ * one pass (so `&amp;#44;` is the text `&#44;`, never a comma):
+ * - numeric references, decimal or hex, with or without the `;`; 0, surrogates and values past
+ *   U+10FFFF become U+FFFD, and 0x80–0x9F are read as Windows-1252;
+ * - named references from the standard's full table (`html-entities.mjs`), longest name first,
+ *   the legacy names without `;` included. With `attribute`, a legacy name followed by `=` or a
+ *   letter or digit stays literal, as browsers keep `?a=1&copy=2` intact in a URL.
+ * A reference that decodes to a line break becomes a space, so a decoded line is still the same
+ * line for findings; in a URL or a srcset a space means what the line break would.
  */
-export function decodeEntities(text) {
-	const named = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-	return String(text)
-		.replace(/&#x([0-9a-f]+);/gi, (e, hex) => String.fromCodePoint(parseInt(hex, 16)))
-		.replace(/&#(\d+);/g, (e, dec) => String.fromCodePoint(Number(dec)))
-		.replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (e, name) => named[name]);
+export function decodeEntities(text, { attribute = false } = {}) {
+	const s = String(text);
+	let out = "";
+	let i = 0;
+	const numeric = /#(?:[xX]([0-9a-fA-F]+)|([0-9]+));?/y;
+	while (i < s.length) {
+		const amp = s.indexOf("&", i);
+		if (amp < 0) {
+			out += s.slice(i);
+			break;
+		}
+		out += s.slice(i, amp);
+		i = amp + 1;
+		numeric.lastIndex = i;
+		const n = numeric.exec(s);
+		if (n) {
+			const digits = n[1] ?? n[2];
+			let code = digits.replace(/^0+/, "").length > 8 ? Infinity : parseInt(digits, n[1] !== undefined ? 16 : 10);
+			if (code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) code = 0xfffd;
+			code = WINDOWS_1252[code] ?? code;
+			out += code === 0x0a || code === 0x0d ? " " : String.fromCodePoint(code);
+			i += n[0].length;
+			continue;
+		}
+		let name = "";
+		for (let len = Math.min(LONGEST_NAME, s.length - i); len > 0; len--) {
+			if (Object.hasOwn(NAMED_REFERENCES, s.slice(i, i + len))) {
+				name = s.slice(i, i + len);
+				break;
+			}
+		}
+		const next = s[i + name.length];
+		if (!name || (attribute && !name.endsWith(";") && next !== undefined && /[=0-9A-Za-z]/.test(next))) {
+			out += "&";
+			continue;
+		}
+		out += NAMED_REFERENCES[name].replace(/[\r\n]/g, " ");
+		i += name.length;
+	}
+	return out;
 }
 
 /**
