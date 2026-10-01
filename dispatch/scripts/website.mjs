@@ -301,7 +301,16 @@ export function scanTags(markup) {
  * Returns `{ start, end, name, raw, quote }`, with `start`/`end` the attribute's offsets in `markup`.
  */
 export function resourceAttributes(markup) {
-	return scanTags(markup).flatMap((tag) => tag.attrs.filter((a) => /^((xlink:)?href|src)$/.test(a.name)));
+	return scanTags(markup).flatMap((tag) =>
+		tag.attrs.flatMap((a) => {
+			if (/^((xlink:)?href|src)$/.test(a.name)) return [a];
+			// `srcset` lists several URLs ("a.webp 1x, b.webp 2x"): one entry per URL, each with
+			// `set` (the whole attribute) and its `part` index, so a rewrite can rebuild the list.
+			if (a.name !== "srcset") return [];
+			const parts = a.raw.split(",").map((p) => p.trim()).filter(Boolean);
+			return parts.map((p, part) => ({ ...a, raw: p.split(/\s+/)[0], set: { attr: a, parts }, part }));
+		}),
+	);
 }
 
 /** A reference that stays on the web or inside the file itself: never a local dependency. */
@@ -759,15 +768,31 @@ export function convertMarkdown(source, ctx) {
 				fail(at(tag.start), `image ${src ? src.raw : "(no src)"} has no alt text`);
 			}
 		}
+		const srcsets = new Map();
 		for (const a of resourceAttributes(line)) {
 			if (masked.slice(a.start, a.end).trim() === "") continue; // inside inline code
 			if (!a.raw) continue; // a bare `href` names nothing
 			const found = target(a.raw, a.start);
-			if (!found.keep) edits.push({ start: a.start, end: a.end, value: `${a.name}=${a.quote}${found.url}${a.quote}` });
+			if (a.set) {
+				// Collect a srcset's entries; the attribute is rebuilt once, below.
+				const parts = srcsets.get(a.set.attr) ?? [...a.set.parts];
+				if (!found.keep) parts[a.part] = parts[a.part].replace(a.raw, found.url);
+				srcsets.set(a.set.attr, parts);
+			} else if (!found.keep) edits.push({ start: a.start, end: a.end, value: `${a.name}=${a.quote}${found.url}${a.quote}` });
+		}
+		for (const [attr, parts] of srcsets) {
+			const original = attr.raw.split(",").map((p) => p.trim()).filter(Boolean);
+			if (parts.some((p, i) => p !== original[i])) {
+				const quote = attr.quote || '"';
+				edits.push({ start: attr.start, end: attr.end, value: `${attr.name}=${quote}${parts.join(", ")}${quote}` });
+			}
 		}
 		// A bare URL is a link on GitHub and in Obsidian, but plain text to Zola. It shows without
-		// its scheme; trailing sentence punctuation stays outside the link.
+		// its scheme; trailing sentence punctuation stays outside the link. A URL inside a tag (an
+		// attribute value, a srcset entry) is markup, not text, and is left as it is.
+		const tagSpans = scanTags(line).map((t) => [t.start, t.end]);
 		for (const m of masked.matchAll(/(?<![(<"'=[\]\w/])https?:\/\/[^\s<>()[\]]+/g)) {
+			if (tagSpans.some(([s, e]) => m.index >= s && m.index < e)) continue;
 			const url = m[0].replace(/[.,;:!?]+$/, "");
 			replace({ index: m.index, 0: url }, `[${url.replace(/^https?:\/\//, "")}](${url})`);
 		}
@@ -1160,19 +1185,21 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 
 	writeFileSync(join(root, "home.json"), JSON.stringify(set.home ?? {}, null, "\t"));
 	writeFileSync(join(root, "updates.json"), JSON.stringify(buildUpdates(set), null, "\t"));
-	// An optional photo on a ready testimonial: an image in the published assets, copied (and
-	// leak-checked) under the site's testimonials/ folder. It is published with the quote, so the
-	// person's approval has to cover it too — the template's GUIDE says so.
+	// An optional photo on a ready testimonial: a raster image in the published assets. It goes to
+	// the staging root's photos/, which Zola does not publish; the template has Zola's
+	// resize_image() make the small versions the card shows, so only those reach the site, never
+	// the full-size original. It is published with the quote, so the person's approval has to cover
+	// it too — the template's GUIDE says so.
 	for (const t of set.testimonials) {
 		if (!t.data.photo) continue;
 		const name = basename(String(t.data.photo));
 		const asset = assets.get(name.toLowerCase());
 		const line = t.lines?.photo ?? 1;
 		if (!asset) errors.push(`${t.rel}:${line}: photo ${t.data.photo} is not a file in the published set`);
-		else if (!/\.(png|jpe?g|webp|gif|avif|svg)$/i.test(asset)) errors.push(`${t.rel}:${line}: photo ${t.data.photo} is not an image`);
+		else if (!/\.(png|jpe?g|webp|gif)$/i.test(asset)) errors.push(`${t.rel}:${line}: photo ${t.data.photo} is not a PNG, JPEG, WebP or GIF image, which the build can resize`);
 		else {
-			copyAsset(asset, join(root, "static", "testimonials"));
-			t.photo = `testimonials/${encodeURI(basename(asset))}`;
+			copyAsset(asset, join(root, "photos"));
+			t.photo = `photos/${basename(asset)}`;
 		}
 	}
 	writeFileSync(join(root, "testimonials.json"), JSON.stringify(buildTestimonials(set), null, "\t"));

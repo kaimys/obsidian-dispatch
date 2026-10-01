@@ -205,7 +205,14 @@ describe("Markdown conversion", () => {
 
 	it("links a bare URL, shown without its scheme, and leaves every other URL alone", () => {
 		expect(convert("See https://github.com/x/y/issues/5.").markdown).toBe("See [github.com/x/y/issues/5](https://github.com/x/y/issues/5).");
-		for (const kept of ["[t](https://a.b/c)", "<https://a.b/c>", '<a href="https://a.b/c">t</a>', "`https://a.b/c`"]) expect(convert(kept).markdown).toBe(kept);
+		for (const kept of ["[t](https://a.b/c)", "<https://a.b/c>", '<a href="https://a.b/c">t</a>', "`https://a.b/c`", '<a title="see https://a.b/c" href="https://a.b/d">t</a>']) expect(convert(kept).markdown).toBe(kept);
+	});
+
+	it("resolves each srcset entry, keeping descriptors and quotes, and fails a private one", () => {
+		expect(convert(`<img src="../assets/pic.png" srcset="../assets/pic.png 1x, https://x.y/p.png 2x" alt="P">`).markdown).toBe(
+			`<img src="pic.png" srcset="pic.png 1x, https://x.y/p.png 2x" alt="P">`,
+		);
+		expect(convert(`<img src="../assets/pic.png" srcset='../../02_Private/s.png 2x' alt="P">`).errors).toEqual(["a.md:1: link ../../02_Private/s.png points outside the published set"]);
 	});
 
 	it("rewrites raw HTML images and requires their alt text", () => {
@@ -411,7 +418,7 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		"10_Website/Articles/Quoted angle brackets.md:9: link ../../02_Private/Other.md points outside the published set",
 		// A testimonial's photo must be a published image.
 		"10_Website/Testimonials/Missing photo.md:6: photo nowhere.png is not a file in the published set",
-		"10_Website/Testimonials/Photo not an image.md:6: photo notes.txt is not an image",
+		"10_Website/Testimonials/Photo not an image.md:6: photo notes.txt is not a PNG, JPEG, WebP or GIF image, which the build can resize",
 	];
 	for (const finding of expected) it(finding.replace(/:\d+: .*/, "") + " — " + finding.split(/:\d+: /)[1], () => expect(errors).toContain(finding));
 	it("reports nothing else", () => expect([...errors].sort()).toEqual([...expected].sort()));
@@ -455,6 +462,12 @@ describe("the output guard", () => {
 		expect(html.slice(img.start, img.end)).toBe(`<img alt='1 < 2 src="fake"' src=y data-z="3 > 2">`);
 		expect(guard(`<a title="A > B" href="../../02_Private/p.md">x</a>`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/p.md"]);
 		expect(guard(`<p title="C:\\Users\\kai > x">in text</p>`)).toEqual([]);
+	});
+
+	it("reads every URL of a srcset, checks each, and rewrites only the entries that change", () => {
+		expect(resourceAttributes(`<img src="a.webp" srcset="a.webp 1x, b.webp 2x" alt="x">`).map((a: { raw: string }) => a.raw)).toEqual(["a.webp", "a.webp", "b.webp"]);
+		expect(guard(`<img src="pic.png" srcset="pic.png 1x, gone.webp 2x" alt="x">`)).toEqual(["articles/a/index.html:1: broken link gone.webp"]);
+		expect(guard(`<img src="pic.png" srcset="pic.png 1x, file:///C:/x.png 2x" alt="x">`)).toEqual(["articles/a/index.html:1: a file:// URL: file:///C:/x.png"]);
 	});
 
 	it("reads URL attributes in every quoting, in pages and in SVG files", () => {
@@ -593,17 +606,26 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		cpSync(join(FIXTURES, "clean"), vault, { recursive: true });
 		const testimonial = (file: string, extra: string) =>
 			writeFileSync(join(vault, "10_Website", "Testimonials", file), `---\nquote: It works for us.\nname: ${file.replace(".md", "")}\nrole: Tester\nconsent: 2026-09-30\n${extra}status: ready\n---\n`);
-		testimonial("With Photo.md", "photo: pic.png\n");
+		testimonial("With Photo.md", "photo: portrait.png\n");
 		testimonial("Without Photo.md", "");
 		const { site, buildDir } = fixtureSite({ design: true });
 		const result = build({ wikiRoot: vault, siteDir: site, buildDir, docs, published, renderDiagram: fakeDiagram });
 		const home = read(join(result.output, "index.html"));
 		expect(home).toContain('<ul class="testimonials">');
-		expect(home).toContain('<p class="who has-photo"><img class="avatar" src="https://kaimys.github.io/obsidian-dispatch/testimonials/pic.png" alt="" width="48" height="48" loading="lazy"><span><span class="name">With Photo</span>');
+		// The card shows two small WebP versions Zola made at build time, 1x and 2x.
+		const img = /<p class="who has-photo"><img class="avatar" src="([^"]+)" srcset="([^"]+) 1x, ([^"]+) 2x" alt="" width="56" height="56" loading="lazy"><span><span class="name">With Photo<\/span>/.exec(home);
+		expect(img).not.toBeNull();
+		const [, src, oneX, twoX] = img!;
+		expect(oneX).toBe(src);
+		for (const url of [src, twoX]) {
+			expect(url).toMatch(/^https:\/\/kaimys\.github\.io\/obsidian-dispatch\/processed_images\/portrait\.[0-9a-f]+\.webp$/);
+			expect(existsSync(join(result.output, url.replace("https://kaimys.github.io/obsidian-dispatch/", "")))).toBe(true);
+		}
 		expect(home).toContain('<p class="who"><span class="name">Without Photo</span> <span class="role">Tester</span></p>');
-		expect(existsSync(join(result.output, "testimonials", "pic.png"))).toBe(true);
+		// The full-size original is never published.
+		expect(listOutput(result.output).filter((f) => /portrait\.png$/.test(f))).toEqual([]);
 		expect(JSON.parse(read(join(result.root, "testimonials.json")))).toEqual([
-			{ quote: "It works for us.", name: "With Photo", role: "Tester", photo: "testimonials/pic.png" },
+			{ quote: "It works for us.", name: "With Photo", role: "Tester", photo: "photos/portrait.png" },
 			{ quote: "It works for us.", name: "Without Photo", role: "Tester" },
 		]);
 	});
