@@ -409,6 +409,9 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		// A quoted < or > inside another attribute neither ends the tag nor hides the URL after it.
 		"10_Website/Articles/Quoted angle brackets.md:7: link ../../02_Private/Private-note.md points outside the published set",
 		"10_Website/Articles/Quoted angle brackets.md:9: link ../../02_Private/Other.md points outside the published set",
+		// A testimonial's photo must be a published image.
+		"10_Website/Testimonials/Missing photo.md:6: photo nowhere.png is not a file in the published set",
+		"10_Website/Testimonials/Photo not an image.md:6: photo notes.txt is not an image",
 	];
 	for (const finding of expected) it(finding.replace(/:\d+: .*/, "") + " — " + finding.split(/:\d+: /)[1], () => expect(errors).toContain(finding));
 	it("reports nothing else", () => expect([...errors].sort()).toEqual([...expected].sort()));
@@ -583,5 +586,25 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		expect(home).toContain("The public introduction. It says what the article is about.");
 		expect(html("legal/impressum/index.html")).toContain('<html lang="de">');
 		expect(html("legal/impressum/index.html")).toContain('hreflang="en">Privacy Policy</a>');
+	});
+
+	it("renders ready testimonials with the design — a photo beside the name when given, the design's plain card otherwise", () => {
+		const vault = join(mkdtempSync(join(tmpdir(), "dispatch-website-vault-")), "wiki");
+		cpSync(join(FIXTURES, "clean"), vault, { recursive: true });
+		const testimonial = (file: string, extra: string) =>
+			writeFileSync(join(vault, "10_Website", "Testimonials", file), `---\nquote: It works for us.\nname: ${file.replace(".md", "")}\nrole: Tester\nconsent: 2026-09-30\n${extra}status: ready\n---\n`);
+		testimonial("With Photo.md", "photo: pic.png\n");
+		testimonial("Without Photo.md", "");
+		const { site, buildDir } = fixtureSite({ design: true });
+		const result = build({ wikiRoot: vault, siteDir: site, buildDir, docs, published, renderDiagram: fakeDiagram });
+		const home = read(join(result.output, "index.html"));
+		expect(home).toContain('<ul class="testimonials">');
+		expect(home).toContain('<p class="who has-photo"><img class="avatar" src="https://kaimys.github.io/obsidian-dispatch/testimonials/pic.png" alt="" width="48" height="48" loading="lazy"><span><span class="name">With Photo</span>');
+		expect(home).toContain('<p class="who"><span class="name">Without Photo</span> <span class="role">Tester</span></p>');
+		expect(existsSync(join(result.output, "testimonials", "pic.png"))).toBe(true);
+		expect(JSON.parse(read(join(result.root, "testimonials.json")))).toEqual([
+			{ quote: "It works for us.", name: "With Photo", role: "Tester", photo: "testimonials/pic.png" },
+			{ quote: "It works for us.", name: "Without Photo", role: "Tester" },
+		]);
 	});
 });

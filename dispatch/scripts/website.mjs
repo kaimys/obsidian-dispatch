@@ -829,7 +829,7 @@ export function buildUpdates(set) {
 }
 
 export function buildTestimonials(set) {
-	return set.testimonials.map((t) => ({ quote: t.data.quote, name: t.data.name, role: t.data.role }));
+	return set.testimonials.map((t) => ({ quote: t.data.quote, name: t.data.name, role: t.data.role, photo: t.photo }));
 }
 
 /** The published notes' names and paths → Zola `@/` links, for wikilinks and relative links. */
@@ -1160,6 +1160,21 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 
 	writeFileSync(join(root, "home.json"), JSON.stringify(set.home ?? {}, null, "\t"));
 	writeFileSync(join(root, "updates.json"), JSON.stringify(buildUpdates(set), null, "\t"));
+	// An optional photo on a ready testimonial: an image in the published assets, copied (and
+	// leak-checked) under the site's testimonials/ folder. It is published with the quote, so the
+	// person's approval has to cover it too — the template's GUIDE says so.
+	for (const t of set.testimonials) {
+		if (!t.data.photo) continue;
+		const name = basename(String(t.data.photo));
+		const asset = assets.get(name.toLowerCase());
+		const line = t.lines?.photo ?? 1;
+		if (!asset) errors.push(`${t.rel}:${line}: photo ${t.data.photo} is not a file in the published set`);
+		else if (!/\.(png|jpe?g|webp|gif|avif|svg)$/i.test(asset)) errors.push(`${t.rel}:${line}: photo ${t.data.photo} is not an image`);
+		else {
+			copyAsset(asset, join(root, "static", "testimonials"));
+			t.photo = `testimonials/${encodeURI(basename(asset))}`;
+		}
+	}
 	writeFileSync(join(root, "testimonials.json"), JSON.stringify(buildTestimonials(set), null, "\t"));
 
 	const baseUrl = /^base_url\s*=\s*"([^"]+)"/m.exec(configText)?.[1];

@@ -65,7 +65,8 @@
   <h2 class="section-title" id="testimonials">What people say</h2>
   <ul class="testimonials">
     {%- for t in testimonials %}
-    <li><blockquote><p>{{ t.quote }}</p></blockquote><p class="who"><span class="name">{{ t.name }}</span> <span class="role">{{ t.role }}</span></p></li>
+    {#- The photo is decorative: the name beside it already says who it is (alt=""). #}
+    <li><blockquote><p>{{ t.quote }}</p></blockquote>{% if t.photo %}<p class="who has-photo"><img class="avatar" src="{{ get_url(path=t.photo) }}" alt="" width="48" height="48" loading="lazy"><span><span class="name">{{ t.name }}</span> <span class="role">{{ t.role }}</span></span></p>{% else %}<p class="who"><span class="name">{{ t.name }}</span> <span class="role">{{ t.role }}</span></p>{% endif %}</li>
     {%- endfor %}
   </ul>
 </section>
