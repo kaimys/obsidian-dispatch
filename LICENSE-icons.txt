@@ -19,3 +19,7 @@ SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
 OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+The GitHub mark in the site header is from Simple Icons (https://simpleicons.org),
+CC0 1.0 Universal. The mark itself is GitHub's trademark, used as GitHub's logo
+guidelines allow: to link to this project on GitHub.
