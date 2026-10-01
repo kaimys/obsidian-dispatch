@@ -1,10 +1,13 @@
 {% extends "base.html" %}
+{% import "macros.html" as macros %}
 {% block content %}
 <div class="wrap">
   <header class="page-head"><h1>{{ section.title }}</h1>{% if section.description %}<p class="description">{{ section.description }}</p>{% endif %}</header>
   <ul class="post-list">
     {%- for p in section.pages %}
-    <li><a href="{{ p.permalink | safe }}">{% if p.extra.teaser %}<span class="teaser{% if p.extra.teaser_cover %} teaser-cover{% endif %}"><img src="{{ p.permalink | safe }}{{ p.extra.teaser }}" alt="" loading="lazy"></span>{% endif %}<span>{% if p.date %}<span class="meta"><time datetime="{{ p.date }}">{{ p.date }}</time></span>{% endif %}<h2>{{ p.title }}</h2>{% if p.description %}<p>{{ p.description }}</p>{% endif %}</span></a></li>
+    {#- The teaser frame is 14rem (224 px) beside the text, and full width above it below 36rem;
+        a raster teaser is resized to fit both, an SVG is used as it is. #}
+    <li><a href="{{ p.permalink | safe }}">{% if p.extra.teaser %}<span class="teaser{% if p.extra.teaser_cover %} teaser-cover{% endif %}">{% if p.extra.teaser_raster %}{{ macros::raster(path=p.extra.teaser, widths=[224, 448, 896], sizes="(max-width: 36rem) calc(100vw - 2rem), 14rem") }}{% else %}<img src="{{ p.permalink | safe }}{{ p.extra.teaser }}" alt="" loading="lazy">{% endif %}</span>{% endif %}<span>{% if p.date %}<span class="meta"><time datetime="{{ p.date }}">{{ p.date }}</time></span>{% endif %}<h2>{{ p.title }}</h2>{% if p.description %}<p>{{ p.description }}</p>{% endif %}</span></a></li>
     {%- else %}
     <li><p>Nothing published here yet.</p></li>
     {%- endfor %}

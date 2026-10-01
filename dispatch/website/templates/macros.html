@@ -1,0 +1,22 @@
+{#- A raster image resized by Zola at build time: one WebP per width in `widths` that the source
+    can fill (never upscaled; a source narrower than all of them is used at its own width), offered
+    as a srcset so the browser fetches only what the frame needs. The original is not published —
+    the converter keeps it in an unpublished folder of the build. #}
+{% macro raster(path, widths, sizes, alt="", lazy=true) %}
+{%- set meta = get_image_metadata(path=path) -%}
+{%- set_global srcset = [] -%}
+{%- set_global src = "" -%}
+{%- for w in widths -%}
+{%- if w <= meta.width -%}
+{%- set img = resize_image(path=path, width=w, op="fit_width", format="webp", quality=82) -%}
+{%- set_global srcset = srcset | concat(with=img.url ~ " " ~ w ~ "w") -%}
+{%- set_global src = img.url -%}
+{%- endif -%}
+{%- endfor -%}
+{%- if srcset | length == 0 -%}
+{%- set img = resize_image(path=path, width=meta.width, op="fit_width", format="webp", quality=82) -%}
+{%- set_global srcset = [img.url ~ " " ~ meta.width ~ "w"] -%}
+{%- set_global src = img.url -%}
+{%- endif -%}
+<img src="{{ src | safe }}" srcset="{{ srcset | join(sep=', ') | safe }}" sizes="{{ sizes }}" alt="{{ alt }}" width="{{ meta.width }}" height="{{ meta.height }}"{% if lazy %} loading="lazy"{% endif %}>
+{%- endmacro raster %}

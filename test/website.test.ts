@@ -339,9 +339,13 @@ describe("the clean fixture vault", () => {
 		});
 	});
 
-	it("copies an article's teaser next to it and names it in the page's extra", () => {
-		expect(existsSync(join(staged.root, "content", "articles", "second-article", "pic.png"))).toBe(true);
-		expect(content("articles/second-article/index.md")).toContain('teaser = "pic.png"\nteaser_cover = true');
+	it("keeps a raster teaser's original out of the content for resizing, and an SVG teaser next to its article", () => {
+		expect(existsSync(join(staged.root, "teasers", "teaser.png"))).toBe(true);
+		expect(existsSync(join(staged.root, "content", "articles", "second-article", "teaser.png"))).toBe(false);
+		expect(content("articles/second-article/index.md")).toContain('teaser = "teasers/teaser.png"\nteaser_raster = true\nteaser_cover = true');
+		expect(existsSync(join(staged.root, "content", "articles", "commented", "diagram.svg"))).toBe(true);
+		expect(content("articles/commented/index.md")).toContain('teaser = "diagram.svg"');
+		expect(content("articles/commented/index.md")).not.toContain("teaser_raster");
 	});
 
 	it("orders legal pages by weight, then file name, and honours slug", () => {
@@ -392,7 +396,8 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		"08_Releases/Release 2.0.0.md:17: [[Release 1.9.0]] links to a page that is not published",
 		"08_Releases/Release 2.0.0.md:17: a path into the vault (dispatch/wiki/…): dispatch/wiki/08_Releases/x.md.",
 		"08_Releases/Release 2.1.0.md:1: a released note needs version: vX.Y.Z and date: YYYY-MM-DD",
-		"10_Website/Articles/Missing teaser.md:1: teaser nowhere.png is not a file in the published set",
+		"10_Website/Articles/Missing teaser.md:4: teaser nowhere.png is not a file in the published set",
+		"10_Website/Articles/Teaser not an image.md:4: teaser notes.txt is not an SVG, PNG, JPEG, WebP or GIF image",
 		// A public section the build cannot delimit fails; the rest of the note is never published.
 		"08_Releases/Release 2.2.0.md:8: ## GitHub release body opens a ```` fence that is never closed",
 		// Frontmatter and heading-derived titles get the same guard as body text.
@@ -575,7 +580,17 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		expect(article).not.toContain('<p class="description">');
 		expect(article).toContain('<base href="https://kaimys.github.io/obsidian-dispatch/articles/getting-started/">');
 		expect(html("articles/second-article/index.html")).toContain('<p class="description">The second one.</p>');
-		expect(html("articles/index.html")).toContain('<span class="teaser teaser-cover"><img src="https://kaimys.github.io/obsidian-dispatch/articles/second-article/pic.png"');
+		// A raster teaser is resized to the widths its 480 px source can fill (never upscaled):
+		// 224 and 448 in the list, 448 on the article page; the original is not published.
+		const processed = "https://kaimys\\.github\\.io/obsidian-dispatch/processed_images/teaser\\.[0-9a-f]+\\.webp";
+		const list = html("articles/index.html");
+		expect(list).toMatch(new RegExp(`<span class="teaser teaser-cover"><img src="${processed}" srcset="${processed} 224w, ${processed} 448w" sizes="\\(max-width: 36rem\\) calc\\(100vw - 2rem\\), 14rem" alt="" width="480" height="270" loading="lazy"></span>`));
+		const second = html("articles/second-article/index.html");
+		expect(second).toMatch(new RegExp(`<figure class="teaser article-teaser teaser-cover"><img src="${processed}" srcset="${processed} 448w" sizes="[^"]+" alt="" width="480" height="270"></figure>`));
+		expect(listOutput(result.output).filter((f) => /teaser\.png$/.test(f))).toEqual([]);
+		for (const m of (list + second).matchAll(/processed_images\/(teaser\.[0-9a-f]+\.webp)/g)) expect(existsSync(join(result.output, "processed_images", m[1]))).toBe(true);
+		// An SVG teaser scales by itself and is used as it is.
+		expect(list).toContain('<span class="teaser"><img src="https://kaimys.github.io/obsidian-dispatch/articles/commented/diagram.svg" alt="" loading="lazy"></span>');
 		const newer = html("releases/1-0-0/index.html");
 		expect(newer).toMatch(/<a href="[^"]*\/releases\/1-0-1\/">v1.0.1 &rarr;<\/a>/);
 		expect(html("docs/overview/index.html")).toMatch(/class="next" href="[^"]*\/docs\/installation\/"/);

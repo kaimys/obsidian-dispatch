@@ -1128,18 +1128,28 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 	section("articles", { title: "Articles", sort_by: "date" });
 	for (const a of set.articles) {
 		const md = convertNote(a, `articles/${a.slug}`);
-		// An optional teaser image, a published asset copied next to the article.
+		// An optional teaser image. A raster image goes to the staging root's unpublished
+		// teasers/, and the templates have Zola resize it to the widths the list and the article
+		// page show, so the original is never published. An SVG scales by itself and is copied
+		// next to the article as it is.
 		let teaser;
+		let teaserRaster;
 		if (a.data.teaser) {
 			const asset = assets.get(basename(String(a.data.teaser)).toLowerCase());
-			if (asset) {
+			const line = a.lines?.teaser ?? 1;
+			if (!asset) errors.push(`${a.rel}:${line}: teaser ${a.data.teaser} is not a file in the published set`);
+			else if (/\.svg$/i.test(asset)) {
 				teaser = basename(asset);
 				copyAsset(asset, join(content, "articles", a.slug));
-			} else errors.push(`${a.rel}:1: teaser ${a.data.teaser} is not a file in the published set`);
+			} else if (/\.(png|jpe?g|webp|gif)$/i.test(asset)) {
+				teaser = `teasers/${basename(asset)}`;
+				teaserRaster = true;
+				copyAsset(asset, join(root, "teasers"));
+			} else errors.push(`${a.rel}:${line}: teaser ${a.data.teaser} is not an SVG, PNG, JPEG, WebP or GIF image`);
 		}
 		// `lead` marks a written description; a generated one serves lists and the meta tag, but
 		// shown above the text it would only repeat the first paragraph.
-		const extra = { author: [].concat(a.data.author || []).join(", "), teaser, teaser_cover: a.data.teaser_cover === "true" || undefined, lead: Boolean(a.data.description) || undefined };
+		const extra = { author: [].concat(a.data.author || []).join(", "), teaser, teaser_raster: teaserRaster, teaser_cover: a.data.teaser_cover === "true" || undefined, lead: Boolean(a.data.description) || undefined };
 		writePage(content, `articles/${a.slug}`, { title: a.title, date: a.data.date, description: a.data.description || summaryOf(a.content), extra }, md);
 	}
 
