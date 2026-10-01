@@ -581,12 +581,12 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		expect(article).toContain('<base href="https://kaimys.github.io/obsidian-dispatch/articles/getting-started/">');
 		expect(html("articles/second-article/index.html")).toContain('<p class="description">The second one.</p>');
 		// A raster teaser is resized to the widths its 480 px source can fill (never upscaled):
-		// 224 and 448 in the list, 448 on the article page; the original is not published.
+		// 224 and 448 in the list, 336 on the article page (as wide as the text column); the original is not published.
 		const processed = "https://kaimys\\.github\\.io/obsidian-dispatch/processed_images/teaser\\.[0-9a-f]+\\.webp";
 		const list = html("articles/index.html");
 		expect(list).toMatch(new RegExp(`<span class="teaser teaser-cover"><img src="${processed}" srcset="${processed} 224w, ${processed} 448w" sizes="\\(max-width: 36rem\\) calc\\(100vw - 2rem\\), 14rem" alt="" width="480" height="270" loading="lazy"></span>`));
 		const second = html("articles/second-article/index.html");
-		expect(second).toMatch(new RegExp(`<figure class="teaser article-teaser teaser-cover"><img src="${processed}" srcset="${processed} 448w" sizes="[^"]+" alt="" width="480" height="270"></figure>`));
+		expect(second).toMatch(new RegExp(`<figure class="teaser article-teaser teaser-cover"><img src="${processed}" srcset="${processed} 336w" sizes="[^"]+" alt="" width="480" height="270"></figure>`));
 		expect(listOutput(result.output).filter((f) => /teaser\.png$/.test(f))).toEqual([]);
 		for (const m of (list + second).matchAll(/processed_images\/(teaser\.[0-9a-f]+\.webp)/g)) expect(existsSync(join(result.output, "processed_images", m[1]))).toBe(true);
 		// An SVG teaser scales by itself and is used as it is.
