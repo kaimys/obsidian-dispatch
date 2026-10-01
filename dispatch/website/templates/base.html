@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="{% if page.extra.lang %}{{ page.extra.lang }}{% else %}{{ lang }}{% endif %}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% if page.title %}{{ page.title }} — {{ config.title }}{% elif section.title and section.path != "/" %}{{ section.title }} — {{ config.title }}{% else %}{{ config.title }}{% endif %}{% endblock %}</title>
+<meta name="description" content="{% block description %}{% if page.description %}{{ page.description }}{% elif section.description %}{{ section.description }}{% else %}{{ config.description }}{% endif %}{% endblock %}">
+<meta name="color-scheme" content="light dark">
+{#- A page's images sit next to it and are linked relatively. Without a trailing slash in the
+    address (`/articles/x` rather than `/articles/x/`) they would resolve one folder too high;
+    the base makes them resolve against the page itself, however it was reached. #}
+{% if page.permalink %}<base href="{{ page.permalink | safe }}">
+{% endif %}
+{% if page.extra.robots %}<meta name="robots" content="{{ page.extra.robots }}">
+{% endif %}<link rel="stylesheet" href="{{ get_url(path='style.css') }}">
+<link rel="preload" href="{{ get_url(path='fonts/DispatchOCR.woff2') }}" as="font" type="font/woff2" crossorigin>
+{#- Declared, not left to the browser: its default /favicon.ico is the host's root, which is not
+    this site under its subpath. sizes="32x32" on the ICO keeps browsers that read SVG on the SVG. #}
+<link rel="icon" href="{{ get_url(path='favicon.ico') }}" sizes="32x32">
+<link rel="icon" href="{{ get_url(path='favicon.svg') }}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{{ get_url(path='apple-touch-icon.png') }}">
+</head>
+<body>
+{#- The 404 page has no current_path; every other page does. #}
+{%- set here = current_path | default(value="") -%}
+{%- set root = get_section(path="_index.md") -%}
+{%- set faq = root.pages | filter(attribute="slug", value="faq") -%}
+{%- set docs = get_section(path="docs/_index.md") -%}
+{%- set legal = get_section(path="legal/_index.md") -%}
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="{{ get_url(path='@/_index.md') }}"{% if here == "/" %} aria-current="page"{% endif %}><span>{{ config.title }}</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="{{ get_url(path='@/articles/_index.md') }}"{% if here is starting_with("/articles/") %} aria-current="page"{% endif %}>Articles</a></li>
+        {%- if docs.pages | length > 0 %}
+        <li><a href="{{ docs.pages[0].permalink | safe }}"{% if here is starting_with("/docs/") %} aria-current="page"{% endif %}>Documentation</a></li>
+        {%- endif %}
+        <li><a href="{{ get_url(path='@/releases/_index.md') }}"{% if here is starting_with("/releases/") %} aria-current="page"{% endif %}>Releases</a></li>
+        {%- if faq | length > 0 %}
+        <li><a href="{{ faq[0].permalink | safe }}"{% if here is starting_with("/faq/") %} aria-current="page"{% endif %}>FAQ</a></li>
+        {%- endif %}
+        {#- The GitHub mark (Simple Icons, CC0; see LICENSE-icons.txt). Icon only, so the link
+            carries its name for screen readers and a tooltip for everyone else. #}
+        <li><a class="nav-github" href="{{ config.extra.repository | safe }}" aria-label="Dispatch on GitHub" title="Dispatch on GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+{% block content %}{% endblock %}
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>{{ config.extra.footer }}</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        {%- for p in legal.pages %}
+        <li><a href="{{ p.permalink | safe }}"{% if p.extra.lang %} hreflang="{{ p.extra.lang }}"{% endif %}>{{ p.title }}</a></li>
+        {%- endfor %}
+        <li><a href="{{ config.extra.repository | safe }}">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

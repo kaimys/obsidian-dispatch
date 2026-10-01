@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% if page.title %}{{ page.title }} · {% elif section.title and not section.path == "/" %}{{ section.title }} · {% endif %}{{ config.title }}{% endblock %}</title>
+<meta name="description" content="{% if page.description %}{{ page.description }}{% else %}{{ config.description }}{% endif %}">
+{% if page.extra.robots %}<meta name="robots" content="{{ page.extra.robots }}">
+{% endif %}<link rel="stylesheet" href="{{ get_url(path='starter.css') }}">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+{% set root = get_section(path="_index.md") %}
+{% set faq = root.pages | filter(attribute="slug", value="faq") %}
+<header class="site">
+<a class="brand" href="{{ get_url(path='@/_index.md') }}">{{ config.title }}</a>
+<nav aria-label="Main">
+<ul>
+<li><a href="{{ get_url(path='@/_index.md') }}">Home</a></li>
+<li><a href="{{ get_url(path='@/articles/_index.md') }}">Articles</a></li>
+<li><a href="{{ get_url(path='@/docs/_index.md') }}">Documentation</a></li>
+<li><a href="{{ get_url(path='@/releases/_index.md') }}">Releases</a></li>
+{% if faq | length > 0 %}<li><a href="{{ get_url(path='@/faq/index.md') }}">FAQ</a></li>{% endif %}
+<li><a href="{{ get_url(path='@/legal/_index.md') }}">Legal</a></li>
+</ul>
+</nav>
+</header>
+<main id="content">
+{% block content %}{% endblock %}
+</main>
+<footer class="site">
+{% set legal = get_section(path="legal/_index.md") %}
+<ul>
+{% for p in legal.pages %}<li><a href="{{ p.permalink }}">{{ p.title }}</a></li>{% endfor %}
+</ul>
+</footer>
+</body>
+</html>

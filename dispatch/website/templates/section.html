@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="wrap">
+  <header class="page-head"><h1>{{ section.title }}</h1>{% if section.description %}<p class="description">{{ section.description }}</p>{% endif %}</header>
+  <ul class="post-list">
+    {%- for p in section.pages %}
+    <li><a href="{{ p.permalink | safe }}">{% if p.extra.teaser %}<span class="teaser{% if p.extra.teaser_cover %} teaser-cover{% endif %}"><img src="{{ p.permalink | safe }}{{ p.extra.teaser }}" alt="" loading="lazy"></span>{% endif %}<span>{% if p.date %}<span class="meta"><time datetime="{{ p.date }}">{{ p.date }}</time></span>{% endif %}<h2>{{ p.title }}</h2>{% if p.description %}<p>{{ p.description }}</p>{% endif %}</span></a></li>
+    {%- else %}
+    <li><p>Nothing published here yet.</p></li>
+    {%- endfor %}
+  </ul>
+</div>
+{% endblock %}

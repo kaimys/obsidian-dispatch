@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title }} — {{ config.title }} releases{% endblock %}
+{% block content %}
+<article class="wrap">
+  <header class="page-head">
+    <p class="breadcrumb"><a href="{{ get_url(path='@/releases/_index.md') }}">Releases</a></p>
+    <h1>{{ page.title }}</h1>
+    <p class="meta"><time datetime="{{ page.date }}">{{ page.date }}</time> · <a href="{{ config.extra.repository | safe }}/releases/tag/{{ page.extra.version }}">GitHub release</a></p>
+  </header>
+  <div class="prose">
+{{ page.content | safe }}
+  </div>
+  {#- Releases are weighted newest first: `higher` is the older release, `lower` the newer. #}
+  <footer class="article-foot">
+    {% if page.higher %}<a href="{{ page.higher.permalink | safe }}">&larr; {{ page.higher.title }}</a>{% else %}<span></span>{% endif %}
+    {% if page.lower %}<a href="{{ page.lower.permalink | safe }}">{{ page.lower.title }} &rarr;</a>{% endif %}
+  </footer>
+</article>
+{% endblock %}

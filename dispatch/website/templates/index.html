@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{% set home = load_data(path="home.json") %}{{ config.title }}{% if home.title %} — {{ home.title | lower }}{% endif %}{% endblock %}
+{% block content %}
+{%- set home = load_data(path="home.json") -%}
+{%- set updates = load_data(path="updates.json") -%}
+{%- set testimonials = load_data(path="testimonials.json") -%}
+<section class="hero" aria-labelledby="pitch">
+  <div class="wrap">
+    <div>
+      {% if home.eyebrow %}<p class="eyebrow">{{ home.eyebrow }}</p>{% endif %}
+      <h1 id="pitch">{% if home.title %}{{ home.title }}{% else %}{{ config.title }}{% endif %} <span class="tri" aria-hidden="true">&#9655;</span></h1>
+      <p class="lede">{% if home.lede %}{{ home.lede }}{% else %}{{ config.description }}{% endif %}</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="{{ config.extra.directory | safe }}">Install from the plugin directory</a>
+        {%- if home.read_more %}
+        <a class="btn btn-secondary" href="{{ get_url(path=home.read_more.url) }}"><span class="tri" aria-hidden="true">&#9655;</span> Read {{ home.read_more.title }}</a>
+        {%- endif %}
+      </div>
+      {% if home.requirements %}<p class="requirements">{{ home.requirements }}</p>{% endif %}
+    </div>
+    <div class="board" role="img" aria-label="A Dispatch board with Refinement, In progress and Review columns. Each card shows its ticket ID, badges for open questions and tests, and a chip that launches a coding agent on it.">
+      <div class="col">
+        <div class="col-head"><span>Refinement</span><span>2</span></div>
+        <div class="card"><div class="id">US00042</div><div class="t">Let users export a report</div><div class="foot"><span class="badge badge-amber">? 2</span><span class="pill">story</span><span class="launch">&#9655; refine</span></div></div>
+        <div class="card"><div class="id">BUG00001</div><div class="t">Bold owner context survives a blank line</div><div class="foot"><span class="badge badge-green">? 0</span><span class="pill">bug</span><span class="launch">&#9655; fix-bug</span></div></div>
+      </div>
+      <div class="col">
+        <div class="col-head"><span>In progress</span><span>1</span></div>
+        <div class="card running"><div class="id">US00053</div><div class="t">Retarget a whole release from its header</div><div class="foot"><span class="pill">v0.3.0</span><span class="launch">&#9654; develop</span></div></div>
+      </div>
+      <div class="col">
+        <div class="col-head"><span>Review</span><span>1</span></div>
+        <div class="card"><div class="id">US00043</div><div class="t">Finished is not shipped</div><div class="foot"><span class="badge badge-violet">&#10003; 5</span><span class="pill">v0.3.0</span><span class="launch">&#9655; test-plan</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+<div class="wrap home-grid">
+  <section class="home-section" aria-labelledby="updates">
+    <h2 class="section-title" id="updates">Updates</h2>
+    <ul class="updates">
+      {%- for item in updates | slice(end=config.extra.updates_on_home) %}
+      <li><a class="entry" href="{% if item.kind == 'link' %}{{ item.url }}{% else %}{{ get_url(path=item.url) }}{% endif %}">
+        <span class="kind"><span class="chip{% if item.kind == 'release' %} chip-release{% endif %}">{{ item.kind | capitalize }}</span><span class="meta"><time datetime="{{ item.date }}">{{ item.date }}</time></span></span>
+        <span class="title">{{ item.title }}{% if item.kind == 'link' %} <span class="ext" aria-hidden="true">&#8599;</span><span class="visually-hidden">(external)</span>{% endif %}</span>
+        {%- if item.summary %}
+        <p class="summary">{{ item.summary }}</p>
+        {%- endif %}
+      </a></li>
+      {%- endfor %}
+    </ul>
+    <p class="more"><a href="{{ get_url(path='@/articles/_index.md') }}">All articles</a> · <a href="{{ get_url(path='@/releases/_index.md') }}">All releases</a></p>
+  </section>
+  <aside class="home-section home-aside" aria-labelledby="follow">
+    <h2 class="section-title" id="follow">Follow and give feedback</h2>
+    <ul class="social">
+      {%- for link in config.extra.social %}{% if link.url %}
+      <li><a href="{{ link.url | safe }}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg><span>{{ link.label }}</span>{% if link.handle %}<span class="handle">{{ link.handle }}</span>{% endif %}</a></li>
+      {%- endif %}{% endfor %}
+    </ul>
+  </aside>
+</div>
+{%- if testimonials | length > 0 %}
+<section class="wrap home-section" aria-labelledby="testimonials">
+  <h2 class="section-title" id="testimonials">What people say</h2>
+  <ul class="testimonials">
+    {%- for t in testimonials %}
+    <li><blockquote><p>{{ t.quote }}</p></blockquote><p class="who"><span class="name">{{ t.name }}</span> <span class="role">{{ t.role }}</span></p></li>
+    {%- endfor %}
+  </ul>
+</section>
+{%- endif %}
+{% endblock %}

@@ -1,0 +1,4 @@
+# This workflow publishes to a public website, which cannot be taken back once it is fetched,
+# so it may only run when a human names it.
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,59 @@
+# The project website (US00018). Built by `node dispatch/scripts/website.mjs build`, which stages
+# this folder together with the converted vault content in the git-ignored `.build/`, and runs Zola
+# there. This file is the only site configuration; nothing here may be a local path or a secret.
+# Editorial text — the Home pitch, articles, FAQ, legal pages — lives in the vault, not here (ADR-0039).
+base_url = "https://kaimys.github.io/obsidian-dispatch"
+title = "Dispatch"
+description = "Dispatch is a board for Obsidian that gives a small agent-native team a working process."
+default_language = "en"
+# The starter theme is Dispatch-scope; this project's own design lives in templates/ and static/
+# beside this file and overrides the theme file by file (ADR-0035).
+theme = "dispatch-starter"
+compile_sass = false
+build_search_index = false
+
+[extra]
+repository = "https://github.com/kaimys/obsidian-dispatch"
+directory = "https://community.obsidian.md/plugins/dispatch"
+feedback = "https://github.com/kaimys/obsidian-dispatch/issues"
+footer = "Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec."
+updates_on_home = 8
+
+# Home's "Follow and give feedback" list, in this order. An entry without a url is left out; no
+# template hard-codes one.
+[[extra.social]]
+label = "GitHub"
+url = "https://github.com/kaimys/obsidian-dispatch"
+handle = "kaimys/obsidian-dispatch"
+
+[[extra.social]]
+label = "Obsidian"
+url = "https://community.obsidian.md/plugins/dispatch"
+handle = "dispatch"
+
+[[extra.social]]
+label = "LinkedIn"
+url = "https://www.linkedin.com/in/kaimysliwiec/"
+handle = "kaimysliwiec"
+
+[[extra.social]]
+label = "Bluesky"
+url = "https://bsky.app/profile/kaimys.bsky.social"
+handle = "@kaimys.bsky.social"
+
+[[extra.social]]
+label = "X"
+url = "https://x.com/kaimys"
+handle = "@kaimys"
+
+[[extra.social]]
+label = "Kai's homepage"
+url = "https://eightnine.de/"
+handle = "eightnine.de"
+
+# Read by website.mjs, not by Zola.
+[extra.dispatch]
+source = "10_Website"
+releases = "08_Delivery_and QA/Releases"
+docs = "docs"
+docs_order = ["overview", "installation", "page-types", "skills", "wiki-structure"]

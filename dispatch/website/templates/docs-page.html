@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+{%- set docs = get_section(path="docs/_index.md") -%}
+<div class="wrap docs">
+  <details class="docs-nav" open>
+    <summary>Documentation</summary>
+    <div class="inner">
+      <nav aria-label="Documentation">
+        <h2>Documentation</h2>
+        <ol>
+          {%- for p in docs.pages %}
+          <li><a href="{{ p.permalink | safe }}"{% if p.path == page.path %} aria-current="page"{% endif %}>{{ p.title }}</a></li>
+          {%- endfor %}
+        </ol>
+      </nav>
+      {%- if page.toc | length > 0 %}
+      <nav class="toc-block" aria-label="On this page">
+        <h2>On this page</h2>
+        <ol class="toc">
+          {%- for h in page.toc %}
+          <li><a href="#{{ h.id }}">{{ h.title }}</a></li>
+          {%- for sub in h.children %}
+          <li class="sub"><a href="#{{ sub.id }}">{{ sub.title }}</a></li>
+          {%- endfor %}
+          {%- endfor %}
+        </ol>
+      </nav>
+      {%- endif %}
+    </div>
+  </details>
+  <article>
+    <header class="page-head">
+      <p class="breadcrumb"><a href="{{ docs.pages[0].permalink | safe }}">Documentation</a></p>
+      {#- A docs page has no written summary, so its description (the first paragraph) stays in
+          the meta tag and is not repeated above the text. #}
+      <h1>{{ page.title }}</h1>
+    </header>
+    <div class="prose">
+{{ page.content | safe }}
+    </div>
+    {#- Docs are weighted in reading order: `lower` is the previous page, `higher` the next. #}
+    <nav class="docs-pager" aria-label="Previous and next page">
+      {% if page.lower %}<a href="{{ page.lower.permalink | safe }}"><span class="dir">&larr; Previous</span>{{ page.lower.title }}</a>{% endif %}
+      {% if page.higher %}<a class="next" href="{{ page.higher.permalink | safe }}"><span class="dir">Next &rarr;</span>{{ page.higher.title }}</a>{% endif %}
+    </nav>
+  </article>
+</div>
+{% endblock %}

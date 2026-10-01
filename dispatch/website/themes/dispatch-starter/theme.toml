@@ -1,0 +1,4 @@
+name = "dispatch-starter"
+description = "The plain starter theme of Dispatch's website pipeline. A project overrides any template by placing a file of the same name in its own templates/."
+license = "MIT"
+min_version = "0.22.0"

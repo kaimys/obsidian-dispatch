@@ -23,6 +23,15 @@ npm test        # vitest
 
 `npm run build && npm run lint && npm test` is the minimum verification for every change.
 
+```bash
+npm run website:build     # vault + docs at the newest published release → dispatch/website/.build/public
+npm run website:serve     # the same, served locally at http://127.0.0.1:1111/
+npm run website:publish   # build and push to gh-pages — only through the website workflow
+```
+
+The website scripts need the `dispatch/wiki` link, Zola on PATH, and `gh` signed in (the build
+asks GitHub which releases are published); `publish -- --dry-run` stops before the push.
+
 ## Architecture
 
 - `src/main.ts` — plugin entry; loads/saves both settings layers, registers view/command/processor/settings tab
@@ -67,8 +76,19 @@ is named without a dot so it is never mistaken for the device-local `~/.dispatch
 
 - `workflow/` — one canonical file per workflow ([[ADR-0020]]).
 - `wiki` — the git-ignored, repo-relative link to the vault ([[ADR-0029]]).
-- `scripts/` — the repo-side scripts: `move-ticket`, `run-state`, `meet-fetch`, `lint-vault`
-  ([[ADR-0027]] decides who configures each).
+- `scripts/` — the repo-side scripts: `move-ticket`, `run-state`, `meet-fetch`, `lint-vault`,
+  `website`, and the temporary `eightnine-legal` ([[ADR-0027]] decides who configures each).
+- `website/` — the project website's Zola root: `config.toml`, the Dispatch-scope starter theme
+  in `themes/dispatch-starter/`, and this project's own design beside it, which overrides the theme
+  file by file ([[ADR-0035]], amended 2026-09-29). `website/.build/` is git-ignored staging for
+  converted vault content: **editorial content never enters git**, and only built HTML is
+  committed, to `gh-pages` ([[ADR-0039]]). The one named, temporary exception is the three
+  eightnine.de legal pages in `docs/`, generated from the vault until US00068 removes their
+  reason. Articles, the FAQ, links and testimonials are published only with `status: ready`; the
+  Home page and legal notes, which have no draft state, by existing ([[ADR-0040]]). Docs and
+  release notes follow the newest release **GitHub shows as published**, never a bare tag. The
+  `website` workflow builds and publishes; `website/project-steps.md` holds this project's own
+  additions to it (the eightnine.de step), so the workflow itself stays Dispatch-standard.
 - `invariants.md` — this file.
 - `settings.yaml` — **project-level settings**: committed, read by agents, true for the project
   whoever checks it out. Today it holds only `tracker.repository`. The vault's `data.json` stays
@@ -85,8 +105,11 @@ and worktree, since git does not carry it: `New-Item -ItemType Junction -Path di
 
 ## The project wiki
 
-The repo dogfoods its own plugin. `docs/` holds only the plugin's published documentation
-(`overview.md`, `installation.md`, `page-types.md`, `skills.md`, `wiki-structure.md`, `assets/`).
+The repo dogfoods its own plugin. `docs/` holds the plugin's published documentation
+(`overview.md`, `installation.md`, `page-types.md`, `skills.md`, `wiki-structure.md`, `assets/`),
+which the website renders at each published release, and the hand-uploaded eightnine.de page
+(`index.html`, `style.css`, and `privacy.html`, `terms.html`, `impressum.html`, which
+`dispatch/scripts/eightnine-legal.mjs` generates from the vault's legal notes — never edit those three by hand).
 The project's tickets, ADRs and release notes live in their own Obsidian vault, `Dispatch-Wiki`,
 synced via Google Drive and reached from this repo through `dispatch/wiki` — a git-ignored,
 repo-relative symlink ([[ADR-0029]]; `git ls-files dispatch/wiki` is empty). `dispatch/wiki/`
