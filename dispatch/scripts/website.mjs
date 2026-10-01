@@ -27,6 +27,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join, posix, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+// The HTML standard's named character references, as data beside this file; lifted with it.
+import NAMED_REFERENCES from "./html-entities.mjs";
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const SITE_DIR = join("dispatch", "website");
@@ -301,7 +303,60 @@ export function scanTags(markup) {
  * Returns `{ start, end, name, raw, quote }`, with `start`/`end` the attribute's offsets in `markup`.
  */
 export function resourceAttributes(markup) {
-	return scanTags(markup).flatMap((tag) => tag.attrs.filter((a) => /^((xlink:)?href|src)$/.test(a.name)));
+	return scanTags(markup).flatMap((tag) =>
+		tag.attrs.flatMap((a) => {
+			// `url` is what the browser fetches: the attribute value with character references
+			// decoded. Every consumer reads `url`; none decodes or splits on its own.
+			if (/^((xlink:)?href|src)$/.test(a.name)) return [{ ...a, url: decodeEntities(a.raw, { attribute: true }).trim() }];
+			// `srcset` lists several candidates ("a.webp 1x, b.webp 2x"): one entry per candidate,
+			// parsed as the browser parses it, each with `set` (the attribute and all its
+			// candidates) and its `part` index, so a rewrite can rebuild the list.
+			if (a.name !== "srcset") return [];
+			const candidates = parseSrcset(decodeEntities(a.raw, { attribute: true }));
+			return candidates.map((c, part) => ({ ...a, url: c.url, set: { attr: a, candidates }, part }));
+		}),
+	);
+}
+
+/**
+ * A `srcset` value split into `{ url, descriptor }` candidates by the HTML standard's algorithm,
+ * on the already-decoded value: a URL is a run of non-whitespace, so a comma *inside* it (a
+ * `resize,w_448` path, a `data:` URL) stays part of it, while trailing commas end the candidate;
+ * a descriptor runs to the next comma outside parentheses.
+ */
+export function parseSrcset(value) {
+	const text = String(value);
+	const space = /[\t\n\f\r ]/;
+	const candidates = [];
+	let i = 0;
+	while (i < text.length) {
+		while (i < text.length && (space.test(text[i]) || text[i] === ",")) i++;
+		if (i >= text.length) break;
+		const start = i;
+		while (i < text.length && !space.test(text[i])) i++;
+		let url = text.slice(start, i);
+		let descriptor = "";
+		if (/,$/.test(url)) url = url.replace(/,+$/, "");
+		else {
+			let depth = 0;
+			while (i < text.length) {
+				const c = text[i++];
+				if (c === "(") depth++;
+				else if (c === ")") depth = Math.max(0, depth - 1);
+				else if (c === "," && depth === 0) break;
+				descriptor += c;
+			}
+			descriptor = descriptor.trim();
+		}
+		if (url) candidates.push({ url, descriptor });
+	}
+	return candidates;
+}
+
+/** A srcset value from candidates, escaped for an attribute quoted with `quote`. */
+export function serializeSrcset(candidates, quote = '"') {
+	const value = candidates.map((c) => (c.descriptor ? `${c.url} ${c.descriptor}` : c.url)).join(", ");
+	return value.replace(/&/g, "&amp;").replace(quote === "'" ? /'/g : /"/g, quote === "'" ? "&#39;" : "&quot;");
 }
 
 /** A reference that stays on the web or inside the file itself: never a local dependency. */
@@ -718,9 +773,10 @@ export function convertMarkdown(source, ctx) {
 		}
 		// A relative link becomes a Zola `@/` link (a published note) or a file copied next to the
 		// page (a published asset); anything else points outside the published set.
-		const target = (raw, index) => {
+		const target = (raw, index, decoded = false) => {
 			// An attribute may be entity-encoded; a browser decodes it before choosing a scheme.
-			const url = decodeEntities(raw);
+			// `resourceAttributes` hands over URLs already decoded, so they are not decoded twice.
+			const url = decoded ? raw : decodeEntities(raw, { attribute: true });
 			if (/^file:/i.test(url)) {
 				fail(at(index), `a file:// URL: ${url}`);
 				return { keep: true };
@@ -759,15 +815,32 @@ export function convertMarkdown(source, ctx) {
 				fail(at(tag.start), `image ${src ? src.raw : "(no src)"} has no alt text`);
 			}
 		}
+		const srcsets = new Map();
 		for (const a of resourceAttributes(line)) {
 			if (masked.slice(a.start, a.end).trim() === "") continue; // inside inline code
-			if (!a.raw) continue; // a bare `href` names nothing
-			const found = target(a.raw, a.start);
-			if (!found.keep) edits.push({ start: a.start, end: a.end, value: `${a.name}=${a.quote}${found.url}${a.quote}` });
+			if (!a.url) continue; // a bare `href` names nothing
+			const found = target(a.url, a.start, true);
+			if (a.set) {
+				// Collect a srcset's candidates; the attribute is rebuilt once, below.
+				const entry = srcsets.get(a.set.attr) ?? { candidates: a.set.candidates.map((c) => ({ ...c })), changed: false };
+				if (!found.keep) {
+					entry.candidates[a.part].url = found.url;
+					entry.changed = true;
+				}
+				srcsets.set(a.set.attr, entry);
+			} else if (!found.keep) edits.push({ start: a.start, end: a.end, value: `${a.name}=${a.quote}${found.url}${a.quote}` });
+		}
+		for (const [attr, entry] of srcsets) {
+			if (!entry.changed) continue;
+			const quote = attr.quote || '"';
+			edits.push({ start: attr.start, end: attr.end, value: `${attr.name}=${quote}${serializeSrcset(entry.candidates, quote)}${quote}` });
 		}
 		// A bare URL is a link on GitHub and in Obsidian, but plain text to Zola. It shows without
-		// its scheme; trailing sentence punctuation stays outside the link.
+		// its scheme; trailing sentence punctuation stays outside the link. A URL inside a tag (an
+		// attribute value, a srcset entry) is markup, not text, and is left as it is.
+		const tagSpans = scanTags(line).map((t) => [t.start, t.end]);
 		for (const m of masked.matchAll(/(?<![(<"'=[\]\w/])https?:\/\/[^\s<>()[\]]+/g)) {
+			if (tagSpans.some(([s, e]) => m.index >= s && m.index < e)) continue;
 			const url = m[0].replace(/[.,;:!?]+$/, "");
 			replace({ index: m.index, 0: url }, `[${url.replace(/^https?:\/\//, "")}](${url})`);
 		}
@@ -829,7 +902,7 @@ export function buildUpdates(set) {
 }
 
 export function buildTestimonials(set) {
-	return set.testimonials.map((t) => ({ quote: t.data.quote, name: t.data.name, role: t.data.role }));
+	return set.testimonials.map((t) => ({ quote: t.data.quote, name: t.data.name, role: t.data.role, photo: t.photo }));
 }
 
 /** The published notes' names and paths → Zola `@/` links, for wikilinks and relative links. */
@@ -861,16 +934,66 @@ function withoutCode(html) {
 	return html.replace(/<(pre|code)\b[\s\S]*?<\/\1>/gi, (m) => m.replace(/[^\n]/g, " "));
 }
 
+/** Numeric references 0x80–0x9F are read as Windows-1252, as the HTML standard maps them. */
+const WINDOWS_1252 = {
+	0x80: 0x20ac, 0x82: 0x201a, 0x83: 0x0192, 0x84: 0x201e, 0x85: 0x2026, 0x86: 0x2020, 0x87: 0x2021, 0x88: 0x02c6,
+	0x89: 0x2030, 0x8a: 0x0160, 0x8b: 0x2039, 0x8c: 0x0152, 0x8e: 0x017d, 0x91: 0x2018, 0x92: 0x2019, 0x93: 0x201c,
+	0x94: 0x201d, 0x95: 0x2022, 0x96: 0x2013, 0x97: 0x2014, 0x98: 0x02dc, 0x99: 0x2122, 0x9a: 0x0161, 0x9b: 0x203a,
+	0x9c: 0x0153, 0x9e: 0x017e, 0x9f: 0x0178,
+};
+const LONGEST_NAME = Math.max(...Object.keys(NAMED_REFERENCES).map((name) => name.length));
+
 /**
- * HTML character references decoded as a browser would. None of them contains a line break, so
- * a decoded line is still the same line.
+ * HTML character references decoded as a browser decodes them, by the HTML standard's rules, in
+ * one pass (so `&amp;#44;` is the text `&#44;`, never a comma):
+ * - numeric references, decimal or hex, with or without the `;`; 0, surrogates and values past
+ *   U+10FFFF become U+FFFD, and 0x80–0x9F are read as Windows-1252;
+ * - named references from the standard's full table (`html-entities.mjs`), longest name first,
+ *   the legacy names without `;` included. With `attribute`, a legacy name followed by `=` or a
+ *   letter or digit stays literal, as browsers keep `?a=1&copy=2` intact in a URL.
+ * A reference that decodes to a line break becomes a space, so a decoded line is still the same
+ * line for findings; in a URL or a srcset a space means what the line break would.
  */
-export function decodeEntities(text) {
-	const named = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-	return String(text)
-		.replace(/&#x([0-9a-f]+);/gi, (e, hex) => String.fromCodePoint(parseInt(hex, 16)))
-		.replace(/&#(\d+);/g, (e, dec) => String.fromCodePoint(Number(dec)))
-		.replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (e, name) => named[name]);
+export function decodeEntities(text, { attribute = false } = {}) {
+	const s = String(text);
+	let out = "";
+	let i = 0;
+	const numeric = /#(?:[xX]([0-9a-fA-F]+)|([0-9]+));?/y;
+	while (i < s.length) {
+		const amp = s.indexOf("&", i);
+		if (amp < 0) {
+			out += s.slice(i);
+			break;
+		}
+		out += s.slice(i, amp);
+		i = amp + 1;
+		numeric.lastIndex = i;
+		const n = numeric.exec(s);
+		if (n) {
+			const digits = n[1] ?? n[2];
+			let code = digits.replace(/^0+/, "").length > 8 ? Infinity : parseInt(digits, n[1] !== undefined ? 16 : 10);
+			if (code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) code = 0xfffd;
+			code = WINDOWS_1252[code] ?? code;
+			out += code === 0x0a || code === 0x0d ? " " : String.fromCodePoint(code);
+			i += n[0].length;
+			continue;
+		}
+		let name = "";
+		for (let len = Math.min(LONGEST_NAME, s.length - i); len > 0; len--) {
+			if (Object.hasOwn(NAMED_REFERENCES, s.slice(i, i + len))) {
+				name = s.slice(i, i + len);
+				break;
+			}
+		}
+		const next = s[i + name.length];
+		if (!name || (attribute && !name.endsWith(";") && next !== undefined && /[=0-9A-Za-z]/.test(next))) {
+			out += "&";
+			continue;
+		}
+		out += NAMED_REFERENCES[name].replace(/[\r\n]/g, " ");
+		i += name.length;
+	}
+	return out;
 }
 
 /**
@@ -890,7 +1013,7 @@ export function guardOutput(pages, baseUrl, exists) {
 	const checkUrls = (page, markup) => {
 		const dir = posix.dirname(`/${page.path}`);
 		for (const a of resourceAttributes(markup)) {
-			const url = decodeEntities(a.raw).trim();
+			const url = a.url;
 			const at = lineOf(markup, a.start);
 			const leaks = scanPaths(url);
 			if (leaks.length) {
@@ -911,7 +1034,7 @@ export function guardOutput(pages, baseUrl, exists) {
 			} else path = posix.normalize(posix.join(dir, url));
 			path = decodeURIComponent(path.split(/[?#]/)[0]);
 			const candidates = path.endsWith("/") ? [`${path}index.html`] : [path, `${path}/index.html`];
-			if (!candidates.some((c) => exists(c.replace(/^\/+/, "")))) errors.push(`${page.path}:${at}: broken link ${a.raw}`);
+			if (!candidates.some((c) => exists(c.replace(/^\/+/, "")))) errors.push(`${page.path}:${at}: broken link ${a.url}`);
 		}
 	};
 	for (const page of pages) {
@@ -1076,7 +1199,7 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 		// would be missing on the site, or reach outside the published set. Embed it instead.
 		const raw = readFileSync(join(sourceRoot, asset), "utf8");
 		for (const a of resourceAttributes(raw)) {
-			const url = decodeEntities(a.raw).trim();
+			const url = a.url;
 			if (url && !isExternal(url) && !/^file:/i.test(url)) errors.push(`${rel}:${lineOf(raw, a.start)}: references ${url}, a local file an asset cannot bring along; embed it instead`);
 		}
 	};
@@ -1103,18 +1226,28 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 	section("articles", { title: "Articles", sort_by: "date" });
 	for (const a of set.articles) {
 		const md = convertNote(a, `articles/${a.slug}`);
-		// An optional teaser image, a published asset copied next to the article.
+		// An optional teaser image. A raster image goes to the staging root's unpublished
+		// teasers/, and the templates have Zola resize it to the widths the list and the article
+		// page show, so the original is never published. An SVG scales by itself and is copied
+		// next to the article as it is.
 		let teaser;
+		let teaserRaster;
 		if (a.data.teaser) {
 			const asset = assets.get(basename(String(a.data.teaser)).toLowerCase());
-			if (asset) {
+			const line = a.lines?.teaser ?? 1;
+			if (!asset) errors.push(`${a.rel}:${line}: teaser ${a.data.teaser} is not a file in the published set`);
+			else if (/\.svg$/i.test(asset)) {
 				teaser = basename(asset);
 				copyAsset(asset, join(content, "articles", a.slug));
-			} else errors.push(`${a.rel}:1: teaser ${a.data.teaser} is not a file in the published set`);
+			} else if (/\.(png|jpe?g|webp|gif)$/i.test(asset)) {
+				teaser = `teasers/${basename(asset)}`;
+				teaserRaster = true;
+				copyAsset(asset, join(root, "teasers"));
+			} else errors.push(`${a.rel}:${line}: teaser ${a.data.teaser} is not an SVG, PNG, JPEG, WebP or GIF image`);
 		}
 		// `lead` marks a written description; a generated one serves lists and the meta tag, but
 		// shown above the text it would only repeat the first paragraph.
-		const extra = { author: [].concat(a.data.author || []).join(", "), teaser, teaser_cover: a.data.teaser_cover === "true" || undefined, lead: Boolean(a.data.description) || undefined };
+		const extra = { author: [].concat(a.data.author || []).join(", "), teaser, teaser_raster: teaserRaster, teaser_cover: a.data.teaser_cover === "true" || undefined, lead: Boolean(a.data.description) || undefined };
 		writePage(content, `articles/${a.slug}`, { title: a.title, date: a.data.date, description: a.data.description || summaryOf(a.content), extra }, md);
 	}
 
@@ -1160,6 +1293,23 @@ export function stage({ repoRoot = REPO_ROOT, wikiRoot = join(repoRoot, WIKI_DIR
 
 	writeFileSync(join(root, "home.json"), JSON.stringify(set.home ?? {}, null, "\t"));
 	writeFileSync(join(root, "updates.json"), JSON.stringify(buildUpdates(set), null, "\t"));
+	// An optional photo on a ready testimonial: a raster image in the published assets. It goes to
+	// the staging root's photos/, which Zola does not publish; the template has Zola's
+	// resize_image() make the small versions the card shows, so only those reach the site, never
+	// the full-size original. It is published with the quote, so the person's approval has to cover
+	// it too — the template's GUIDE says so.
+	for (const t of set.testimonials) {
+		if (!t.data.photo) continue;
+		const name = basename(String(t.data.photo));
+		const asset = assets.get(name.toLowerCase());
+		const line = t.lines?.photo ?? 1;
+		if (!asset) errors.push(`${t.rel}:${line}: photo ${t.data.photo} is not a file in the published set`);
+		else if (!/\.(png|jpe?g|webp|gif)$/i.test(asset)) errors.push(`${t.rel}:${line}: photo ${t.data.photo} is not a PNG, JPEG, WebP or GIF image, which the build can resize`);
+		else {
+			copyAsset(asset, join(root, "photos"));
+			t.photo = `photos/${basename(asset)}`;
+		}
+	}
 	writeFileSync(join(root, "testimonials.json"), JSON.stringify(buildTestimonials(set), null, "\t"));
 
 	const baseUrl = /^base_url\s*=\s*"([^"]+)"/m.exec(configText)?.[1];

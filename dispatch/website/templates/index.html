@@ -65,7 +65,11 @@
   <h2 class="section-title" id="testimonials">What people say</h2>
   <ul class="testimonials">
     {%- for t in testimonials %}
-    <li><blockquote><p>{{ t.quote }}</p></blockquote><p class="who"><span class="name">{{ t.name }}</span> <span class="role">{{ t.role }}</span></p></li>
+    {#- The photo is decorative: the name beside it already says who it is (alt=""). Zola resizes
+        the unpublished original to the card's size (56 px; the CSS shows 48–56) and twice that for
+        high-density screens, so only those two small files are published. #}
+    {%- if t.photo %}{% set photo = resize_image(path=t.photo, width=56, height=56, op="fill", format="webp", quality=85) %}{% set photo2x = resize_image(path=t.photo, width=112, height=112, op="fill", format="webp", quality=85) %}{% endif %}
+    <li><blockquote><p>{{ t.quote }}</p></blockquote>{% if t.photo %}<p class="who has-photo"><img class="avatar" src="{{ photo.url | safe }}" srcset="{{ photo.url | safe }} 1x, {{ photo2x.url | safe }} 2x" alt="" width="56" height="56" loading="lazy"><span><span class="name">{{ t.name }}</span> <span class="role">{{ t.role }}</span></span></p>{% else %}<p class="who"><span class="name">{{ t.name }}</span> <span class="role">{{ t.role }}</span></p>{% endif %}</li>
     {%- endfor %}
   </ul>
 </section>

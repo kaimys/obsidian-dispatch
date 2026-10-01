@@ -376,7 +376,7 @@ a:hover { text-decoration-thickness: 2px; }
 }
 .teaser img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 6%; border-radius: 0; }
 .teaser-cover img { object-fit: cover; object-position: top left; padding: 0; }
-.article-teaser { max-width: 56rem; margin: 0 0 2.75rem; }
+.article-teaser { max-width: var(--prose); margin: 0 0 2.75rem; } /* the text column, 672 px (Kai, 2026-10-01; the design had 56rem) */
 
 /* ---------- Article page ---------- */
 .article-foot { max-width: var(--prose); margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; font-size: .95rem; }
@@ -451,3 +451,8 @@ a:hover { text-decoration-thickness: 2px; }
  * text links; the mark takes the link colour, so it follows the scheme and the current state. */
 .site-nav a.nav-github { display: flex; align-items: center; padding-left: .55rem; padding-right: .55rem; }
 .site-nav a.nav-github svg { width: 1.25rem; height: 1.25rem; }
+/* A testimonial's optional photo (Kai, 2026-10-01): a small round portrait beside the name.
+ * Without one, the card is exactly the design's. */
+.testimonials .who.has-photo { display: flex; align-items: center; gap: .8rem; }
+.testimonials .avatar { width: 3rem; height: 3rem; border-radius: 50%; object-fit: cover; flex: none; border: 1px solid var(--line); background: var(--sunk); }
+.testimonials li:only-child .avatar { width: 3.5rem; height: 3.5rem; }

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "macros.html" as macros %}
 {% block content %}
 {%- if page.components.0 == "articles" %}
 <article class="wrap">
@@ -9,7 +10,8 @@
     <p class="meta"><time datetime="{{ page.date }}">{{ page.date }}</time>{% if page.extra.author %} · {{ page.extra.author }}{% endif %}</p>
   </header>
   {%- if page.extra.teaser %}
-  <figure class="teaser article-teaser{% if page.extra.teaser_cover %} teaser-cover{% endif %}"><img src="{{ page.extra.teaser }}" alt=""></figure>
+  {#- The article's teaser is as wide as the text column, 42rem (672 px), and full width on smaller screens. #}
+  <figure class="teaser article-teaser{% if page.extra.teaser_cover %} teaser-cover{% endif %}">{% if page.extra.teaser_raster %}{{ macros::raster(path=page.extra.teaser, widths=[336, 672, 1344], sizes="(max-width: 46rem) calc(100vw - 2rem), 42rem", lazy=false) }}{% else %}<img src="{{ page.extra.teaser }}" alt="">{% endif %}</figure>
   {%- endif %}
   <div class="prose">
 {{ page.content | safe }}

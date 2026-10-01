@@ -77,7 +77,9 @@ is named without a dot so it is never mistaken for the device-local `~/.dispatch
 - `workflow/` — one canonical file per workflow ([[ADR-0020]]).
 - `wiki` — the git-ignored, repo-relative link to the vault ([[ADR-0029]]).
 - `scripts/` — the repo-side scripts: `move-ticket`, `run-state`, `meet-fetch`, `lint-vault`,
-  `website`, and the temporary `eightnine-legal` ([[ADR-0027]] decides who configures each).
+  `website` (with `html-entities.mjs`, the HTML standard's named-reference table it decodes
+  with; regenerate it from the URL in its header, never edit it), and the temporary
+  `eightnine-legal` ([[ADR-0027]] decides who configures each).
 - `website/` — the project website's Zola root: `config.toml`, the Dispatch-scope starter theme
   in `themes/dispatch-starter/`, and this project's own design beside it, which overrides the theme
   file by file ([[ADR-0035]], amended 2026-09-29). `website/.build/` is git-ignored staging for

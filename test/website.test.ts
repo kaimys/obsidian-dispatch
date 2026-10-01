@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { deflateSync } from "node:zlib";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -20,7 +21,9 @@ import {
 	parseNote,
 	publishedTags,
 	readSiteSettings,
+	parseSrcset,
 	resourceAttributes,
+	serializeSrcset,
 	scanTags,
 	repositoryOf,
 	routeCollisions,
@@ -34,6 +37,45 @@ import {
 } from "../dispatch/scripts/website.mjs";
 
 const FIXTURES = "test/fixtures/website";
+
+/** A real RGB PNG of any size, so resize tests need no committed image per case. */
+function png(width: number, height: number): Buffer {
+	const table = Array.from({ length: 256 }, (_, n) => {
+		let c = n;
+		for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+		return c >>> 0;
+	});
+	const crc = (data: Buffer) => {
+		let c = 0xffffffff;
+		for (const byte of data) c = table[(c ^ byte) & 255] ^ (c >>> 8);
+		return (c ^ 0xffffffff) >>> 0;
+	};
+	const chunk = (type: string, data: Buffer) => {
+		const body = Buffer.concat([Buffer.from(type), data]);
+		const length = Buffer.alloc(4);
+		length.writeUInt32BE(data.length);
+		const sum = Buffer.alloc(4);
+		sum.writeUInt32BE(crc(body));
+		return Buffer.concat([length, body, sum]);
+	};
+	const header = Buffer.alloc(13);
+	header.writeUInt32BE(width, 0);
+	header.writeUInt32BE(height, 4);
+	header[8] = 8; // bit depth
+	header[9] = 2; // RGB
+	const rows = Buffer.alloc((width * 3 + 1) * height, 200);
+	for (let y = 0; y < height; y++) rows[y * (width * 3 + 1)] = 0;
+	return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", header), chunk("IDAT", deflateSync(rows)), chunk("IEND", Buffer.alloc(0))]);
+}
+
+/** A WebP file's pixel width, read from its VP8, VP8L or VP8X header. */
+function webpWidth(file: Buffer): number {
+	const kind = file.toString("ascii", 12, 16);
+	if (kind === "VP8 ") return file.readUInt16LE(26) & 0x3fff;
+	if (kind === "VP8L") return 1 + (file[21] | ((file[22] & 0x3f) << 8));
+	if (kind === "VP8X") return 1 + file.readUIntLE(24, 3);
+	throw new Error(`not a WebP file (${kind})`);
+}
 const listOutput = (dir: string, prefix = ""): string[] =>
 	readdirSync(join(dir, prefix), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? listOutput(dir, join(prefix, e.name)) : [join(prefix, e.name)]));
 const read = (path: string) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
@@ -205,7 +247,33 @@ describe("Markdown conversion", () => {
 
 	it("links a bare URL, shown without its scheme, and leaves every other URL alone", () => {
 		expect(convert("See https://github.com/x/y/issues/5.").markdown).toBe("See [github.com/x/y/issues/5](https://github.com/x/y/issues/5).");
-		for (const kept of ["[t](https://a.b/c)", "<https://a.b/c>", '<a href="https://a.b/c">t</a>', "`https://a.b/c`"]) expect(convert(kept).markdown).toBe(kept);
+		for (const kept of ["[t](https://a.b/c)", "<https://a.b/c>", '<a href="https://a.b/c">t</a>', "`https://a.b/c`", '<a title="see https://a.b/c" href="https://a.b/d">t</a>']) expect(convert(kept).markdown).toBe(kept);
+	});
+
+	it("parses srcset as the HTML standard does: commas inside a URL stay, trailing commas separate", () => {
+		expect(parseSrcset("a.png 1x, b.png 2x")).toEqual([{ url: "a.png", descriptor: "1x" }, { url: "b.png", descriptor: "2x" }]);
+		expect(parseSrcset("https://img.example/resize,w_448/p.png 2x")).toEqual([{ url: "https://img.example/resize,w_448/p.png", descriptor: "2x" }]);
+		expect(parseSrcset("data:image/png;base64,iVBORw0KGgo= 1x,b.png 2x")).toEqual([{ url: "data:image/png;base64,iVBORw0KGgo=", descriptor: "1x" }, { url: "b.png", descriptor: "2x" }]);
+		expect(parseSrcset("https://img.example/a.png, ../../02_Private/s.png 2x")).toEqual([{ url: "https://img.example/a.png", descriptor: "" }, { url: "../../02_Private/s.png", descriptor: "2x" }]);
+		expect(parseSrcset(" ,, a.png 100w (x, y), b.png")).toEqual([{ url: "a.png", descriptor: "100w (x, y)" }, { url: "b.png", descriptor: "" }]);
+		expect(serializeSrcset([{ url: "a&b.png", descriptor: "2x" }, { url: "c.png", descriptor: "" }])).toBe("a&amp;b.png 2x, c.png");
+		// The reader decodes before parsing, so an encoded separator cannot hide a candidate.
+		expect(resourceAttributes(`<img srcset="https://x.y/a.png&#44; ../../02_Private/s.png 2x">`).map((a: { url: string }) => a.url)).toEqual(["https://x.y/a.png", "../../02_Private/s.png"]);
+	});
+
+	it("keeps comma-containing external and data: candidates, and rewrites only the local one", () => {
+		const external = `<img src="https://img.example/f.png" srcset="https://img.example/resize,w_448/p.png 2x, data:image/png;base64,iVBORw0KGgo= 1x" alt="E">`;
+		expect(convert(external)).toMatchObject({ markdown: external, errors: [] });
+		expect(convert(`<img src="../assets/pic.png" srcset='../assets/pic.png 1x, https://img.example/resize,w_2/p.png 2x' alt="P">`).markdown).toBe(
+			`<img src="pic.png" srcset='pic.png 1x, https://img.example/resize,w_2/p.png 2x' alt="P">`,
+		);
+	});
+
+	it("resolves each srcset entry, keeping descriptors and quotes, and fails a private one", () => {
+		expect(convert(`<img src="../assets/pic.png" srcset="../assets/pic.png 1x, https://x.y/p.png 2x" alt="P">`).markdown).toBe(
+			`<img src="pic.png" srcset="pic.png 1x, https://x.y/p.png 2x" alt="P">`,
+		);
+		expect(convert(`<img src="../assets/pic.png" srcset='../../02_Private/s.png 2x' alt="P">`).errors).toEqual(["a.md:1: link ../../02_Private/s.png points outside the published set"]);
 	});
 
 	it("rewrites raw HTML images and requires their alt text", () => {
@@ -332,9 +400,13 @@ describe("the clean fixture vault", () => {
 		});
 	});
 
-	it("copies an article's teaser next to it and names it in the page's extra", () => {
-		expect(existsSync(join(staged.root, "content", "articles", "second-article", "pic.png"))).toBe(true);
-		expect(content("articles/second-article/index.md")).toContain('teaser = "pic.png"\nteaser_cover = true');
+	it("keeps a raster teaser's original out of the content for resizing, and an SVG teaser next to its article", () => {
+		expect(existsSync(join(staged.root, "teasers", "teaser.png"))).toBe(true);
+		expect(existsSync(join(staged.root, "content", "articles", "second-article", "teaser.png"))).toBe(false);
+		expect(content("articles/second-article/index.md")).toContain('teaser = "teasers/teaser.png"\nteaser_raster = true\nteaser_cover = true');
+		expect(existsSync(join(staged.root, "content", "articles", "commented", "diagram.svg"))).toBe(true);
+		expect(content("articles/commented/index.md")).toContain('teaser = "diagram.svg"');
+		expect(content("articles/commented/index.md")).not.toContain("teaser_raster");
 	});
 
 	it("orders legal pages by weight, then file name, and honours slug", () => {
@@ -385,7 +457,8 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		"08_Releases/Release 2.0.0.md:17: [[Release 1.9.0]] links to a page that is not published",
 		"08_Releases/Release 2.0.0.md:17: a path into the vault (dispatch/wiki/…): dispatch/wiki/08_Releases/x.md.",
 		"08_Releases/Release 2.1.0.md:1: a released note needs version: vX.Y.Z and date: YYYY-MM-DD",
-		"10_Website/Articles/Missing teaser.md:1: teaser nowhere.png is not a file in the published set",
+		"10_Website/Articles/Missing teaser.md:4: teaser nowhere.png is not a file in the published set",
+		"10_Website/Articles/Teaser not an image.md:4: teaser notes.txt is not an SVG, PNG, JPEG, WebP or GIF image",
 		// A public section the build cannot delimit fails; the rest of the note is never published.
 		"08_Releases/Release 2.2.0.md:8: ## GitHub release body opens a ```` fence that is never closed",
 		// Frontmatter and heading-derived titles get the same guard as body text.
@@ -409,6 +482,14 @@ describe("the broken fixture vault — every mistake fails with file and line", 
 		// A quoted < or > inside another attribute neither ends the tag nor hides the URL after it.
 		"10_Website/Articles/Quoted angle brackets.md:7: link ../../02_Private/Private-note.md points outside the published set",
 		"10_Website/Articles/Quoted angle brackets.md:9: link ../../02_Private/Other.md points outside the published set",
+		// A testimonial's photo must be a published image.
+		// srcset is parsed as the browser parses it, after decoding: &#44; separates candidates.
+		"10_Website/Articles/Encoded srcset separator.md:7: link ../../02_Private/secret.png points outside the published set",
+		// A named reference, and a numeric one without its semicolon, separate candidates too.
+		"10_Website/Articles/Named srcset separator.md:7: link ../../02_Private/secret.png points outside the published set",
+		"10_Website/Articles/Named srcset separator.md:9: link ../../02_Private/other.png points outside the published set",
+		"10_Website/Testimonials/Missing photo.md:6: photo nowhere.png is not a file in the published set",
+		"10_Website/Testimonials/Photo not an image.md:6: photo notes.txt is not a PNG, JPEG, WebP or GIF image, which the build can resize",
 	];
 	for (const finding of expected) it(finding.replace(/:\d+: .*/, "") + " — " + finding.split(/:\d+: /)[1], () => expect(errors).toContain(finding));
 	it("reports nothing else", () => expect([...errors].sort()).toEqual([...expected].sort()));
@@ -452,6 +533,39 @@ describe("the output guard", () => {
 		expect(html.slice(img.start, img.end)).toBe(`<img alt='1 < 2 src="fake"' src=y data-z="3 > 2">`);
 		expect(guard(`<a title="A > B" href="../../02_Private/p.md">x</a>`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/p.md"]);
 		expect(guard(`<p title="C:\\Users\\kai > x">in text</p>`)).toEqual([]);
+	});
+
+	it("decodes character references by the HTML standard's rules, once", () => {
+		const attr = (s: string) => decodeEntities(s, { attribute: true });
+		// Numeric, decimal and hex, with and without the semicolon.
+		expect(["&#44;", "&#44", "&#x2c;", "&#X2C", "&#0044;"].map(attr)).toEqual([",", ",", ",", ",", ","]);
+		// Named, from the standard's full table; the longest name wins.
+		expect(attr("&comma;&period;&period;&sol;")).toBe(",../");
+		expect(attr("&notin; &not;")).toBe("∉ ¬");
+		// Legacy names without ";": decoded in text, but kept before "=" or an alphanumeric in an attribute.
+		expect(decodeEntities("&copy 2026 &notit;")).toBe("© 2026 ¬it;");
+		expect(attr("?a=1&copy=2&notit;&copy 2026")).toBe("?a=1&copy=2&notit;© 2026");
+		// One pass: an escaped ampersand stays an ampersand, never a second reference.
+		expect(attr("&amp;#44; &amp;comma;")).toBe("&#44; &comma;");
+		// Out-of-range and C1 values as the standard maps them; unknown names stay literal.
+		expect(attr("&#0;&#x110000;&#xD800;&#128;&#x9F;")).toBe("���€Ÿ");
+		expect(attr("&unknown; & &#; &#x;")).toBe("&unknown; & &#; &#x;");
+		// A decoded line break is a space, so findings keep their line numbers.
+		expect(attr("a&NewLine;b&#10;c")).toBe("a b c");
+	});
+
+	it("sees the candidate behind any encoded srcset separator, and accepts commas inside external URLs", () => {
+		expect(guard(`<img src="pic.png" srcset="https://img.example/a.png&#44; ../../02_Private/s.png 2x" alt="x">`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/s.png"]);
+		expect(guard(`<img src="pic.png" srcset="https://img.example/a.png&comma; ../../02_Private/s.png 2x" alt="x">`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/s.png"]);
+		expect(guard(`<img src="pic.png" srcset="https://img.example/a.png&#44 ../../02_Private/s.png 2x" alt="x">`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/s.png"]);
+		expect(guard(`<a href="&period;&period;&sol;&period;&period;&sol;02_Private/p.md">x</a>`)).toEqual(["articles/a/index.html:1: broken link ../../02_Private/p.md"]);
+		expect(guard(`<img src="pic.png" srcset="https://img.example/resize,w_448/p.png 2x, data:image/png;base64,iVBORw0KGgo= 1x" alt="x">`)).toEqual([]);
+	});
+
+	it("reads every URL of a srcset, checks each, and rewrites only the entries that change", () => {
+		expect(resourceAttributes(`<img src="a.webp" srcset="a.webp 1x, b.webp 2x" alt="x">`).map((a: { url: string }) => a.url)).toEqual(["a.webp", "a.webp", "b.webp"]);
+		expect(guard(`<img src="pic.png" srcset="pic.png 1x, gone.webp 2x" alt="x">`)).toEqual(["articles/a/index.html:1: broken link gone.webp"]);
+		expect(guard(`<img src="pic.png" srcset="pic.png 1x, file:///C:/x.png 2x" alt="x">`)).toEqual(["articles/a/index.html:1: a file:// URL: file:///C:/x.png"]);
 	});
 
 	it("reads URL attributes in every quoting, in pages and in SVG files", () => {
@@ -559,7 +673,18 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		expect(article).not.toContain('<p class="description">');
 		expect(article).toContain('<base href="https://kaimys.github.io/obsidian-dispatch/articles/getting-started/">');
 		expect(html("articles/second-article/index.html")).toContain('<p class="description">The second one.</p>');
-		expect(html("articles/index.html")).toContain('<span class="teaser teaser-cover"><img src="https://kaimys.github.io/obsidian-dispatch/articles/second-article/pic.png"');
+		// A raster teaser is resized to the widths its 480 px source can fill, plus its own width
+		// (never upscaled): 224, 448 and 480 in the list, 336 and 480 on the article page (as wide
+		// as the text column); the original is not published.
+		const processed = "https://kaimys\\.github\\.io/obsidian-dispatch/processed_images/teaser\\.[0-9a-f]+\\.webp";
+		const list = html("articles/index.html");
+		expect(list).toMatch(new RegExp(`<span class="teaser teaser-cover"><img src="${processed}" srcset="${processed} 224w, ${processed} 448w, ${processed} 480w" sizes="\\(max-width: 36rem\\) calc\\(100vw - 2rem\\), 14rem" alt="" width="480" height="270" loading="lazy"></span>`));
+		const second = html("articles/second-article/index.html");
+		expect(second).toMatch(new RegExp(`<figure class="teaser article-teaser teaser-cover"><img src="${processed}" srcset="${processed} 336w, ${processed} 480w" sizes="[^"]+" alt="" width="480" height="270"></figure>`));
+		expect(listOutput(result.output).filter((f) => /teaser\.png$/.test(f))).toEqual([]);
+		for (const m of (list + second).matchAll(/processed_images\/(teaser\.[0-9a-f]+\.webp)/g)) expect(existsSync(join(result.output, "processed_images", m[1]))).toBe(true);
+		// An SVG teaser scales by itself and is used as it is.
+		expect(list).toContain('<span class="teaser"><img src="https://kaimys.github.io/obsidian-dispatch/articles/commented/diagram.svg" alt="" loading="lazy"></span>');
 		const newer = html("releases/1-0-0/index.html");
 		expect(newer).toMatch(/<a href="[^"]*\/releases\/1-0-1\/">v1.0.1 &rarr;<\/a>/);
 		expect(html("docs/overview/index.html")).toMatch(/class="next" href="[^"]*\/docs\/installation\/"/);
@@ -583,5 +708,67 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 		expect(home).toContain("The public introduction. It says what the article is about.");
 		expect(html("legal/impressum/index.html")).toContain('<html lang="de">');
 		expect(html("legal/impressum/index.html")).toContain('hreflang="en">Privacy Policy</a>');
+	});
+
+	it("renders ready testimonials with the design — a photo beside the name when given, the design's plain card otherwise", () => {
+		const vault = join(mkdtempSync(join(tmpdir(), "dispatch-website-vault-")), "wiki");
+		cpSync(join(FIXTURES, "clean"), vault, { recursive: true });
+		const testimonial = (file: string, extra: string) =>
+			writeFileSync(join(vault, "10_Website", "Testimonials", file), `---\nquote: It works for us.\nname: ${file.replace(".md", "")}\nrole: Tester\nconsent: 2026-09-30\n${extra}status: ready\n---\n`);
+		testimonial("With Photo.md", "photo: portrait.png\n");
+		testimonial("Without Photo.md", "");
+		const { site, buildDir } = fixtureSite({ design: true });
+		const result = build({ wikiRoot: vault, siteDir: site, buildDir, docs, published, renderDiagram: fakeDiagram });
+		const home = read(join(result.output, "index.html"));
+		expect(home).toContain('<ul class="testimonials">');
+		// The card shows two small WebP versions Zola made at build time, 1x and 2x.
+		const img = /<p class="who has-photo"><img class="avatar" src="([^"]+)" srcset="([^"]+) 1x, ([^"]+) 2x" alt="" width="56" height="56" loading="lazy"><span><span class="name">With Photo<\/span>/.exec(home);
+		expect(img).not.toBeNull();
+		const [, src, oneX, twoX] = img!;
+		expect(oneX).toBe(src);
+		for (const url of [src, twoX]) {
+			expect(url).toMatch(/^https:\/\/kaimys\.github\.io\/obsidian-dispatch\/processed_images\/portrait\.[0-9a-f]+\.webp$/);
+			expect(existsSync(join(result.output, url.replace("https://kaimys.github.io/obsidian-dispatch/", "")))).toBe(true);
+		}
+		expect(home).toContain('<p class="who"><span class="name">Without Photo</span> <span class="role">Tester</span></p>');
+		// The full-size original is never published.
+		expect(listOutput(result.output).filter((f) => /portrait\.png$/.test(f))).toEqual([]);
+		expect(JSON.parse(read(join(result.root, "testimonials.json")))).toEqual([
+			{ quote: "It works for us.", name: "With Photo", role: "Tester", photo: "photos/portrait.png" },
+			{ quote: "It works for us.", name: "Without Photo", role: "Tester" },
+		]);
+	});
+
+	it("resizes a teaser to every width its source can fill, plus its own width — never upscaled, never losing resolution", () => {
+		const vault = join(mkdtempSync(join(tmpdir(), "dispatch-website-vault-")), "wiki");
+		cpSync(join(FIXTURES, "clean"), vault, { recursive: true });
+		// Sources below, between, exactly at and above the requested widths.
+		const sources = { below: [200, 113], between: [1177, 662], exact: [672, 378], above: [1400, 788] } as const;
+		for (const [name, [w, h]] of Object.entries(sources)) {
+			writeFileSync(join(vault, "10_Website", "assets", `${name}.png`), png(w, h));
+			writeFileSync(join(vault, "10_Website", "Articles", `Size ${name}.md`), `---\ndate: 2026-09-01\nstatus: ready\nteaser: ${name}.png\n---\n# Size ${name}\n\nText.\n`);
+		}
+		const { site, buildDir } = fixtureSite({ design: true });
+		const result = build({ wikiRoot: vault, siteDir: site, buildDir, docs, published, renderDiagram: fakeDiagram });
+		const read$ = (path: string) => read(join(result.output, path));
+		const offered = (html: string, name: string) => {
+			const tag = new RegExp(`<img src="[^"]*processed_images/${name}\\.[0-9a-f]+\\.webp" srcset="([^"]+)"`).exec(html);
+			expect(tag, name).not.toBeNull();
+			return parseSrcset(tag![1]).map((c: { url: string; descriptor: string }) => {
+				const file = readFileSync(join(result.output, c.url.replace(/^.*\/obsidian-dispatch\//, "")));
+				expect(webpWidth(file), `${c.url} is really ${c.descriptor}`).toBe(Number(c.descriptor.replace("w", "")));
+				return Number(c.descriptor.replace("w", ""));
+			});
+		};
+		const list = read$("articles/index.html");
+		expect(offered(list, "below")).toEqual([200]);
+		expect(offered(list, "between")).toEqual([224, 448, 896]);
+		expect(offered(list, "exact")).toEqual([224, 448, 672]);
+		expect(offered(list, "above")).toEqual([224, 448, 896]);
+		expect(offered(read$("articles/size-below/index.html"), "below")).toEqual([200]);
+		expect(offered(read$("articles/size-between/index.html"), "between")).toEqual([336, 672, 1177]);
+		expect(offered(read$("articles/size-exact/index.html"), "exact")).toEqual([336, 672]);
+		expect(offered(read$("articles/size-above/index.html"), "above")).toEqual([336, 672, 1344]);
+		expect(listOutput(result.output).filter((f) => /(below|between|exact|above)\.png$/.test(f))).toEqual([]);
 	});
 });

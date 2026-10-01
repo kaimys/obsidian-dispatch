@@ -28,7 +28,7 @@
 {% for t in testimonials %}
 <figure class="testimonial">
 <blockquote><p>{{ t.quote }}</p></blockquote>
-<figcaption>{{ t.name }}, {{ t.role }}</figcaption>
+<figcaption>{% if t.photo %}{% set photo = resize_image(path=t.photo, width=48, height=48, op="fill", format="webp") %}<img src="{{ photo.url | safe }}" alt="" width="48" height="48"> {% endif %}{{ t.name }}, {{ t.role }}</figcaption>
 </figure>
 {% endfor %}
 </section>
