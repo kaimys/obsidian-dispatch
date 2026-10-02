@@ -529,8 +529,8 @@ export function collectVault(wikiRoot, settings) {
 		const note = read("Home page.md");
 		const { title } = titleAndBody(note.data, note.body);
 		note.title = title;
-		guard(note, ["title", "eyebrow", "description", "requirements"]);
-		set.home = { eyebrow: note.data.eyebrow || "", title, lede: note.data.description || "", requirements: note.data.requirements || "", readMore: note.data.read_more || "" };
+		guard(note, ["title", "eyebrow", "description", "requirements", "read_more_label"]);
+		set.home = { eyebrow: note.data.eyebrow || "", title, lede: note.data.description || "", requirements: note.data.requirements || "", readMore: note.data.read_more || "", readMoreLabel: note.data.read_more_label || "" };
 		if (!title) set.errors.push(`${note.rel}:1: missing title (no title: and no # heading)`);
 	}
 
@@ -554,8 +554,11 @@ export function collectVault(wikiRoot, settings) {
 	if (set.home) {
 		const name = String(set.home.readMore).replace(/^\[\[|\]\]$/g, "").trim().toLowerCase();
 		const article = set.articles.find((a) => basename(a.rel, ".md").toLowerCase() === name);
-		set.home.read_more = article ? { url: `articles/${article.slug}/`, title: article.title } : undefined;
+		// The button says "Read <title>" unless the note gives a shorter label for a long title.
+		const label = String(set.home.readMoreLabel).trim() || (article && `Read ${article.title}`);
+		set.home.read_more = article ? { url: `articles/${article.slug}/`, title: article.title, label } : undefined;
 		delete set.home.readMore;
+		delete set.home.readMoreLabel;
 	}
 
 	if (existsSync(join(root, "FAQ.md"))) {
@@ -677,6 +680,16 @@ export function convertMarkdown(source, ctx) {
 	const anchors = new Map();
 	const fail = (line, message) => errors.push(`${ctx.file}:${line}: ${message}`);
 	const out = [];
+	const footnotes = [];
+	// Names the note's own footnotes use (`[^name]`, `[^name]:`), so a generated one never takes
+	// one of them: two footnotes with one name would share a number and a target.
+	const footnoteNames = new Set();
+	if (!ctx.github) {
+		for (const part of segments(body)) {
+			if (part.code) continue;
+			for (const m of blankInlineCode(part.text).matchAll(/\[\^([^\]\s]+)\]/g)) footnoteNames.add(m[1].toLowerCase());
+		}
+	}
 
 	for (const part of segments(body)) {
 		const first = (ctx.line ?? 1) + part.line;
@@ -703,6 +716,7 @@ export function convertMarkdown(source, ctx) {
 		}
 		out.push(convertProse(part.text, first));
 	}
+	if (footnotes.length) out.push("", ...footnotes.map((f) => `[^${f.name}]: ${f.text}`));
 	return { markdown: out.join("\n"), errors, assets: [...assets], diagrams };
 
 	function convertProse(text, first) {
@@ -711,22 +725,79 @@ export function convertMarkdown(source, ctx) {
 		for (let i = 0; i < lines.length; i++) {
 			const callout = /^>\s*\[!(\w+)\][-+]?\s*(.*)$/.exec(lines[i]);
 			if (callout && !ctx.github) {
+				// A callout is an HTML block around ordinary Markdown, not a shortcode: its body is
+				// then part of the page, so a footnote in a quote numbers on with the page's and its
+				// definition joins theirs at the bottom. Blank lines around the body let Markdown
+				// render inside the block; the markup is the design's.
+				const start = i;
 				const inner = [];
 				while (i + 1 < lines.length && /^>/.test(lines[i + 1])) inner.push(lines[++i].replace(/^>\s?/, ""));
 				// No written title stays untitled, so the site's text matches what the note says.
 				const title = callout[2].trim();
-				const args = `type="${callout[1].toLowerCase()}", title=${teraString(title)}`;
-				// Zola rejects a body shortcode with an empty body, so a title-only callout is inline.
-				if (inner.join("").trim()) done.push(`{% callout(${args}) %}`, convertLine(inner.join("\n"), first + i - inner.length), "{% end %}");
-				else done.push(`{{ callout(${args}) }}`);
+				done.push(`<aside class="callout callout-${callout[1].toLowerCase()}">`);
+				if (title) done.push(`<p class="callout-title">${escapeHtml(title)}</p>`);
+				done.push("", ...inner.map((l, k) => proseLine(l, first + start + 1 + k)), "", "</aside>", "");
 				continue;
 			}
-			done.push(convertLine(lines[i], first + i));
+			done.push(proseLine(lines[i], first + i));
 		}
 		return done.join("\n");
 	}
 
-	function convertLine(line, lineNo) {
+	// A footnote's text also sits next to its number, shown on hover or focus, so a reader need
+	// not jump to the bottom. It is a copy for the eye only: `inert` keeps its links out of the tab
+	// order and, with aria-hidden, out of the accessibility tree; the list at the end has the real
+	// ones. A generated name is unique in the note, so the marker replaced is the generated one.
+	function proseLine(line, lineNo) {
+		if (ctx.github) return convertLine(line, lineNo);
+		const before = footnotes.length;
+		const done = convertLine(extractFootnotes(line, lineNo), lineNo);
+		return footnotes
+			.slice(before)
+			.reduce((text, f) => text.replace(`[^${f.name}]`, `<span class="fn">[^${f.name}]<span class="fn-tip" aria-hidden="true" inert>${f.text}</span></span>`), done);
+	}
+
+	// Obsidian's inline footnote `^[text]` becomes a standard footnote `[^note-N]`, which Zola
+	// numbers and lists at the bottom of the page. Its text is converted once like any line, so
+	// links in it are resolved and guarded too, with the line it came from, and moves to a
+	// definition at the end of the body. It stays phrasing content, as it sits inside a sentence:
+	// an image is an inline image, not a figure. Code (a fence or an inline span) keeps `^[`.
+	function extractFootnotes(line, lineNo) {
+		const masked = blankInlineCode(line);
+		let out = "";
+		let i = 0;
+		while (i < line.length) {
+			const at = masked.indexOf("^[", i);
+			if (at < 0) {
+				out += line.slice(i);
+				break;
+			}
+			let depth = 0;
+			let end = -1;
+			for (let j = at + 1; j < masked.length; j++) {
+				if (masked[j] === "[") depth++;
+				else if (masked[j] === "]" && --depth === 0) {
+					end = j;
+					break;
+				}
+			}
+			if (end < 0) {
+				out += line.slice(i);
+				break;
+			}
+			let n = footnotes.length + 1;
+			while (footnoteNames.has(`note-${n}`)) n++;
+			const name = `note-${n}`;
+			footnoteNames.add(name);
+			footnotes.push({ name, text: convertLine(line.slice(at + 2, end).trim(), lineNo, { inline: true }) });
+			out += `${line.slice(i, at)}[^${name}]`;
+			i = end + 1;
+		}
+		return out;
+	}
+
+	// `inline` converts text that sits inside a sentence (a footnote): no heading anchor, no figure.
+	function convertLine(line, lineNo, { inline = false } = {}) {
 		const masked = blankInlineCode(line);
 		const edits = [];
 		const widths = new Map();
@@ -734,7 +805,7 @@ export function convertMarkdown(source, ctx) {
 		const replace = (m, value) => edits.push({ start: m.index, end: m.index + m[0].length, value });
 
 		const heading = /^(#{1,6})\s+(.+?)\s*$/.exec(masked);
-		if (heading && !/\{#[^}]+\}$/.test(heading[2])) {
+		if (heading && !inline && !/\{#[^}]+\}$/.test(heading[2])) {
 			let id = headingSlug(line.slice(heading[1].length).trim());
 			const seen = anchors.get(id) ?? 0;
 			anchors.set(id, seen + 1);
@@ -848,19 +919,13 @@ export function convertMarkdown(source, ctx) {
 		let result = line;
 		for (const edit of edits) result = result.slice(0, edit.start) + edit.value + result.slice(edit.end);
 		// An image alone on its line is a figure, as the design sets it; an embed keeps its width.
-		const only = /^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(result);
+		const only = !inline && /^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(result);
 		if (only) {
 			const width = widths.get(only[2]);
 			return `<figure>\n<img src="${only[2]}" alt="${escapeHtml(only[1])}"${width ? ` width="${width}"` : ""}>\n</figure>`;
 		}
 		return result;
 	}
-}
-
-/** A Tera string literal: Tera has no escapes, so pick a delimiter the text does not contain. */
-export function teraString(text) {
-	const delimiter = ['"', "'", "`"].find((d) => !String(text).includes(d));
-	return delimiter ? `${delimiter}${text}${delimiter}` : `"${String(text).replace(/"/g, "”")}"`;
 }
 
 export function escapeHtml(text) {

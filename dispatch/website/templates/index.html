@@ -13,7 +13,7 @@
       <div class="actions">
         <a class="btn btn-primary" href="{{ config.extra.directory | safe }}">Install from the plugin directory</a>
         {%- if home.read_more %}
-        <a class="btn btn-secondary" href="{{ get_url(path=home.read_more.url) }}"><span class="tri" aria-hidden="true">&#9655;</span> Read {{ home.read_more.title }}</a>
+        <a class="btn btn-secondary" href="{{ get_url(path=home.read_more.url) }}"><span class="tri" aria-hidden="true">&#9655;</span> {{ home.read_more.label }}</a>
         {%- endif %}
       </div>
       {% if home.requirements %}<p class="requirements">{{ home.requirements }}</p>{% endif %}

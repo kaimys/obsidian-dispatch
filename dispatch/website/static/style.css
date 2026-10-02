@@ -145,6 +145,8 @@ a:hover { text-decoration-thickness: 2px; }
 
 /* ---------- Buttons ---------- */
 .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 2rem; }
+/* A button moves to the next row whole instead of breaking its label; only one wider than the screen wraps. */
+.actions .btn { flex-shrink: 0; max-width: 100%; }
 .btn {
 	display: inline-flex; align-items: center; gap: .5em; min-height: 2.75rem;
 	padding: .6rem 1.1rem; border-radius: 7px; border: 1px solid var(--accent);
@@ -366,6 +368,22 @@ a:hover { text-decoration-thickness: 2px; }
 .footnote-definition-label { font-family: var(--ocr); color: var(--accent); }
 .footnotes { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
 .footnotes ol { padding-left: 1.4rem; }
+/* The footnote's text under the line of its number, on hover or focus (.fn > sup + .fn-tip, from
+ * the build). Its top stays where the number is (top: auto); across, it is placed in the text
+ * column (.prose), not at the number, so it never reaches past the column's edges, and the column
+ * always fits the screen. Touch screens have no hover: a tap follows the number to the list. */
+.prose { position: relative; }
+.fn-tip { display: none; }
+@media (hover: hover) {
+	.fn:hover .fn-tip, .fn:focus-within .fn-tip {
+		display: block; position: absolute; z-index: 10; top: auto; left: 0; right: 0; margin: .35rem auto 0;
+		width: fit-content; max-width: min(28rem, 100%); padding: .55rem .75rem;
+		background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 7px;
+		box-shadow: 0 4px 16px rgba(16, 23, 31, .12);
+		font: 400 .875rem/1.45 var(--sans); font-style: normal; text-align: left; white-space: normal; letter-spacing: normal;
+	}
+	.fn-tip img { display: block; max-width: 100%; max-height: 12rem; width: auto; height: auto; }
+}
 
 /* ---------- Teasers (extra.teaser on articles) ----------
  * One frame for screenshots, diagrams and the Patch mark alike: a white plate

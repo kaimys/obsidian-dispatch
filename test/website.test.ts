@@ -31,7 +31,6 @@ import {
 	segments,
 	stage,
 	summaryOf,
-	teraString,
 	titleAndBody,
 	withoutComments,
 } from "../dispatch/scripts/website.mjs";
@@ -205,7 +204,7 @@ describe("Markdown conversion", () => {
 		expect(markdown).toContain("![Rel](pic.png) [Other](@/articles/other/index.md)");
 		expect(markdown).toContain("<mark>hi</mark>");
 		expect(markdown).not.toContain("hidden");
-		expect(markdown).toContain('{% callout(type="tip", title="Title") %}\nBody\n{% end %}');
+		expect(markdown).toContain('<aside class="callout callout-tip">\n<p class="callout-title">Title</p>\n\nBody\n\n</aside>');
 		expect(used).toEqual(["assets/pic.png"]);
 	});
 
@@ -226,9 +225,48 @@ describe("Markdown conversion", () => {
 		expect(headingSlug("The `google` block — optional Meet transcript import")).toBe("the-google-block--optional-meet-transcript-import");
 	});
 
-	it("makes a title-only callout an inline shortcode, since Zola rejects an empty body", () => {
-		expect(convert("> [!quote] Only a title\n\nNext").markdown).toBe('{{ callout(type="quote", title="Only a title") }}\n\nNext');
-		expect(teraString('He said "no"')).toBe("'He said \"no\"'");
+	it("makes a callout an HTML block around Markdown, escaping its title and leaving none unwritten", () => {
+		expect(convert("> [!quote] Only a title\n\nNext").markdown).toBe('<aside class="callout callout-quote">\n<p class="callout-title">Only a title</p>\n\n\n</aside>\n\n\nNext');
+		expect(convert('> [!note] He said "<no>"\n> Body').markdown).toContain('<p class="callout-title">He said &quot;&lt;no&gt;&quot;</p>');
+		expect(convert("> [!note]\n> Body").markdown).toBe('<aside class="callout callout-note">\n\nBody\n\n</aside>\n');
+	});
+
+	it("turns inline footnotes into numbered ones with a hover text, defined at the end and converted like any line", () => {
+		const { markdown, errors } = convert("A^[An [[Other]] note] and B^[With [a](https://x.org) link].\n> [!quote] Q\n> Said^[Source].");
+		expect(errors).toEqual([]);
+		expect(markdown).toContain(`A${tip(1, "An [Other](@/articles/other/index.md) note")} and B${tip(2, "With [a](https://x.org) link")}.`);
+		expect(markdown).toContain(`Said${tip(3, "Source")}.`);
+		expect(markdown.endsWith("\n\n[^note-1]: An [Other](@/articles/other/index.md) note\n[^note-2]: With [a](https://x.org) link\n[^note-3]: Source")).toBe(true);
+	});
+
+	// The hover copy is inert: its links are out of the tab order and, with aria-hidden, out of
+	// the accessibility tree (R9).
+	const tip = (n: number, text: string) => `<span class="fn">[^note-${n}]<span class="fn-tip" aria-hidden="true" inert>${text}</span></span>`;
+
+	it("never gives an inline footnote a name the note's own footnotes use, so each keeps its number and hover text", () => {
+		const { markdown } = convert("Old[^note-1] and new^[NEW] and [^Note-2].\n\nMore^[MORE].\n\n[^note-1]: OLD\n[^note-2]: TWO");
+		expect(markdown).toContain(`Old[^note-1] and new${tip(3, "NEW")} and [^Note-2].`);
+		expect(markdown).toContain(`More${tip(4, "MORE")}.`);
+		expect(markdown).toContain("[^note-1]: OLD\n[^note-2]: TWO");
+		expect(markdown.endsWith("\n\n[^note-3]: NEW\n[^note-4]: MORE")).toBe(true);
+	});
+
+	it("keeps an image in a footnote inline: no figure, one line, alt text and asset kept", () => {
+		const { markdown, errors, assets: used } = convert("See^[![[pic.png|A picture|300]]] and^[![Rel](../assets/pic.png)].");
+		expect(errors).toEqual([]);
+		expect(markdown).not.toContain("<figure>");
+		expect(markdown).toContain(`See${tip(1, "![A picture](pic.png)")} and${tip(2, "![Rel](pic.png)")}.`);
+		expect(markdown.endsWith("\n\n[^note-1]: ![A picture](pic.png)\n[^note-2]: ![Rel](pic.png)")).toBe(true);
+		expect(used).toEqual(["assets/pic.png"]);
+		expect(convert("A^[![[pic.png]]]").errors).toEqual(["a.md:1: image pic.png has no alt text (write ![[pic.png|Alt text]])"]);
+		expect(convert("A^[# Not a heading]").markdown).toContain(tip(1, "# Not a heading"));
+	});
+
+	it("guards a footnote's text with the line it came from, and leaves code and docs alone", () => {
+		expect(convert("Intro\n\nSee^[[[Missing]]]").errors).toEqual(["a.md:3: [[Missing]] links to a page that is not published"]);
+		expect(convert("`x^[y]` and ```^[z]```").markdown).toBe("`x^[y]` and ```^[z]```");
+		expect(convert("Unclosed ^[note").markdown).toBe("Unclosed ^[note");
+		expect(convert("A^[b]", { github: true, dir: "" }).markdown).toBe("A^[b]");
 	});
 
 	it("renders a Mermaid block as a figure with its accTitle as alt text and accDescr as description", () => {
@@ -310,7 +348,7 @@ describe("the clean fixture vault", () => {
 	it("stages with no finding", () => expect(staged.errors).toEqual([]));
 
 	it("publishes the ready articles only, and says what it skipped and why", () => {
-		expect(staged.set.articles.map((a: { slug: string }) => a.slug)).toEqual(["comment-around-code", "commented", "getting-started", "hidden-heading", "second-article"]);
+		expect(staged.set.articles.map((a: { slug: string }) => a.slug)).toEqual(["comment-around-code", "commented", "footnotes", "getting-started", "hidden-heading", "second-article"]);
 		expect(staged.set.skipped).toEqual([
 			"10_Website/Articles/Capital ready.md (status: Ready)",
 			"10_Website/Articles/Draft.md (status: draft)",
@@ -353,7 +391,7 @@ describe("the clean fixture vault", () => {
 
 	it("lists updates newest first, the newer release first on a shared date, links included", () => {
 		const updates = JSON.parse(read(join(staged.root, "updates.json")));
-		expect(updates.map((u: { title: string }) => u.title)).toEqual(["Second article", "A podcast about Dispatch", "Getting started", "Commented", "Public article", "Comment around code", "v1.0.1", "v1.0.0"]);
+		expect(updates.map((u: { title: string }) => u.title)).toEqual(["Second article", "A podcast about Dispatch", "Footnotes", "Getting started", "Commented", "Public article", "Comment around code", "v1.0.1", "v1.0.0"]);
 		expect(updates[1]).toEqual({ kind: "link", title: "A podcast about Dispatch", url: "https://example.com/podcast", date: "2026-09-21", summary: "" });
 		expect(updates[0]).toMatchObject({ kind: "article", url: "articles/second-article/", summary: "The second one." });
 	});
@@ -396,7 +434,7 @@ describe("the clean fixture vault", () => {
 			title: "A pitch in one line",
 			lede: "The lede: it says what Dispatch does.",
 			requirements: "Desktop only.",
-			read_more: { url: "articles/getting-started/", title: "Getting started" },
+			read_more: { url: "articles/getting-started/", title: "Getting started", label: "Read Getting started" },
 		});
 	});
 
@@ -696,6 +734,25 @@ describe.skipIf(!zola)("a real Zola build of the clean fixture (skipped without 
 			}
 		}
 		expect(home).toContain("Public article");
+		// Named and inline footnotes side by side (R6, R7, R9): one list item per footnote, each id
+		// once, numbered in reading order; each hover text sits at its own number, is inert, and
+		// holds images inline; the article keeps its structure.
+		const notes = html("articles/footnotes/index.html");
+		const prose = notes.slice(notes.indexOf('<div class="prose">'), notes.indexOf('<section class="footnotes">'));
+		const ids = [...notes.matchAll(/<li id="(fn-[^"]+)">/g)].map((m) => m[1]);
+		expect(ids).toEqual(["fn-note-1", "fn-note-2", "fn-note-3", "fn-note-4", "fn-note-5", "fn-note-6", "fn-later"]);
+		expect([...prose.matchAll(/href="#(fn-[^"]+)">(\d+)</g)].map((m) => `${m[1]}=${m[2]}`)).toEqual(["fn-note-1=1", "fn-note-2=2", "fn-note-3=3", "fn-note-4=4", "fn-note-5=5", "fn-note-6=6", "fn-later=7"]);
+		expect(prose).toContain('Existing reference<sup class="footnote-reference" id="fr-note-1-1"><a href="#fn-note-1">1</a></sup>.');
+		expect(prose).toContain('<a href="#fn-note-2">2</a></sup><span class="fn-tip" aria-hidden="true" inert>INLINE-NOTE-TEXT</span></span>');
+		expect(prose).toContain('<span class="fn-tip" aria-hidden="true" inert>See <a rel="external" href="https://example.com/">the example</a> here.</span>');
+		expect(prose).toMatch(/<a href="#fn-note-4">4<\/a><\/sup><span class="fn-tip" aria-hidden="true" inert><img src="[^"]+\/pic\.png" alt="A picture" \/><\/span><\/span>/);
+		expect(prose).toMatch(/<a href="#fn-note-5">5<\/a><\/sup><span class="fn-tip" aria-hidden="true" inert><img src="[^"]+\/diagram\.svg" alt="Diagram" \/><\/span><\/span>/);
+		expect(prose).toContain('<a href="#fn-note-6">6</a></sup><span class="fn-tip" aria-hidden="true" inert>QUOTE-NOTE-TEXT</span></span>');
+		expect(prose).not.toContain("<figure");
+		expect(prose).not.toContain("EXISTING-NOTE-TEXT");
+		expect(notes.match(/EXISTING-NOTE-TEXT/g)).toHaveLength(1);
+		expect(notes).toMatch(/<li id="fn-note-4">\s*<p><img src="[^"]+\/pic\.png" alt="A picture" \/> <a href="#fr-note-4-1">/);
+		expect(existsSync(join(result.output, "articles", "footnotes", "pic.png"))).toBe(true);
 		// The GitHub mark sits last in the header navigation — after FAQ when the FAQ is published,
 		// after Releases while it is a draft, as in this fixture — named for screen readers.
 		const nav = home.slice(home.indexOf('<nav class="site-nav"'), home.indexOf("</nav>"));
