@@ -681,6 +681,15 @@ export function convertMarkdown(source, ctx) {
 	const fail = (line, message) => errors.push(`${ctx.file}:${line}: ${message}`);
 	const out = [];
 	const footnotes = [];
+	// Names the note's own footnotes use (`[^name]`, `[^name]:`), so a generated one never takes
+	// one of them: two footnotes with one name would share a number and a target.
+	const footnoteNames = new Set();
+	if (!ctx.github) {
+		for (const part of segments(body)) {
+			if (part.code) continue;
+			for (const m of blankInlineCode(part.text).matchAll(/\[\^([^\]\s]+)\]/g)) footnoteNames.add(m[1].toLowerCase());
+		}
+	}
 
 	for (const part of segments(body)) {
 		const first = (ctx.line ?? 1) + part.line;
@@ -736,20 +745,23 @@ export function convertMarkdown(source, ctx) {
 	}
 
 	// A footnote's text also sits next to its number, shown on hover or focus, so a reader need
-	// not jump to the bottom. Screen readers skip it there and get the list at the end instead.
+	// not jump to the bottom. It is a copy for the eye only: `inert` keeps its links out of the tab
+	// order and, with aria-hidden, out of the accessibility tree; the list at the end has the real
+	// ones. A generated name is unique in the note, so the marker replaced is the generated one.
 	function proseLine(line, lineNo) {
 		if (ctx.github) return convertLine(line, lineNo);
 		const before = footnotes.length;
 		const done = convertLine(extractFootnotes(line, lineNo), lineNo);
 		return footnotes
 			.slice(before)
-			.reduce((text, f) => text.replace(`[^${f.name}]`, `<span class="fn">[^${f.name}]<span class="fn-tip" aria-hidden="true">${f.text}</span></span>`), done);
+			.reduce((text, f) => text.replace(`[^${f.name}]`, `<span class="fn">[^${f.name}]<span class="fn-tip" aria-hidden="true" inert>${f.text}</span></span>`), done);
 	}
 
 	// Obsidian's inline footnote `^[text]` becomes a standard footnote `[^note-N]`, which Zola
 	// numbers and lists at the bottom of the page. Its text is converted once like any line, so
 	// links in it are resolved and guarded too, with the line it came from, and moves to a
-	// definition at the end of the body. Code (a fence or an inline span) keeps `^[` literally.
+	// definition at the end of the body. It stays phrasing content, as it sits inside a sentence:
+	// an image is an inline image, not a figure. Code (a fence or an inline span) keeps `^[`.
 	function extractFootnotes(line, lineNo) {
 		const masked = blankInlineCode(line);
 		let out = "";
@@ -773,15 +785,19 @@ export function convertMarkdown(source, ctx) {
 				out += line.slice(i);
 				break;
 			}
-			const name = `note-${footnotes.length + 1}`;
-			footnotes.push({ name, text: convertLine(line.slice(at + 2, end).trim(), lineNo) });
+			let n = footnotes.length + 1;
+			while (footnoteNames.has(`note-${n}`)) n++;
+			const name = `note-${n}`;
+			footnoteNames.add(name);
+			footnotes.push({ name, text: convertLine(line.slice(at + 2, end).trim(), lineNo, { inline: true }) });
 			out += `${line.slice(i, at)}[^${name}]`;
 			i = end + 1;
 		}
 		return out;
 	}
 
-	function convertLine(line, lineNo) {
+	// `inline` converts text that sits inside a sentence (a footnote): no heading anchor, no figure.
+	function convertLine(line, lineNo, { inline = false } = {}) {
 		const masked = blankInlineCode(line);
 		const edits = [];
 		const widths = new Map();
@@ -789,7 +805,7 @@ export function convertMarkdown(source, ctx) {
 		const replace = (m, value) => edits.push({ start: m.index, end: m.index + m[0].length, value });
 
 		const heading = /^(#{1,6})\s+(.+?)\s*$/.exec(masked);
-		if (heading && !/\{#[^}]+\}$/.test(heading[2])) {
+		if (heading && !inline && !/\{#[^}]+\}$/.test(heading[2])) {
 			let id = headingSlug(line.slice(heading[1].length).trim());
 			const seen = anchors.get(id) ?? 0;
 			anchors.set(id, seen + 1);
@@ -903,7 +919,7 @@ export function convertMarkdown(source, ctx) {
 		let result = line;
 		for (const edit of edits) result = result.slice(0, edit.start) + edit.value + result.slice(edit.end);
 		// An image alone on its line is a figure, as the design sets it; an embed keeps its width.
-		const only = /^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(result);
+		const only = !inline && /^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(result);
 		if (only) {
 			const width = widths.get(only[2]);
 			return `<figure>\n<img src="${only[2]}" alt="${escapeHtml(only[1])}"${width ? ` width="${width}"` : ""}>\n</figure>`;

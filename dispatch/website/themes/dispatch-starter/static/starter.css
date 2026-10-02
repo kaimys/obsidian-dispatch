@@ -60,14 +60,17 @@ blockquote, .callout { margin: 1rem 0; padding: 0.25rem 1rem; border-left: 3px s
 .callout-title { font-weight: 600; }
 .testimonial blockquote { margin: 0; }
 
-/* A footnote's text above its number on hover or focus; touch screens follow the number to the list. */
-.fn { position: relative; }
+/* A footnote's text under the line of its number, on hover or focus. Across, it is placed in the
+   page column (main), not at the number, so it never reaches past the screen's edges. Touch
+   screens have no hover: a tap follows the number to the list. */
+main { position: relative; }
 .fn-tip { display: none; }
 @media (hover: hover) {
 	.fn:hover .fn-tip, .fn:focus-within .fn-tip {
-		display: block; position: absolute; z-index: 10; bottom: calc(100% + 0.35rem); left: 50%; transform: translateX(-50%);
-		width: max-content; max-width: min(20rem, 80vw); padding: 0.5rem 0.75rem;
+		display: block; position: absolute; z-index: 10; top: auto; left: 0; right: 0; margin: 0.35rem auto 0;
+		width: fit-content; max-width: min(28rem, 100%); padding: 0.5rem 0.75rem;
 		background: var(--bg); color: var(--fg); border: 1px solid var(--rule); border-radius: 6px;
 		font-size: 0.875rem; font-style: normal; line-height: 1.45;
 	}
+	.fn-tip img { display: block; max-height: 12rem; width: auto; }
 }
