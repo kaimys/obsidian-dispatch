@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Introduction to Dispatch — Dispatch</title>
+<meta name="description" content="The LLM Wiki is the shared memory of your team. Dispatch adds a process to it. The LLM Wiki grows with your project and becomes the substrate for your AI automation.">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/articles/introduction-to-dispatch/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/" aria-current="page">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+        <li><a class="nav-github" href="https://github.com/kaimys/obsidian-dispatch" aria-label="Dispatch on GitHub" title="Dispatch on GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+
+<article class="wrap">
+  <header class="page-head">
+    <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></p>
+    <h1>Introduction to Dispatch</h1>
+    <p class="description">The LLM Wiki is the shared memory of your team. Dispatch adds a process to it. The LLM Wiki grows with your project and becomes the substrate for your AI automation.</p>
+    <p class="meta"><time datetime="2026-10-02">2026-10-02</time> · Kai Mysliwiec</p>
+  </header>
+  <div class="prose">
+<p>Andrej Karpathy published his famous <a rel="external" href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f">LLM Wiki post on GitHub</a><span class="fn"><sup class="footnote-reference" id="fr-note-1-1"><a href="#fn-note-1">1</a></sup><span class="fn-tip" aria-hidden="true">An LLM (large language model) is the AI behind tools like ChatGPT or Claude. An LLM Wiki is a collection of linked notes that such an AI reads and keeps up to date.</span></span> in April 2026 and we were lucky to have just started our project back then. Our first lines of code were committed to GitHub a week earlier. The concept made sense to us instantly and we decided to adapt it. Four months later we launched the Elternkraft app in the app stores. You can read more about the story of Elternkraft in <a href="https://kaimys.github.io/obsidian-dispatch/articles/elternkraft/">Elternkraft - the origins of Dispatch</a>.</p>
+<aside class="callout callout-quote">
+<p class="callout-title">Andrej Karpathy</p>
+<p>Obsidian is the IDE<span class="fn"><sup class="footnote-reference" id="fr-note-2-1"><a href="#fn-note-2">2</a></sup><span class="fn-tip" aria-hidden="true">An IDE (integrated development environment) is the program developers write and test their code in.</span></span>; the LLM is the programmer; the wiki is the codebase.</p>
+</aside>
+<p>This is his text's most iconic claim. You only have to maintain your wiki with the free markdown editor<span class="fn"><sup class="footnote-reference" id="fr-note-3-1"><a href="#fn-note-3">3</a></sup><span class="fn-tip" aria-hidden="true">Markdown is plain text with a few simple marks for formatting, such as asterisks around a word to make it bold. A Markdown editor shows the formatting as you write.</span></span> <a rel="external" href="https://obsidian.md/">Obsidian</a> and leave the rest to the LLM? How could this even work you might ask? Here's why.</p>
+<ol>
+<li>You don't have to add the context to the prompt<span class="fn"><sup class="footnote-reference" id="fr-note-4-1"><a href="#fn-note-4">4</a></sup><span class="fn-tip" aria-hidden="true">A prompt is the request you type to the AI. Context is the background it needs to answer well, such as your notes or earlier decisions.</span></span> one by one until you get the right answer for your request. Let the LLM pick the context it needs.</li>
+<li>The whole team will benefit from the added context by you.</li>
+<li>Over time the LLM Wiki grows into an extensive knowledge base for your project. And you can automate more high level tasks with the LLM.</li>
+<li>The wiki makes your LLM fast because it can easily access all knowledge it needs through fast file reads and full text search.<span class="fn"><sup class="footnote-reference" id="fr-note-5-1"><a href="#fn-note-5">5</a></sup><span class="fn-tip" aria-hidden="true">The wiki is a folder of plain text files on your computer, so the AI can open and search them directly, without a database or web service in between.</span></span></li>
+<li>You can create workflows on the fly by adding inline prompts<span class="fn"><sup class="footnote-reference" id="fr-note-6-1"><a href="#fn-note-6">6</a></sup><span class="fn-tip" aria-hidden="true">An inline prompt is an instruction to the AI written into the wiki page itself, such as "List this week's meetings here". The AI follows it whenever it updates the page.</span></span> on the wiki pages. This is great for updating reports, updating your homepage, reading your inbox or updating your to-dos etc. It's like SharePoint but you don't need a developer.</li>
+</ol>
+<p>One main counter-argument against wikis often is that they are rarely well maintained. Documentation of in-house processes and tools is often so out of date that you can't rely on it and you need an expert user you can ask. The good news is the LLM can do that too. They are the <em>perfect bureaucrats</em> to update your documentation, find outdated pages and inconsistencies and update overview pages. As Yuval Noah Harari puts it:</p>
+<aside class="callout callout-quote">
+<p class="callout-title">Yuval Noah Harari</p>
+<p>They love bureaucracy, whereas we feel suffocated often by bureaucracy. For AIs, bureaucracy is oxygen.</p>
+</aside>
+<h2 id="what-dispatch-adds-to-it">What Dispatch adds to it<a class="zola-anchor" href="#what-dispatch-adds-to-it" aria-label="Anchor link for: what-dispatch-adds-to-it">#</a></h2>
+<p>Karpathy's post explained the general concept of the LLM Wiki and hardly mentioned how to work with it in a team. Dispatch is filling this gap. It gives your team a set of tools, a familiar user interface and a working process to interact with the wiki and the LLM.</p>
+<ul>
+<li>A Kanban board<span class="fn"><sup class="footnote-reference" id="fr-note-7-1"><a href="#fn-note-7">7</a></sup><span class="fn-tip" aria-hidden="true">A Kanban board shows each task as a card that moves through columns such as "To do", "In progress" and "Done".</span></span></li>
+<li>A board for release planning<span class="fn"><sup class="footnote-reference" id="fr-note-8-1"><a href="#fn-note-8">8</a></sup><span class="fn-tip" aria-hidden="true">Release planning decides which features ship together in the next version of your product, and when.</span></span></li>
+<li>An overview of your past and upcoming meetings</li>
+<li>An overview of all open tasks for you and your team</li>
+</ul>
+<p>Dispatch adds chips<span class="fn"><sup class="footnote-reference" id="fr-note-9-1"><a href="#fn-note-9">9</a></sup><span class="fn-tip" aria-hidden="true">Chips are small buttons on a ticket or meeting card. Each one starts the next step, for example asking the AI to plan or build the ticket.</span></span> to tickets and meetings, buttons to wiki pages so that the next step in your plan is just one click away and everyone is up to date.</p>
+<p>You don't have to pay for it, it's open source. You can try it yourself, and I'd be happy to hear from you on <a rel="external" href="https://github.com/kaimys/obsidian-dispatch/discussions">GitHub Discussions</a>. <a href="mailto:kai@eightnine.de">Drop me a mail</a> or a <a rel="external" href="https://www.linkedin.com/in/kaimysliwiec/">DM on LinkedIn</a> if you want to have a quick demo. I would be happy to support you with your project.</p>
+<p><em>Kai Mysliwiec</em></p>
+<p><strong>Further reading</strong></p>
+<ul>
+<li><a href="https://kaimys.github.io/obsidian-dispatch/articles/elternkraft/">Elternkraft - the origins of Dispatch</a>, a customer success story</li>
+<li><a href="https://kaimys.github.io/obsidian-dispatch/articles/dispatch-101/">Dispatch 101</a> for a technical introduction</li>
+</ul>
+<section class="footnotes">
+<ol class="footnotes-list">
+<li id="fn-note-1">
+<p>An LLM (large language model) is the AI behind tools like ChatGPT or Claude. An LLM Wiki is a collection of linked notes that such an AI reads and keeps up to date. <a href="#fr-note-1-1">↩</a></p>
+</li>
+<li id="fn-note-2">
+<p>An IDE (integrated development environment) is the program developers write and test their code in. <a href="#fr-note-2-1">↩</a></p>
+</li>
+<li id="fn-note-3">
+<p>Markdown is plain text with a few simple marks for formatting, such as asterisks around a word to make it bold. A Markdown editor shows the formatting as you write. <a href="#fr-note-3-1">↩</a></p>
+</li>
+<li id="fn-note-4">
+<p>A prompt is the request you type to the AI. Context is the background it needs to answer well, such as your notes or earlier decisions. <a href="#fr-note-4-1">↩</a></p>
+</li>
+<li id="fn-note-5">
+<p>The wiki is a folder of plain text files on your computer, so the AI can open and search them directly, without a database or web service in between. <a href="#fr-note-5-1">↩</a></p>
+</li>
+<li id="fn-note-6">
+<p>An inline prompt is an instruction to the AI written into the wiki page itself, such as "List this week's meetings here". The AI follows it whenever it updates the page. <a href="#fr-note-6-1">↩</a></p>
+</li>
+<li id="fn-note-7">
+<p>A Kanban board shows each task as a card that moves through columns such as "To do", "In progress" and "Done". <a href="#fr-note-7-1">↩</a></p>
+</li>
+<li id="fn-note-8">
+<p>Release planning decides which features ship together in the next version of your product, and when. <a href="#fr-note-8-1">↩</a></p>
+</li>
+<li id="fn-note-9">
+<p>Chips are small buttons on a ticket or meeting card. Each one starts the next step, for example asking the AI to plan or build the ticket. <a href="#fr-note-9-1">↩</a></p>
+</li>
+</ol>
+</section>
+
+  </div>
+  <footer class="article-foot">
+    <a href="https://kaimys.github.io/obsidian-dispatch/articles/">&larr; All articles</a>
+    <a href="https://github.com/kaimys/obsidian-dispatch/issues">Give feedback on GitHub</a>
+  </footer>
+</article>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>
