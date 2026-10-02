@@ -231,11 +231,12 @@ describe("Markdown conversion", () => {
 		expect(convert("> [!note]\n> Body").markdown).toBe('<aside class="callout callout-note">\n\nBody\n\n</aside>\n');
 	});
 
-	it("turns inline footnotes into numbered ones, defined at the end and converted like any line", () => {
+	it("turns inline footnotes into numbered ones with a hover text, defined at the end and converted like any line", () => {
 		const { markdown, errors } = convert("A^[An [[Other]] note] and B^[With [a](https://x.org) link].\n> [!quote] Q\n> Said^[Source].");
+		const tip = (n: number, text: string) => `<span class="fn">[^note-${n}]<span class="fn-tip" aria-hidden="true">${text}</span></span>`;
 		expect(errors).toEqual([]);
-		expect(markdown).toContain("A[^note-1] and B[^note-2].");
-		expect(markdown).toContain("Said[^note-3].");
+		expect(markdown).toContain(`A${tip(1, "An [Other](@/articles/other/index.md) note")} and B${tip(2, "With [a](https://x.org) link")}.`);
+		expect(markdown).toContain(`Said${tip(3, "Source")}.`);
 		expect(markdown.endsWith("\n\n[^note-1]: An [Other](@/articles/other/index.md) note\n[^note-2]: With [a](https://x.org) link\n[^note-3]: Source")).toBe(true);
 	});
 

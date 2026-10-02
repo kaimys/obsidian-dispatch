@@ -59,3 +59,15 @@ th, td { border: 1px solid var(--rule); padding: 0.3rem 0.6rem; vertical-align: 
 blockquote, .callout { margin: 1rem 0; padding: 0.25rem 1rem; border-left: 3px solid var(--accent); }
 .callout-title { font-weight: 600; }
 .testimonial blockquote { margin: 0; }
+
+/* A footnote's text above its number on hover or focus; touch screens follow the number to the list. */
+.fn { position: relative; }
+.fn-tip { display: none; }
+@media (hover: hover) {
+	.fn:hover .fn-tip, .fn:focus-within .fn-tip {
+		display: block; position: absolute; z-index: 10; bottom: calc(100% + 0.35rem); left: 50%; transform: translateX(-50%);
+		width: max-content; max-width: min(20rem, 80vw); padding: 0.5rem 0.75rem;
+		background: var(--bg); color: var(--fg); border: 1px solid var(--rule); border-radius: 6px;
+		font-size: 0.875rem; font-style: normal; line-height: 1.45;
+	}
+}

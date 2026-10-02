@@ -707,7 +707,7 @@ export function convertMarkdown(source, ctx) {
 		}
 		out.push(convertProse(part.text, first));
 	}
-	if (footnotes.length) out.push("", ...footnotes.map((f) => `[^${f.name}]: ${convertLine(f.text, f.line)}`));
+	if (footnotes.length) out.push("", ...footnotes.map((f) => `[^${f.name}]: ${f.text}`));
 	return { markdown: out.join("\n"), errors, assets: [...assets], diagrams };
 
 	function convertProse(text, first) {
@@ -735,14 +735,21 @@ export function convertMarkdown(source, ctx) {
 		return done.join("\n");
 	}
 
+	// A footnote's text also sits next to its number, shown on hover or focus, so a reader need
+	// not jump to the bottom. Screen readers skip it there and get the list at the end instead.
 	function proseLine(line, lineNo) {
-		return convertLine(ctx.github ? line : extractFootnotes(line, lineNo), lineNo);
+		if (ctx.github) return convertLine(line, lineNo);
+		const before = footnotes.length;
+		const done = convertLine(extractFootnotes(line, lineNo), lineNo);
+		return footnotes
+			.slice(before)
+			.reduce((text, f) => text.replace(`[^${f.name}]`, `<span class="fn">[^${f.name}]<span class="fn-tip" aria-hidden="true">${f.text}</span></span>`), done);
 	}
 
 	// Obsidian's inline footnote `^[text]` becomes a standard footnote `[^note-N]`, which Zola
-	// numbers and lists at the bottom of the page. Its text moves to a definition at the end of the
-	// body and is converted there like any line, so links in it are resolved and guarded too, with
-	// the line it came from. Code (a fence or an inline span) keeps `^[` literally.
+	// numbers and lists at the bottom of the page. Its text is converted once like any line, so
+	// links in it are resolved and guarded too, with the line it came from, and moves to a
+	// definition at the end of the body. Code (a fence or an inline span) keeps `^[` literally.
 	function extractFootnotes(line, lineNo) {
 		const masked = blankInlineCode(line);
 		let out = "";
@@ -767,7 +774,7 @@ export function convertMarkdown(source, ctx) {
 				break;
 			}
 			const name = `note-${footnotes.length + 1}`;
-			footnotes.push({ name, text: line.slice(at + 2, end).trim(), line: lineNo });
+			footnotes.push({ name, text: convertLine(line.slice(at + 2, end).trim(), lineNo) });
 			out += `${line.slice(i, at)}[^${name}]`;
 			i = end + 1;
 		}
