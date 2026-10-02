@@ -529,8 +529,8 @@ export function collectVault(wikiRoot, settings) {
 		const note = read("Home page.md");
 		const { title } = titleAndBody(note.data, note.body);
 		note.title = title;
-		guard(note, ["title", "eyebrow", "description", "requirements"]);
-		set.home = { eyebrow: note.data.eyebrow || "", title, lede: note.data.description || "", requirements: note.data.requirements || "", readMore: note.data.read_more || "" };
+		guard(note, ["title", "eyebrow", "description", "requirements", "read_more_label"]);
+		set.home = { eyebrow: note.data.eyebrow || "", title, lede: note.data.description || "", requirements: note.data.requirements || "", readMore: note.data.read_more || "", readMoreLabel: note.data.read_more_label || "" };
 		if (!title) set.errors.push(`${note.rel}:1: missing title (no title: and no # heading)`);
 	}
 
@@ -554,8 +554,11 @@ export function collectVault(wikiRoot, settings) {
 	if (set.home) {
 		const name = String(set.home.readMore).replace(/^\[\[|\]\]$/g, "").trim().toLowerCase();
 		const article = set.articles.find((a) => basename(a.rel, ".md").toLowerCase() === name);
-		set.home.read_more = article ? { url: `articles/${article.slug}/`, title: article.title } : undefined;
+		// The button says "Read <title>" unless the note gives a shorter label for a long title.
+		const label = String(set.home.readMoreLabel).trim() || (article && `Read ${article.title}`);
+		set.home.read_more = article ? { url: `articles/${article.slug}/`, title: article.title, label } : undefined;
 		delete set.home.readMore;
+		delete set.home.readMoreLabel;
 	}
 
 	if (existsSync(join(root, "FAQ.md"))) {
@@ -677,6 +680,7 @@ export function convertMarkdown(source, ctx) {
 	const anchors = new Map();
 	const fail = (line, message) => errors.push(`${ctx.file}:${line}: ${message}`);
 	const out = [];
+	const footnotes = [];
 
 	for (const part of segments(body)) {
 		const first = (ctx.line ?? 1) + part.line;
@@ -703,6 +707,7 @@ export function convertMarkdown(source, ctx) {
 		}
 		out.push(convertProse(part.text, first));
 	}
+	if (footnotes.length) out.push("", ...footnotes.map((f) => `[^${f.name}]: ${convertLine(f.text, f.line)}`));
 	return { markdown: out.join("\n"), errors, assets: [...assets], diagrams };
 
 	function convertProse(text, first) {
@@ -711,19 +716,62 @@ export function convertMarkdown(source, ctx) {
 		for (let i = 0; i < lines.length; i++) {
 			const callout = /^>\s*\[!(\w+)\][-+]?\s*(.*)$/.exec(lines[i]);
 			if (callout && !ctx.github) {
+				// A callout is an HTML block around ordinary Markdown, not a shortcode: its body is
+				// then part of the page, so a footnote in a quote numbers on with the page's and its
+				// definition joins theirs at the bottom. Blank lines around the body let Markdown
+				// render inside the block; the markup is the design's.
+				const start = i;
 				const inner = [];
 				while (i + 1 < lines.length && /^>/.test(lines[i + 1])) inner.push(lines[++i].replace(/^>\s?/, ""));
 				// No written title stays untitled, so the site's text matches what the note says.
 				const title = callout[2].trim();
-				const args = `type="${callout[1].toLowerCase()}", title=${teraString(title)}`;
-				// Zola rejects a body shortcode with an empty body, so a title-only callout is inline.
-				if (inner.join("").trim()) done.push(`{% callout(${args}) %}`, convertLine(inner.join("\n"), first + i - inner.length), "{% end %}");
-				else done.push(`{{ callout(${args}) }}`);
+				done.push(`<aside class="callout callout-${callout[1].toLowerCase()}">`);
+				if (title) done.push(`<p class="callout-title">${escapeHtml(title)}</p>`);
+				done.push("", ...inner.map((l, k) => proseLine(l, first + start + 1 + k)), "", "</aside>", "");
 				continue;
 			}
-			done.push(convertLine(lines[i], first + i));
+			done.push(proseLine(lines[i], first + i));
 		}
 		return done.join("\n");
+	}
+
+	function proseLine(line, lineNo) {
+		return convertLine(ctx.github ? line : extractFootnotes(line, lineNo), lineNo);
+	}
+
+	// Obsidian's inline footnote `^[text]` becomes a standard footnote `[^note-N]`, which Zola
+	// numbers and lists at the bottom of the page. Its text moves to a definition at the end of the
+	// body and is converted there like any line, so links in it are resolved and guarded too, with
+	// the line it came from. Code (a fence or an inline span) keeps `^[` literally.
+	function extractFootnotes(line, lineNo) {
+		const masked = blankInlineCode(line);
+		let out = "";
+		let i = 0;
+		while (i < line.length) {
+			const at = masked.indexOf("^[", i);
+			if (at < 0) {
+				out += line.slice(i);
+				break;
+			}
+			let depth = 0;
+			let end = -1;
+			for (let j = at + 1; j < masked.length; j++) {
+				if (masked[j] === "[") depth++;
+				else if (masked[j] === "]" && --depth === 0) {
+					end = j;
+					break;
+				}
+			}
+			if (end < 0) {
+				out += line.slice(i);
+				break;
+			}
+			const name = `note-${footnotes.length + 1}`;
+			footnotes.push({ name, text: line.slice(at + 2, end).trim(), line: lineNo });
+			out += `${line.slice(i, at)}[^${name}]`;
+			i = end + 1;
+		}
+		return out;
 	}
 
 	function convertLine(line, lineNo) {
@@ -855,12 +903,6 @@ export function convertMarkdown(source, ctx) {
 		}
 		return result;
 	}
-}
-
-/** A Tera string literal: Tera has no escapes, so pick a delimiter the text does not contain. */
-export function teraString(text) {
-	const delimiter = ['"', "'", "`"].find((d) => !String(text).includes(d));
-	return delimiter ? `${delimiter}${text}${delimiter}` : `"${String(text).replace(/"/g, "”")}"`;
 }
 
 export function escapeHtml(text) {

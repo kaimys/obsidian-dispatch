@@ -145,6 +145,8 @@ a:hover { text-decoration-thickness: 2px; }
 
 /* ---------- Buttons ---------- */
 .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 2rem; }
+/* A button moves to the next row whole instead of breaking its label; only one wider than the screen wraps. */
+.actions .btn { flex-shrink: 0; max-width: 100%; }
 .btn {
 	display: inline-flex; align-items: center; gap: .5em; min-height: 2.75rem;
 	padding: .6rem 1.1rem; border-radius: 7px; border: 1px solid var(--accent);

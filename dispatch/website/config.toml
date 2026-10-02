@@ -12,6 +12,11 @@ theme = "dispatch-starter"
 compile_sass = false
 build_search_index = false
 
+[markdown]
+# A note's inline footnotes (`^[…]`) become numbered ones; list them all at the end of the page,
+# below any callout that holds one, rather than where each definition stands.
+bottom_footnotes = true
+
 [extra]
 repository = "https://github.com/kaimys/obsidian-dispatch"
 directory = "https://community.obsidian.md/plugins/dispatch"

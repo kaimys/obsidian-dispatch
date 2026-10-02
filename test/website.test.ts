@@ -31,7 +31,6 @@ import {
 	segments,
 	stage,
 	summaryOf,
-	teraString,
 	titleAndBody,
 	withoutComments,
 } from "../dispatch/scripts/website.mjs";
@@ -205,7 +204,7 @@ describe("Markdown conversion", () => {
 		expect(markdown).toContain("![Rel](pic.png) [Other](@/articles/other/index.md)");
 		expect(markdown).toContain("<mark>hi</mark>");
 		expect(markdown).not.toContain("hidden");
-		expect(markdown).toContain('{% callout(type="tip", title="Title") %}\nBody\n{% end %}');
+		expect(markdown).toContain('<aside class="callout callout-tip">\n<p class="callout-title">Title</p>\n\nBody\n\n</aside>');
 		expect(used).toEqual(["assets/pic.png"]);
 	});
 
@@ -226,9 +225,25 @@ describe("Markdown conversion", () => {
 		expect(headingSlug("The `google` block — optional Meet transcript import")).toBe("the-google-block--optional-meet-transcript-import");
 	});
 
-	it("makes a title-only callout an inline shortcode, since Zola rejects an empty body", () => {
-		expect(convert("> [!quote] Only a title\n\nNext").markdown).toBe('{{ callout(type="quote", title="Only a title") }}\n\nNext');
-		expect(teraString('He said "no"')).toBe("'He said \"no\"'");
+	it("makes a callout an HTML block around Markdown, escaping its title and leaving none unwritten", () => {
+		expect(convert("> [!quote] Only a title\n\nNext").markdown).toBe('<aside class="callout callout-quote">\n<p class="callout-title">Only a title</p>\n\n\n</aside>\n\n\nNext');
+		expect(convert('> [!note] He said "<no>"\n> Body').markdown).toContain('<p class="callout-title">He said &quot;&lt;no&gt;&quot;</p>');
+		expect(convert("> [!note]\n> Body").markdown).toBe('<aside class="callout callout-note">\n\nBody\n\n</aside>\n');
+	});
+
+	it("turns inline footnotes into numbered ones, defined at the end and converted like any line", () => {
+		const { markdown, errors } = convert("A^[An [[Other]] note] and B^[With [a](https://x.org) link].\n> [!quote] Q\n> Said^[Source].");
+		expect(errors).toEqual([]);
+		expect(markdown).toContain("A[^note-1] and B[^note-2].");
+		expect(markdown).toContain("Said[^note-3].");
+		expect(markdown.endsWith("\n\n[^note-1]: An [Other](@/articles/other/index.md) note\n[^note-2]: With [a](https://x.org) link\n[^note-3]: Source")).toBe(true);
+	});
+
+	it("guards a footnote's text with the line it came from, and leaves code and docs alone", () => {
+		expect(convert("Intro\n\nSee^[[[Missing]]]").errors).toEqual(["a.md:3: [[Missing]] links to a page that is not published"]);
+		expect(convert("`x^[y]` and ```^[z]```").markdown).toBe("`x^[y]` and ```^[z]```");
+		expect(convert("Unclosed ^[note").markdown).toBe("Unclosed ^[note");
+		expect(convert("A^[b]", { github: true, dir: "" }).markdown).toBe("A^[b]");
 	});
 
 	it("renders a Mermaid block as a figure with its accTitle as alt text and accDescr as description", () => {
@@ -396,7 +411,7 @@ describe("the clean fixture vault", () => {
 			title: "A pitch in one line",
 			lede: "The lede: it says what Dispatch does.",
 			requirements: "Desktop only.",
-			read_more: { url: "articles/getting-started/", title: "Getting started" },
+			read_more: { url: "articles/getting-started/", title: "Getting started", label: "Read Getting started" },
 		});
 	});
 
