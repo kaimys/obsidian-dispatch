@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>6 reasons why you need a wiki for your LLM — Dispatch</title>
+<meta name="description" content="What would you send an alien pen pal on Proxima Centauri 4 light years away to explain humanity?">
+<meta name="color-scheme" content="light dark">
+<base href="https://kaimys.github.io/obsidian-dispatch/articles/6-reasons-why-the-llm-wiki-works/">
+
+<link rel="stylesheet" href="https://kaimys.github.io/obsidian-dispatch/style.css">
+<link rel="preload" href="https://kaimys.github.io/obsidian-dispatch/fonts/DispatchOCR.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.ico" sizes="32x32">
+<link rel="icon" href="https://kaimys.github.io/obsidian-dispatch/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://kaimys.github.io/obsidian-dispatch/apple-touch-icon.png">
+</head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="https://kaimys.github.io/obsidian-dispatch/"><span>Dispatch</span><span aria-hidden="true">&#9655;</span><span class="visually-hidden">— Home</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/articles/" aria-current="page">Articles</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/docs/overview/">Documentation</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/releases/">Releases</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/faq/">FAQ</a></li>
+        <li><a class="nav-github" href="https://github.com/kaimys/obsidian-dispatch" aria-label="Dispatch on GitHub" title="Dispatch on GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="content" tabindex="-1">
+
+<article class="wrap">
+  <header class="page-head">
+    <p class="breadcrumb"><a href="https://kaimys.github.io/obsidian-dispatch/articles/">Articles</a></p>
+    <h1>6 reasons why you need a wiki for your LLM</h1>
+    <p class="description">What would you send an alien pen pal on Proxima Centauri 4 light years away to explain humanity?</p>
+    <p class="meta"><time datetime="2026-10-09">2026-10-09</time> · Kai Mysliwiec</p>
+  </header>
+  <figure class="teaser article-teaser teaser-cover"><img src="https://kaimys.github.io/obsidian-dispatch/processed_images/Greetings_earthling.78fd6d8c1b3621e9.webp" srcset="https://kaimys.github.io/obsidian-dispatch/processed_images/Greetings_earthling.1e4fad42901cbe1a.webp 336w, https://kaimys.github.io/obsidian-dispatch/processed_images/Greetings_earthling.14d15ffbdf21ccae.webp 672w, https://kaimys.github.io/obsidian-dispatch/processed_images/Greetings_earthling.78fd6d8c1b3621e9.webp 1344w" sizes="(max-width: 46rem) calc(100vw - 2rem), 42rem" alt="" width="4071" height="2290"></figure>
+  <div class="prose">
+<p>Imagine you have an alien pen pal on Proxima Centauri 4 light years away, and they ask you to send them one URL to learn all about humanity. What would you send them? I guess you would send them Wikipedia, because most of our knowledge is collected there in a way that is fairly easy to understand. It’s not all our knowledge, but it is the best possible start. The LLM Wiki<span class="fn"><sup class="footnote-reference" id="fr-note-1-1"><a href="#fn-note-1">1</a></sup><span class="fn-tip" aria-hidden="true" inert>An LLM Wiki is a collection of linked notes that an AI reads and keeps up to date.</span></span> idea of Andrej Karpathy is the same thing for your software project, and the alien is the LLM.</p>
+<p>The original <a rel="external" href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f">gist of Andrej Karpathy</a><span class="fn"><sup class="footnote-reference" id="fr-note-2-1"><a href="#fn-note-2">2</a></sup><span class="fn-tip" aria-hidden="true" inert>A gist is a short text or piece of code shared on GitHub.</span></span> hardly mentions how to use an LLM Wiki in a team. I would argue that the LLM Wiki is especially well suited to teams, for these 6 reasons.</p>
+<p>I'm writing from experience: our team built <a href="https://kaimys.github.io/obsidian-dispatch/articles/elternkraft/">Elternkraft</a> on an LLM Wiki, and the process we developed along the way became Dispatch, a free, open-source board for Obsidian<span class="fn"><sup class="footnote-reference" id="fr-note-3-1"><a href="#fn-note-3">3</a></sup><span class="fn-tip" aria-hidden="true" inert>Obsidian is a free Markdown editor that turns a folder of notes on your computer into a linked wiki.</span></span> that gives a team its workflow around the wiki.</p>
+<h2 id="1-a-shared-knowledge-base">1. A shared knowledge base<a class="zola-anchor" href="#1-a-shared-knowledge-base" aria-label="Anchor link for: 1-a-shared-knowledge-base">#</a></h2>
+<p>The LLM can only make the right decisions if it has the right context.<span class="fn"><sup class="footnote-reference" id="fr-note-4-1"><a href="#fn-note-4">4</a></sup><span class="fn-tip" aria-hidden="true" inert>Context is the background the AI needs to answer well, such as your notes or earlier decisions.</span></span> If every team member works on their own, the LLM will store the generated documents and memories in local folders. Only one user can benefit from this knowledge. If these documents are shared through the LLM Wiki, every member and every LLM can benefit from them. It gives the entire team the ability to define the goals, the means and the things to avoid, so the LLM can derive its conclusions from them.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>With legal documents like the terms of use and the privacy declaration in the wiki, the LLM can warn you if a new feature violates them. It can also suggest changes to these documents to enable these features.</li>
+<li>An industry news report can warn you about upcoming regulatory obligations and suggest creating a new ticket for it or putting that topic on the agenda of the next weekly sync.</li>
+<li>Decisions made in meetings can have effects on upcoming tickets.</li>
+</ul>
+<h2 id="2-accelerate-product-and-project-management">2. Accelerate product and project management<a class="zola-anchor" href="#2-accelerate-product-and-project-management" aria-label="Anchor link for: 2-accelerate-product-and-project-management">#</a></h2>
+<p>Developers use Git<span class="fn"><sup class="footnote-reference" id="fr-note-5-1"><a href="#fn-note-5">5</a></sup><span class="fn-tip" aria-hidden="true" inert>Git is the tool developers use to track changes to code and combine the work of several people.</span></span> to synchronize the code between workstations, test and production environments. The LLM Wiki can do the same for product and project managers when they must sync information between tickets, emails, Slack, meetings, documents and presentations.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>Update tickets with decisions made in a meeting</li>
+<li>Distribute meeting notes via email and Slack</li>
+<li>Nudge stakeholders on urgent open questions on Slack to advance with a ticket</li>
+<li>Update the estimation for MVP<span class="fn"><sup class="footnote-reference" id="fr-note-6-1"><a href="#fn-note-6">6</a></sup><span class="fn-tip" aria-hidden="true" inert>An MVP (minimum viable product) is the smallest version of a product that is worth releasing to real users.</span></span> readiness based on completed and new tickets</li>
+</ul>
+<h2 id="3-create-workflows-without-coding">3. Create workflows without coding<a class="zola-anchor" href="#3-create-workflows-without-coding" aria-label="Anchor link for: 3-create-workflows-without-coding">#</a></h2>
+<p>Skills for Claude Code or Codex<span class="fn"><sup class="footnote-reference" id="fr-note-7-1"><a href="#fn-note-7">7</a></sup><span class="fn-tip" aria-hidden="true" inert>Claude Code and Codex are AI coding assistants by Anthropic and OpenAI. A skill is a written set of instructions that teaches them a workflow.</span></span> are just <a rel="external" href="https://markdown.org/">Markdown files</a>, like the pages in the wiki. You can define a new workflow or skill by writing all steps on a wiki page and then pointing your LLM to this page. You don't share only the content but also the workflow with the team.</p>
+<p>You can leave instructions for the LLM in the document itself. For example, you can add the resources and the prompt<span class="fn"><sup class="footnote-reference" id="fr-note-8-1"><a href="#fn-note-8">8</a></sup><span class="fn-tip" aria-hidden="true" inert>A prompt is the request you type to the AI.</span></span> you used to create the document in a paragraph of the document, and then just ask the LLM to update the document. There is even a way to inline a prompt and attach it to a button, so you don't even need to type.<span class="fn"><sup class="footnote-reference" id="fr-note-9-1"><a href="#fn-note-9">9</a></sup><span class="fn-tip" aria-hidden="true" inert>An inline prompt is an instruction to the AI written into the wiki page itself, such as "List this week's meetings here". The AI follows it whenever it updates the page.</span></span></p>
+<figure>
+<img src="inline-prompt.png" alt="A Mermaid graph of plugin downloads on a wiki page, with an inline prompt button below it">
+</figure>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>The screenshot above shows a wiki page with a Mermaid<span class="fn"><sup class="footnote-reference" id="fr-note-10-1"><a href="#fn-note-10">10</a></sup><span class="fn-tip" aria-hidden="true" inert>Mermaid draws diagrams and charts from a few lines of text inside a Markdown page.</span></span> graph of the downloads of Obsidian plugins similar to Dispatch. The button below the graph runs a prompt that updates it from the live sources.</li>
+<li>Add an inline prompt to the end of the Open Questions paragraph: <em>Guide me through all open questions of this ticket</em>. You can then discuss each question with the LLM one by one.</li>
+<li>Manually going through tests in a test plan is often a very tedious task. With the same guide-me technique the LLM will generate test data for each test and you will rush through the test plan.</li>
+</ul>
+<h2 id="4-the-llm-will-maintain-the-wiki-for-you">4. The LLM will maintain the wiki for you<a class="zola-anchor" href="#4-the-llm-will-maintain-the-wiki-for-you" aria-label="Anchor link for: 4-the-llm-will-maintain-the-wiki-for-you">#</a></h2>
+<p>You might think it’s tedious to maintain a wiki, and you might know a lot of outdated corporate wikis which contain so much stale documentation that reading them is a waste of time. That may have been true in the past, but you will rarely update the pages yourself – the LLM will do that for you.</p>
+<aside class="callout callout-quote">
+<p class="callout-title">Yuval Noah Harari</p>
+<p>They love bureaucracy, whereas we feel suffocated often by bureaucracy. For AIs, bureaucracy is oxygen.
+— <a rel="external" href="https://www.youtube.com/watch?v=hBtVGwuJzpk">Tanner Lecture at Oxford</a></p>
+</aside>
+<p>The LLM is the perfect bureaucrat for this job.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>You won’t write the tickets yourself. Just give the /create-ticket skill a few lines of context and it will write the rest for you. No more clerical Scrum<span class="fn"><sup class="footnote-reference" id="fr-note-11-1"><a href="#fn-note-11">11</a></sup><span class="fn-tip" aria-hidden="true" inert>Scrum is a popular way of organizing software teams in short work cycles called sprints.</span></span> work.</li>
+<li>Inconsistencies, outdated pages and unlinked references can be fixed by the LLM.</li>
+</ul>
+<h2 id="5-the-llm-wiki-is-fast">5. The LLM Wiki is fast<a class="zola-anchor" href="#5-the-llm-wiki-is-fast" aria-label="Anchor link for: 5-the-llm-wiki-is-fast">#</a></h2>
+<p>A common approach is to add context to the LLM using MCP servers. MCP stands for Model Context Protocol,<span class="fn"><sup class="footnote-reference" id="fr-note-12-1"><a href="#fn-note-12">12</a></sup><span class="fn-tip" aria-hidden="true" inert>MCP is a standard way to connect an AI to other services, such as your ticket system.</span></span> and there are MCP servers for almost all ticket systems like Asana or Jira. The catch with MCP is that it's slow compared to a file read or a file write. If you have multiple MCP servers for different sources, your LLM must know which one to use for which information, or it might miss some important information and it can even bloat your context window.<span class="fn"><sup class="footnote-reference" id="fr-note-13-1"><a href="#fn-note-13">13</a></sup><span class="fn-tip" aria-hidden="true" inert>The context window is the amount of text an AI can take into account at once. What fills it up leaves less room for your actual task.</span></span> Jediah Katz of Cursor <a rel="external" href="https://cursor.com/blog/dynamic-context-discovery">wrote recently about this</a>.</p>
+<p>The LLM Wiki is simple in this regard. Its premise is that all information is stored locally on your hard drive, and the LLM only has to follow the links or do a full-text search with the Obsidian CLI.<span class="fn"><sup class="footnote-reference" id="fr-note-14-1"><a href="#fn-note-14">14</a></sup><span class="fn-tip" aria-hidden="true" inert>A CLI (command-line interface) is a way to control a program by typing commands instead of clicking.</span></span> With the LLM Wiki approach you would rather download and upload tickets and wiki pages than look them up every time you need them.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>MCP is for syncing the wiki with tickets, local files are for reading and writing for the LLM</li>
+<li>Keep a copy of your website in the form of Markdown files in your wiki</li>
+<li>Sync your GitHub issues and pages with the GitHub CLI</li>
+</ul>
+<h2 id="6-the-llm-wiki-works-best-for-remote-teams">6. The LLM Wiki works best for remote teams<a class="zola-anchor" href="#6-the-llm-wiki-works-best-for-remote-teams" aria-label="Anchor link for: 6-the-llm-wiki-works-best-for-remote-teams">#</a></h2>
+<p>Remote is still the standard in most software development teams. That’s good for our LLM colleagues. If every interaction between team members is digital (Slack, email or meetings), an LLM can access the data and use it. This is not so easy for on-site teams. There is a lot of communication across the desk and in meeting rooms. The agent<span class="fn"><sup class="footnote-reference" id="fr-note-15-1"><a href="#fn-note-15">15</a></sup><span class="fn-tip" aria-hidden="true" inert>An agent is an AI that carries out tasks on its own, such as editing files or running commands.</span></span> can't access these channels and is always lagging behind. You can record on-site meetings, but it will be hard to assign the right speaker to each part of the transcript.</p>
+<h2 id="the-best-interface-for-humans-and-alien-llms">The best interface for humans and alien LLMs<a class="zola-anchor" href="#the-best-interface-for-humans-and-alien-llms" aria-label="Anchor link for: the-best-interface-for-humans-and-alien-llms">#</a></h2>
+<p>My conclusion is that a wiki is the best way to store knowledge about your project and your team and make it available for an alien LLM. Otherwise your alien friend would only know what you have typed in the small input field at the bottom of your chat window.</p>
+<p>At the beginning, building it up takes extra effort, but as you keep working on it you can hand over more and more of your daily tasks to the LLM.</p>
+<h2 id="what-is-missing">What is missing?<a class="zola-anchor" href="#what-is-missing" aria-label="Anchor link for: what-is-missing">#</a></h2>
+<p>The code repository is one part, and the wiki is the other. But how do you glue these two parts together? One answer to this question is skills or commands, which usually reside in the <code>.claude/commands</code> or <code>.codex/skills</code> folder. These skills are for planning, developing or reviewing the code, and they must be aware of the wiki and know when to read or write it. The other answer is Dispatch, which gives users the right process and UI to manage the development process and update the wiki. The prepared skills also rely on a common directory structure which is optimized for the workflow.</p>
+<p>If you want to dive deeper, I recommend reading <a href="https://kaimys.github.io/obsidian-dispatch/articles/dispatch-101/">Dispatch 101</a>, which describes this in detail, or ask me to give you and your team a short introduction to Dispatch. <a rel="external" href="https://www.linkedin.com/in/kaimysliwiec/">DM me on LinkedIn</a> or <a href="mailto:kai@eightnine.de">email</a> me for the free starter package which includes a 30-minute introduction, help with the initial setup, support via Slack and a review after 6 weeks.</p>
+<p><em>Kai Mysliwiec</em></p>
+<p><strong>Further reading:</strong></p>
+<ul>
+<li><a href="https://kaimys.github.io/obsidian-dispatch/articles/dispatch-101/">Dispatch 101</a> for a technical introduction</li>
+<li><a href="https://kaimys.github.io/obsidian-dispatch/articles/elternkraft/">Elternkraft - the origins of Dispatch</a>, a customer success story</li>
+</ul>
+<section class="footnotes">
+<ol class="footnotes-list">
+<li id="fn-note-1">
+<p>An LLM Wiki is a collection of linked notes that an AI reads and keeps up to date. <a href="#fr-note-1-1">↩</a></p>
+</li>
+<li id="fn-note-2">
+<p>A gist is a short text or piece of code shared on GitHub. <a href="#fr-note-2-1">↩</a></p>
+</li>
+<li id="fn-note-3">
+<p>Obsidian is a free Markdown editor that turns a folder of notes on your computer into a linked wiki. <a href="#fr-note-3-1">↩</a></p>
+</li>
+<li id="fn-note-4">
+<p>Context is the background the AI needs to answer well, such as your notes or earlier decisions. <a href="#fr-note-4-1">↩</a></p>
+</li>
+<li id="fn-note-5">
+<p>Git is the tool developers use to track changes to code and combine the work of several people. <a href="#fr-note-5-1">↩</a></p>
+</li>
+<li id="fn-note-6">
+<p>An MVP (minimum viable product) is the smallest version of a product that is worth releasing to real users. <a href="#fr-note-6-1">↩</a></p>
+</li>
+<li id="fn-note-7">
+<p>Claude Code and Codex are AI coding assistants by Anthropic and OpenAI. A skill is a written set of instructions that teaches them a workflow. <a href="#fr-note-7-1">↩</a></p>
+</li>
+<li id="fn-note-8">
+<p>A prompt is the request you type to the AI. <a href="#fr-note-8-1">↩</a></p>
+</li>
+<li id="fn-note-9">
+<p>An inline prompt is an instruction to the AI written into the wiki page itself, such as "List this week's meetings here". The AI follows it whenever it updates the page. <a href="#fr-note-9-1">↩</a></p>
+</li>
+<li id="fn-note-10">
+<p>Mermaid draws diagrams and charts from a few lines of text inside a Markdown page. <a href="#fr-note-10-1">↩</a></p>
+</li>
+<li id="fn-note-11">
+<p>Scrum is a popular way of organizing software teams in short work cycles called sprints. <a href="#fr-note-11-1">↩</a></p>
+</li>
+<li id="fn-note-12">
+<p>MCP is a standard way to connect an AI to other services, such as your ticket system. <a href="#fr-note-12-1">↩</a></p>
+</li>
+<li id="fn-note-13">
+<p>The context window is the amount of text an AI can take into account at once. What fills it up leaves less room for your actual task. <a href="#fr-note-13-1">↩</a></p>
+</li>
+<li id="fn-note-14">
+<p>A CLI (command-line interface) is a way to control a program by typing commands instead of clicking. <a href="#fr-note-14-1">↩</a></p>
+</li>
+<li id="fn-note-15">
+<p>An agent is an AI that carries out tasks on its own, such as editing files or running commands. <a href="#fr-note-15-1">↩</a></p>
+</li>
+</ol>
+</section>
+
+  </div>
+  <footer class="article-foot">
+    <a href="https://kaimys.github.io/obsidian-dispatch/articles/">&larr; All articles</a>
+    <a href="https://github.com/kaimys/obsidian-dispatch/issues">Give feedback on GitHub</a>
+  </footer>
+</article>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dispatch — an open-source plugin for Obsidian by Kai Mysliwiec.</p>
+    <nav aria-label="Legal and source">
+      <ul>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/privacy/">Privacy Policy</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/terms/">Terms of Service</a></li>
+        <li><a href="https://kaimys.github.io/obsidian-dispatch/legal/impressum/" hreflang="de">Impressum</a></li>
+        <li><a href="https://github.com/kaimys/obsidian-dispatch">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>
