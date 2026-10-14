@@ -21,3 +21,6 @@ Thumbs.db
 
 # website staging: converted vault content and built output, never committed (ADR-0039)
 /dispatch/website/.build/
+
+# graphify knowledge graph — holds wiki content, so it stays local
+/graphify-out/
