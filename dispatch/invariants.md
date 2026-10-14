@@ -128,8 +128,15 @@ Obsidian writes a plugin's `data.json` beside its `main.js`, so two vaults linke
 checkout silently share one board's configuration ([[ADR-0026]]).
 
 - **Tickets** `dispatch/wiki/05_Requirements/Tickets` — columns
-  `Backlog → Refinement → In progress → Review → Done → Released`, plus `Rejected` (excluded from
-  progress). **`Done` and `Released` both carry `progress: 100`, and only `Done` stamps
+  `Discovery → Planned → Backlog → Refinement → In progress → Review → Done → Released`, plus
+  `Rejected` (excluded from progress). The first three sort by commitment, and `version_target`
+  follows them: **`Discovery`** is an idea that may never be built (where a new ticket starts),
+  **`Planned`** will be built but has no release, **`Backlog`** is planned for one of the next
+  one or two releases. The Release Plan carries only the next two or three versions; every other
+  ticket carries a **roadmap topic** in `version_target` instead (`ACP`, `Foundations`,
+  `Marketing`, `Module System`, `Workflow` — the milestones of `02_Product/Mission and Roadmap.md`), which the
+  board shows as a label column. A topic is not a release: `/refine` and `/release` want a
+  version. **`Done` and `Released` both carry `progress: 100`, and only `Done` stamps
   `completed:`** — so the forecast measures throughput rather than release cadence. `Released` is
   *not* excluded, and the distinction is load-bearing: `excluded` means *not part of this version*
   (`Rejected`), which drops the card from the progress bar's denominator as well as its numerator.
@@ -159,7 +166,8 @@ checkout silently share one board's configuration ([[ADR-0026]]).
   because closed on GitHub means shipped. The same script
   mirrors `version_target` onto the issue as a **GitHub milestone** of the same name, creating
   it on first use: per patch version (not per major.minor line, so one board column can span
-  several milestones), never with a due date, and an empty `version_target` skips the step
+  several milestones) — and a roadmap topic becomes a milestone of its own name the same way,
+  never with a due date, and an empty `version_target` skips the step
   rather than un-assigning. **It only runs on a status drag** — the Milestones tab writes
   `version_target` without firing automations — by a drag or by a header retarget of a whole
   line — so a card moved between version columns is not mirrored until its status next changes. Closing a milestone belongs to `/release`.

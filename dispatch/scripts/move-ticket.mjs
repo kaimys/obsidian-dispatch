@@ -239,7 +239,7 @@ function plan(to) {
 			argv: ["issue", "close", "--reason", "not planned"],
 		};
 	}
-	// Backlog / Refinement / In progress / Review / Done all mean "still open".
+	// Discovery / Planned / Backlog / Refinement / In progress / Review / Done all mean "still open".
 	return { state: "OPEN", done: "reopened", argv: ["issue", "reopen"] };
 }
 
