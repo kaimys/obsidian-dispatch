@@ -31,13 +31,15 @@ export function isVersionLine(key: string): boolean {
 }
 
 /**
- * Special (non-version) columns like "Rejected" or "Icebox" sort leftmost, in
- * their plannedVersions order; semver columns follow, ascending.
+ * Semver columns sort first, ascending; special (non-version) columns like
+ * "Icebox" or a roadmap topic follow, in their plannedVersions order — so the
+ * near releases read left to right and the parked labels sit beside
+ * "(no version)".
  */
 export function compareMilestoneColumns(a: MilestoneColumn, b: MilestoneColumn): number {
 	const pa = a.key.match(/^(\d+)\.(\d+)$/);
 	const pb = b.key.match(/^(\d+)\.(\d+)$/);
-	if (!pa !== !pb) return pa ? 1 : -1;
+	if (!pa !== !pb) return pa ? -1 : 1;
 	if (pa && pb) return Number(pa[1]) - Number(pb[1]) || Number(pa[2]) - Number(pb[2]);
 	return a.order - b.order || a.key.localeCompare(b.key);
 }

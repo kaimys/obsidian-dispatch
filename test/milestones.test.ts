@@ -91,11 +91,16 @@ describe("which line columns exist", () => {
 		expect(buildLineColumns([], ["v0.4.0"], ["v0.4.0", "v0.6.0"]).map((c) => c.key)).toEqual(["0.4"]);
 	});
 
-	it("keeps special labels leftmost in planned order, writing their planned spelling", () => {
+	it("puts special labels after the version lines, in planned order, writing their planned spelling", () => {
 		const cols = lines(["v1.0.0", "Icebox", "Later"], ["v0.3.0", "Parked"]);
-		expect(cols.map((c) => c.key)).toEqual(["Icebox", "Later", "Parked", "0.3", "1.0"]);
+		expect(cols.map((c) => c.key)).toEqual(["0.3", "1.0", "Icebox", "Later", "Parked"]);
 		expect(cols.find((c) => c.key === "Icebox")?.writeValue).toBe("Icebox");
 		expect(cols.find((c) => c.key === "Parked")?.writeValue).toBe("Parked");
+	});
+
+	it("puts planned labels in roadmap order before discovered labels, which sort alphabetically", () => {
+		const cols = lines(["Workflow", "v0.5.0", "ACP"], ["Zeta", "v0.4.0", "Alpha"]);
+		expect(cols.map((c) => c.key)).toEqual(["0.4", "0.5", "Workflow", "ACP", "Alpha", "Zeta"]);
 	});
 
 	it("sorts version lines numerically", () => {
